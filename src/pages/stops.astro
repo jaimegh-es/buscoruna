@@ -110,6 +110,15 @@ import Layout from '../layouts/Layout.astro';
 	      return;
 	    }
 
+      const lines = catalog.actualizacion.lineas || [];
+      const lineMap = lines.reduce((acc: any, line: any) => {
+        acc[line.id] = {
+          name: line.lin_comer,
+          color: line.color
+        };
+        return acc;
+      }, {});
+
 	    const nearby = stops
 	      .map((s: any) => ({
 	        ...s,
@@ -120,13 +129,21 @@ import Layout from '../layouts/Layout.astro';
 
 	    container.innerHTML = `
 	      <div class="stops-list">
-	        ${nearby.map((s: any) => `
+	        ${nearby.map((s: any, index) => `
 	          <a href="/stop/${s.id}" class="card stop-card-link">
+              <div class="stop-badge">${index + 1}</div>
 	            <div class="stop-info">
-	              <strong>${s.nombre}</strong>
-	              <small>${filterQuery ? `Parada ${s.id}` : `A ${Math.round(s.dist)} metros`}</small>
+	              <div class="stop-name-row">
+                  <strong>${s.nombre}</strong>
+                  <span class="stop-distance">${Math.round(s.dist)}m</span>
+                </div>
+	              <small>Parada ${s.id}</small>
 	              <div class="stop-lines">
-	                ${s.enlaces.slice(0, 5).map((l: any) => `<span class="line-tag">${l}</span>`).join('')}
+	                ${s.enlaces.map((lId: any) => {
+                    const lineInfo = lineMap[lId];
+                    if (!lineInfo) return '';
+                    return `<span class="line-tag" style="background-color: #${lineInfo.color}">${lineInfo.name}</span>`;
+                  }).join('')}
 	              </div>
 	            </div>
 	            <div class="stop-arrow">→</div>
@@ -137,9 +154,16 @@ import Layout from '../layouts/Layout.astro';
 
       // @ts-ignore
       const bounds = L.latLngBounds([[lat, lon]]);
-      nearby.forEach(s => {
+      nearby.forEach((s, index) => {
         // @ts-ignore
-        const m = L.marker([s.posy, s.posx]).addTo(map).bindPopup(s.nombre);
+        const customIcon = L.divIcon({
+          html: `<div class="map-stop-marker"><span>${index + 1}</span></div>`,
+          className: 'custom-stop-icon',
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        });
+        // @ts-ignore
+        const m = L.marker([s.posy, s.posx], { icon: customIcon }).addTo(map).bindPopup(s.nombre);
         markers.push(m);
         bounds.extend([s.posy, s.posx]);
       });
@@ -233,7 +257,7 @@ import Layout from '../layouts/Layout.astro';
 
   .stop-card-link {
     display: flex;
-    justify-content: space-between;
+    gap: 1rem;
     align-items: center;
     padding: 1rem;
     margin-bottom: 1rem;
@@ -246,9 +270,80 @@ import Layout from '../layouts/Layout.astro';
     transform: scale(0.98);
   }
 
+  .stop-badge {
+    background: var(--primary);
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    flex-shrink: 0;
+    font-size: 0.9rem;
+  }
+
+  .stop-info {
+    flex-grow: 1;
+    min-width: 0;
+  }
+
+  .stop-name-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+
+  .stop-name-row strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .stop-distance {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .stop-lines {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 0.5rem;
+  }
+
+  .line-tag {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: white;
+    font-weight: bold;
+    min-width: 24px;
+    text-align: center;
+  }
+
   .stop-arrow {
     font-size: 1.5rem;
     color: #ccc;
     font-weight: 300;
+  }
+
+  /* Map Markers */
+  .map-stop-marker {
+    background: var(--primary);
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
   }
 </style>
