@@ -68,6 +68,8 @@ import Layout from '../../layouts/Layout.astro';
 
       // Refresh ETAs every 30s
       setInterval(fetchETAs, 30000);
+
+      window.addEventListener('request-refresh', fetchETAs);
     }
 
     function renderStopInfo() {
@@ -120,7 +122,7 @@ import Layout from '../../layouts/Layout.astro';
                   <div class="eta-line-info">
                     <span class="line-num-badge" style="background-color: ${color}">${commercialName}</span>
                     <div class="eta-dest">
-                      <strong>${l.buses[0]?.destino || 'En ruta'}</strong>
+                      <strong>${l.buses[0]?.destino || ''}</strong>
                       <div class="eta-bus-info">
                         ${l.buses[0]?.bus ? `<span class="bus-id">Bus: ${l.buses[0].bus}</span>` : ''}
                         ${l.buses.length > 1 ? `<span class="next-buses">Ver +${l.buses.length - 1} buses próximos</span>` : ''}
@@ -138,7 +140,7 @@ import Layout from '../../layouts/Layout.astro';
                     ${l.buses.slice(1).map((b: any) => `
                       <div class="extra-bus-row">
                         <div class="extra-bus-main">
-                          <span>Próximo bus: <strong>${b.destino || 'En ruta'}</strong></span>
+                          <span>Próximo bus: <strong>${b.destino || ''}</strong></span>
                           ${b.bus ? `<small class="extra-bus-id">Bus: ${b.bus}</small>` : ''}
                         </div>
                         <span class="extra-time"><strong>${b.tiempo}</strong> min</span>

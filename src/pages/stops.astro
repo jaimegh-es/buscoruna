@@ -173,6 +173,11 @@ import Layout from '../layouts/Layout.astro';
     window.addEventListener('catalog-loaded', () => {
       loadNearbyStops();
     });
+
+    // Listen for global refresh
+    window.addEventListener('request-refresh', () => {
+      showStopsList(currentLat, currentLon, (document.getElementById('stop-search-input') as HTMLInputElement).value.trim());
+    });
   </script>
 </Layout>
 
@@ -181,18 +186,49 @@ import Layout from '../layouts/Layout.astro';
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
   }
 
   .btn-icon {
     background: white;
+    border: 1px solid #ddd;
     border-radius: 50%;
     width: 40px;
     height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    font-size: 1.25rem;
+  }
+
+  .search-container {
+    padding: 0.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #stop-search-input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    font-size: 1rem;
+    background: #f9f9f9;
+  }
+
+  #stop-search-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: white;
+  }
+
+  .search-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+    padding-left: 0.5rem;
   }
 
   .stop-card-link {

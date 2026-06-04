@@ -1,61 +1,85 @@
 ---
 ---
-<trip-calculator class="card">
-  <form id="calc-form">
-    <div class="input-group">
-      <label for="origin">Origen</label>
-      <div class="input-with-action">
-        <input type="text" id="origin" placeholder="Mi ubicación o parada..." autocomplete="off" />
-        <button type="button" id="get-location-origin" class="geo-btn" title="Usar GPS">📍</button>
-      </div>
-      <div id="origin-results" class="autocomplete-results"></div>
-    </div>
-
-    <div class="input-group">
-      <label for="destination">Destino</label>
-      <div class="input-with-action">
-        <input type="text" id="destination" placeholder="¿A dónde vas?" autocomplete="off" />
-        <button type="button" id="get-location-dest" class="geo-btn" title="Seleccionar en mapa">🗺️</button>
-      </div>
-      <div id="destination-results" class="autocomplete-results"></div>
-    </div>
-
-    <!-- Map Modal -->
-    <div id="map-modal" class="modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>Selecciona una parada</h3>
-          <button type="button" id="close-map" class="close-btn">&times;</button>
+<trip-calculator>
+  <div class="card main-calculator-card">
+    <form id="calc-form">
+      <div class="input-group">
+        <label for="origin">Origen</label>
+        <div class="input-with-action">
+          <input type="text" id="origin" placeholder="Mi ubicación o parada..." autocomplete="off" />
+          <button type="button" id="get-location-origin" class="geo-btn" title="Usar GPS">📍</button>
         </div>
-        <div id="selection-map"></div>
-        <div class="modal-footer">
-          <p id="selected-stop-info">Toca una parada en el mapa</p>
-          <button type="button" id="confirm-selection" class="btn-primary" disabled>Confirmar</button>
+        <div id="origin-results" class="autocomplete-results"></div>
+      </div>
+
+      <div class="input-group">
+        <label for="destination">Destino</label>
+        <div class="input-with-action">
+          <input type="text" id="destination" placeholder="¿A dónde vas?" autocomplete="off" />
+          <button type="button" id="get-location-dest" class="geo-btn" title="Seleccionar en mapa">🗺️</button>
+        </div>
+        <div id="destination-results" class="autocomplete-results"></div>
+      </div>
+
+      <!-- Map Modal (for selection) -->
+      <div id="map-modal" class="modal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>Selecciona una parada</h3>
+            <button type="button" id="close-map" class="close-btn">&times;</button>
+          </div>
+          <div id="selection-map"></div>
+          <div class="modal-footer">
+            <p id="selected-stop-info">Toca una parada en el mapa</p>
+            <button type="button" id="confirm-selection" class="btn-primary" disabled>Confirmar</button>
+          </div>
         </div>
       </div>
-    </div>
 
+      <!-- Route Detail Modal -->
+      <div id="route-detail-modal" class="modal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>Detalle de la ruta</h3>
+            <button type="button" id="close-route-detail" class="close-btn">&times;</button>
+          </div>
+          <div id="route-map" style="flex: 1; min-height: 250px;"></div>
+          <div class="modal-footer" id="route-detail-info">
+            <!-- Details will be injected here -->
+          </div>
+        </div>
+      </div>
 
-    <div class="input-group">
-      <label for="time">Hora de llegada deseada</label>
-      <input type="time" id="arrival-time" />
-    </div>
+      <div class="input-group">
+        <label for="time">Hora de llegada deseada</label>
+        <input type="time" id="arrival-time" />
+      </div>
 
-    <button type="submit" class="btn-primary">Calcular Ruta</button>
-  </form>
+      <button type="submit" class="btn-primary">Calcular Ruta</button>
+    </form>
+  </div>
 
   <div id="results" class="results-container">
     <!-- Results will be injected here -->
   </div>
 </trip-calculator>
 
-<style>
+<style is:global>
+  trip-calculator {
+    display: block;
+    width: 100%;
+  }
+
+  .main-calculator-card {
+    margin-bottom: 2rem;
+  }
+
   .input-group {
     margin-bottom: 1.5rem;
     position: relative;
   }
 
-  label {
+  .input-group label {
     display: block;
     font-size: 0.875rem;
     font-weight: 600;
@@ -63,7 +87,7 @@
     color: var(--text-muted);
   }
 
-  input {
+  .input-group input {
     width: 100%;
     padding: 0.75rem;
     border: 1px solid #ddd;
@@ -72,7 +96,7 @@
     background: #fafafa;
   }
 
-  input:focus {
+  .input-group input:focus {
     border-color: var(--primary);
     background: #fff;
     outline: none;
@@ -137,7 +161,7 @@
     border-bottom: 1px solid #eee;
   }
 
-  #selection-map {
+  #selection-map, #route-map {
     flex: 1;
     width: 100%;
     background: #e5e7eb;
@@ -212,6 +236,12 @@
 
   .result-card {
     padding: 1rem;
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+
+  .result-card:active {
+    transform: scale(0.98);
   }
 
   .result-header {
@@ -228,6 +258,7 @@
     border-radius: 6px;
     min-width: 45px;
     text-align: center;
+    display: inline-block;
   }
 
   .travel-summary {
@@ -262,6 +293,7 @@
   .bus-status .eta .unit { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
 
   .bus-status .details p { margin: 0; font-size: 0.85rem; }
+  
   .result-card.nearby {
     background: #f0f9ff;
     border: 1px solid #bae6fd;
@@ -300,9 +332,12 @@
     private selectedDestination: any = null;
     private catalog: any = null;
     private map: any = null;
+    private routeMap: any = null;
     private markers: any[] = [];
+    private routeMarkers: any[] = [];
     private currentSelectionTarget: 'origin' | 'destination' | null = null;
     private tempSelectedStop: any = null;
+    private lastResults: any[] = [];
 
     constructor() {
       super();
@@ -315,6 +350,47 @@
       this.setupAutocomplete('destination');
       this.setupGeoButtons();
       this.setupMapModal();
+      this.setupRouteDetailModal();
+
+      window.addEventListener('request-refresh', () => {
+        if (this.selectedOrigin && this.selectedDestination) {
+          this.calculateRefresh();
+        }
+      });
+    }
+
+    setupRouteDetailModal() {
+      const closeBtn = this.querySelector('#close-route-detail');
+      closeBtn?.addEventListener('click', () => {
+        const modal = this.querySelector('#route-detail-modal') as HTMLElement;
+        modal.style.display = 'none';
+      });
+    }
+
+    async calculateRefresh() {
+      if (!this.selectedOrigin || !this.selectedDestination) return;
+      
+      this.catalog = storage.getCatalog();
+      if (!this.catalog) return;
+
+      const originId = parseInt(this.selectedOrigin.id);
+      const destId = parseInt(this.selectedDestination.id);
+      const allLines = this.catalog.actualizacion.lineas;
+
+      let directRoutes = this.findDirectRoutes(originId, destId, allLines);
+      let nearbyRoutes: any[] = [];
+      if (directRoutes.length === 0) {
+        const nearbyDestinations = this.findNearbyStops(this.selectedDestination.posy, this.selectedDestination.posx, 400)
+          .filter(s => s.id !== destId);
+
+        for (const nearbyStop of nearbyDestinations) {
+          const routes = this.findDirectRoutes(originId, nearbyStop.id, allLines);
+          routes.forEach(r => nearbyRoutes.push({ ...r, isNearby: true, walkToDest: Math.round(nearbyStop.dist) }));
+        }
+      }
+
+      const toFetch = [...directRoutes.slice(0,2), ...nearbyRoutes.slice(0,2)];
+      this.fetchRealTime(toFetch);
     }
 
     setupForm() {
@@ -458,7 +534,6 @@
         timeout = setTimeout(async () => {
           this.catalog = storage.getCatalog();
           
-          // 1. Search Stops in Catalog
           let matchedStops: any[] = [];
           if (this.catalog && this.catalog.paradas) {
             const stops = Object.values(this.catalog.paradas);
@@ -470,7 +545,6 @@
               .slice(0, 3);
           }
 
-          // 2. Search Places/Addresses
           let places: any[] = [];
           try {
             places = await Geocoding.search(query);
@@ -546,7 +620,6 @@
       let minDist = Infinity;
       
       stops.forEach((s: any) => {
-        // Simple Euclidean distance (fine for small areas)
         const d = Math.sqrt(Math.pow(s.posy - lat, 2) + Math.pow(s.posx - lon, 2));
         if (d < minDist) {
           minDist = d;
@@ -555,8 +628,6 @@
       });
       return closest;
     }
-
-
 
     async calculate() {
       const resultsDiv = this.querySelector('#results');
@@ -578,10 +649,8 @@
       const allLines = this.catalog.actualizacion.lineas;
       const allStops = this.catalog.actualizacion.paradas;
 
-      // 1. Direct Routes
       let directRoutes = this.findDirectRoutes(originId, destId, allLines);
 
-      // 2. If no direct routes, try "nearby" stops (within ~400m)
       let nearbyRoutes: any[] = [];
       if (directRoutes.length === 0) {
         const nearbyDestinations = this.findNearbyStops(this.selectedDestination.posy, this.selectedDestination.posx, 400)
@@ -593,7 +662,6 @@
         }
       }
 
-      // 3. Transfer Routes (1-transfer)
       let transferRoutes: any[] = [];
       if (directRoutes.length < 2) {
         transferRoutes = this.findTransferRoutes(originId, destId, allLines, allStops);
@@ -609,26 +677,155 @@
         return;
       }
 
-      // Sort and combine
       directRoutes.sort((a, b) => a.stopsCount - b.stopsCount);
       nearbyRoutes.sort((a, b) => (a.stopsCount + a.walkToDest/50) - (b.stopsCount + b.walkToDest/50));
       transferRoutes.sort((a, b) => (a.totalStops) - (b.totalStops));
+
+      this.lastResults = [
+        ...directRoutes.map(r => ({ ...r, type: 'direct' })),
+        ...nearbyRoutes.map(r => ({ ...r, type: 'nearby' })),
+        ...transferRoutes.map(r => ({ ...r, type: 'transfer' }))
+      ];
 
       if (resultsDiv) {
         resultsDiv.innerHTML = `
           <div class="route-summary-header">
             <h3>Rutas de <strong>${this.selectedOrigin.nombre}</strong> a <strong>${this.selectedDestination.nombre}</strong></h3>
           </div>
+          <div id="taxi-warning" style="display: none; padding: 1rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; margin-bottom: 1.5rem; color: #92400e; font-style: italic; text-align: center;">
+             🚕 Pues va a haber que coger un taxi...
+          </div>
           <div class="results-list">
-            ${directRoutes.slice(0, 2).map(l => this.renderDirectRouteCard(l)).join('')}
-            ${nearbyRoutes.slice(0, 2).map(l => this.renderNearbyRouteCard(l)).join('')}
-            ${transferRoutes.slice(0, 2).map(l => this.renderTransferRouteCard(l)).join('')}
+            ${directRoutes.slice(0, 2).map((l, i) => this.renderDirectRouteCard(l, i)).join('')}
+            ${nearbyRoutes.slice(0, 2).map((l, i) => this.renderNearbyRouteCard(l, i + directRoutes.length)).join('')}
+            ${transferRoutes.slice(0, 2).map((l, i) => this.renderTransferRouteCard(l, i + directRoutes.length + nearbyRoutes.length)).join('')}
           </div>
         `;
         
-        // Fetch real-time for direct and nearby
+        // Add click listeners to result cards
+        resultsDiv.querySelectorAll('.result-card').forEach(card => {
+          card.addEventListener('click', () => {
+            const idx = parseInt(card.getAttribute('data-idx') || '0');
+            const route = this.lastResults[idx];
+            if (route) this.showRouteOnMap(route);
+          });
+        });
+
         const toFetch = [...directRoutes.slice(0,2), ...nearbyRoutes.slice(0,2)];
         this.fetchRealTime(toFetch);
+      }
+    }
+
+    async showRouteOnMap(route: any) {
+      const modal = this.querySelector('#route-detail-modal') as HTMLElement;
+      const detailInfo = this.querySelector('#route-detail-info') as HTMLElement;
+      modal.style.display = 'block';
+
+      if (!this.routeMap) {
+        // @ts-ignore
+        this.routeMap = L.map('route-map').setView([43.3623, -8.4115], 14);
+        // @ts-ignore
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OSM'
+        }).addTo(this.routeMap);
+      }
+
+      setTimeout(async () => {
+        this.routeMap.invalidateSize();
+        this.routeMarkers.forEach(m => m.remove());
+        this.routeMarkers = [];
+
+        // @ts-ignore
+        const bounds = L.latLngBounds([]);
+
+        if (route.type === 'direct' || route.type === 'nearby') {
+          // @ts-ignore
+          const m1 = L.marker([route.originStop.posy, route.originStop.posx]).addTo(this.routeMap).bindPopup(`Sube aquí: ${route.originStop.nombre}`);
+          // @ts-ignore
+          const m2 = L.marker([route.destStop.posy, route.destStop.posx]).addTo(this.routeMap).bindPopup(`Bájate aquí: ${route.destStop.nombre}`);
+          this.routeMarkers.push(m1, m2);
+          bounds.extend([route.originStop.posy, route.originStop.posx]);
+          bounds.extend([route.destStop.posy, route.destStop.posx]);
+
+          this.fetchBusPath(route.originStop, route.destStop, route.color);
+
+          if (route.type === 'nearby') {
+             // @ts-ignore
+             const m3 = L.marker([this.selectedDestination.posy, this.selectedDestination.posx], { icon: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/25/25694.png', iconSize: [25, 25] }) }).addTo(this.routeMap).bindPopup("Tu destino");
+             this.routeMarkers.push(m3);
+             bounds.extend([this.selectedDestination.posy, this.selectedDestination.posx]);
+             
+             this.drawWalkingPath(route.destStop.posy, route.destStop.posx, this.selectedDestination.posy, this.selectedDestination.posx);
+          }
+
+          detailInfo.innerHTML = `
+            <div style="display: flex; gap: 1rem; align-items: center;">
+              <span class="line-badge" style="background-color: #${route.color}">${route.lineComer}</span>
+              <div>
+                <p><strong>${route.originStop.nombre}</strong> &rarr; <strong>${route.destStop.nombre}</strong></p>
+                <p><small>${route.stopsCount} paradas (~${route.estimatedTravelMins} min)</small></p>
+                ${route.isNearby ? `<p><small id="walking-time-info">Calculando camino a pie...</small></p>` : ''}
+              </div>
+            </div>
+          `;
+        } else if (route.type === 'transfer') {
+          // @ts-ignore
+          const m1 = L.marker([this.selectedOrigin.posy, this.selectedOrigin.posx]).addTo(this.routeMap).bindPopup(`Sube aquí: ${this.selectedOrigin.nombre}`);
+          // @ts-ignore
+          const m2 = L.marker([route.transferStop.posy, route.transferStop.posx]).addTo(this.routeMap).bindPopup(`Trasbordo: ${route.transferStop.nombre}`);
+          // @ts-ignore
+          const m3 = L.marker([this.selectedDestination.posy, this.selectedDestination.posx]).addTo(this.routeMap).bindPopup(`Bájate aquí: ${this.selectedDestination.nombre}`);
+          this.routeMarkers.push(m1, m2, m3);
+          bounds.extend([this.selectedOrigin.posy, this.selectedOrigin.posx]);
+          bounds.extend([route.transferStop.posy, route.transferStop.posx]);
+          bounds.extend([this.selectedDestination.posy, this.selectedDestination.posx]);
+
+          this.fetchBusPath(this.selectedOrigin, route.transferStop, route.l1.color);
+          this.fetchBusPath(route.transferStop, this.selectedDestination, route.l2.color);
+
+          detailInfo.innerHTML = `
+            <div>
+              <p>1. Línea <strong>${route.l1.lin_comer}</strong> hasta <strong>${route.transferStop.nombre}</strong></p>
+              <p>2. Línea <strong>${route.l2.lin_comer}</strong> hasta <strong>${this.selectedDestination.nombre}</strong></p>
+            </div>
+          `;
+        }
+
+        this.routeMap.fitBounds(bounds, { padding: [50, 50] });
+      }, 200);
+    }
+
+    async fetchBusPath(s1: any, s2: any, color: string) {
+       try {
+         const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${s1.posx},${s1.posy};${s2.posx},${s2.posy}?overview=full&geometries=geojson`);
+         const data = await response.json();
+         if (data.routes && data.routes[0]) {
+            // @ts-ignore
+            const layer = L.geoJSON(data.routes[0].geometry, { style: { color: `#${color}`, weight: 6 } }).addTo(this.routeMap);
+            this.routeMarkers.push(layer);
+         }
+       } catch (e) {}
+    }
+
+    async drawWalkingPath(lat1: number, lon1: number, lat2: number, lon2: number) {
+      try {
+        const response = await fetch(`https://router.project-osrm.org/route/v1/walking/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`);
+        const data = await response.json();
+        if (data.routes && data.routes[0]) {
+          const route = data.routes[0];
+          // @ts-ignore
+          const pathLayer = L.geoJSON(route.geometry, { style: { color: 'gray', dashArray: '5, 10', weight: 3 } }).addTo(this.routeMap);
+          this.routeMarkers.push(pathLayer);
+          
+          const timeInfo = document.getElementById('walking-time-info');
+          if (timeInfo) {
+            const mins = Math.round(route.duration / 60);
+            const dist = Math.round(route.distance);
+            timeInfo.innerHTML = `Luego camina ${dist}m (${mins} min) hasta tu destino.`;
+          }
+        }
+      } catch (err) {
+        console.error('OSRM Error:', err);
       }
     }
 
@@ -675,18 +872,16 @@
           const oIdx = r1.paradas.indexOf(originId);
           if (oIdx === -1) return;
 
-          // Check stops after origin for possible transfers
           for (let i = oIdx + 1; i < r1.paradas.length; i++) {
             const transferStopId = r1.paradas[i];
             const transferStop = stops.find(s => s.id === transferStopId);
             if (!transferStop) continue;
 
-            // Does any line at this stop go to the destination?
             const linesAtTransfer = transferStop.enlaces;
             const commonLines = linesAtTransfer.filter((lId: any) => linesAtDest.includes(lId));
 
             commonLines.forEach((l2Id: any) => {
-              if (l2Id === l1Id) return; // Skip same line
+              if (l2Id === l1Id) return;
               const line2 = lines.find(l => l.id === l2Id);
               if (!line2) return;
 
@@ -695,8 +890,7 @@
                 const dIdx = r2.paradas.indexOf(destId);
 
                 if (tIdx !== -1 && dIdx !== -1 && tIdx < dIdx) {
-                  // Found a 1-transfer route!
-                  if (!results.find(r => r.l1 === l1Id && r.l2 === l2Id)) {
+                  if (!results.find(r => r.l1.id === l1Id && r.l2.id === l2Id)) {
                     results.push({
                       l1: line1,
                       l2: line2,
@@ -737,9 +931,9 @@
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
-    renderDirectRouteCard(l: any) {
+    renderDirectRouteCard(l: any, idx: number) {
       return `
-        <div class="card result-card direct" style="border-left: 5px solid #${l.color}">
+        <div class="card result-card direct" data-idx="${idx}" style="border-left: 5px solid #${l.color}">
           <div class="result-header">
             <span class="line-badge" style="background-color: #${l.color}">${l.lineComer}</span>
             <div class="travel-summary">
@@ -754,9 +948,9 @@
       `;
     }
 
-    renderNearbyRouteCard(l: any) {
+    renderNearbyRouteCard(l: any, idx: number) {
       return `
-        <div class="card result-card nearby" style="border-left: 5px solid #${l.color}; background: #f0f9ff;">
+        <div class="card result-card nearby" data-idx="${idx}" style="border-left: 5px solid #${l.color}">
           <div class="result-header">
             <span class="line-badge" style="background-color: #${l.color}">${l.lineComer}</span>
             <div class="travel-summary">
@@ -771,9 +965,9 @@
       `;
     }
 
-    renderTransferRouteCard(r: any) {
+    renderTransferRouteCard(r: any, idx: number) {
       return `
-        <div class="card result-card transfer" style="border-left: 5px solid #${r.l1.color}">
+        <div class="card result-card transfer" data-idx="${idx}" style="border-left: 5px solid #${r.l1.color}">
           <div class="result-header">
             <div class="transfer-badges">
               <span class="line-badge" style="background-color: #${r.l1.color}">${r.l1.lin_comer}</span>
@@ -794,6 +988,10 @@
     }
 
     async fetchRealTime(lines: any[]) {
+      const arrivalTimeInput = this.querySelector('#arrival-time') as HTMLInputElement;
+      const desiredTime = arrivalTimeInput?.value;
+      let earliestArrival: Date | null = null;
+
       for (const l of lines) {
         try {
           const data = await API.getStopArrivals(l.originStop.id);
@@ -808,8 +1006,12 @@
               const bus = lineInfo.buses[0];
               const arrivalAtDest = new Date();
               const busTime = typeof bus.tiempo === 'number' ? bus.tiempo : parseInt(bus.tiempo) || 0;
-              arrivalAtDest.setMinutes(arrivalAtDest.getMinutes() + busTime + l.estimatedTravelMins);
+              arrivalAtDest.setMinutes(arrivalAtDest.getMinutes() + busTime + l.estimatedTravelMins + (l.isNearby ? Math.round(l.walkToDest/60) : 0));
               
+              if (!earliestArrival || arrivalAtDest < earliestArrival) {
+                earliestArrival = arrivalAtDest;
+              }
+
               infoDiv.innerHTML = `
                 <div class="bus-status success">
                   <div class="eta">
@@ -831,8 +1033,24 @@
           }
         } catch (err) {
           console.error(err);
-          const infoDiv = this.querySelector(`.real-time-info[data-stop-id="${l.originStop.id}"][data-line-id="${l.lineId}"]`);
-          if (infoDiv) infoDiv.innerHTML = `<div class="bus-status error">Error de conexión.</div>`;
+        }
+      }
+
+      // Check against desired arrival time
+      if (desiredTime && earliestArrival) {
+        const [h, m] = desiredTime.split(':').map(Number);
+        const desiredDate = new Date();
+        desiredDate.setHours(h, m, 0, 0);
+        
+        if (desiredDate < new Date()) {
+          desiredDate.setDate(desiredDate.getDate() + 1);
+        }
+
+        const warning = this.querySelector('#taxi-warning') as HTMLElement;
+        if (earliestArrival > desiredDate) {
+          if (warning) warning.style.display = 'block';
+        } else {
+          if (warning) warning.style.display = 'none';
         }
       }
     }
