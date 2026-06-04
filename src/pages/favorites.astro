@@ -109,37 +109,11 @@ import Layout from '../layouts/Layout.astro';
         link.addEventListener('click', (e) => {
           const destId = link.getAttribute('data-dest');
           if (destId) {
+            // Force save to localStorage immediately
             tracking.setTargetDestination(parseInt(destId));
           }
         });
       });
-    }
-
-    async function fetchArrivals(stopId: number) {
-      const div = document.getElementById(`arrivals-${stopId}`);
-      if (!div) return;
-      
-      div.innerHTML = '<small>Cargando...</small>';
-      
-      try {
-        const data = await API.getStopArrivals(stopId);
-        if (data.resultado === 'OK' && data.buses.lineas.length > 0) {
-          div.innerHTML = `
-            <div class="arrival-items">
-              ${data.buses.lineas.slice(0, 3).map((l: any) => `
-                <div class="arrival-row">
-                  <span class="l-name">${l.linea}</span>
-                  <span class="l-time">${l.buses[0]?.tiempo || '?'} min</span>
-                </div>
-              `).join('')}
-            </div>
-          `;
-        } else {
-          div.innerHTML = '<small>Sin buses próximos</small>';
-        }
-      } catch (err) {
-        div.innerHTML = '<small>Error</small>';
-      }
     }
 
     loadFavorites();
@@ -151,7 +125,7 @@ import Layout from '../layouts/Layout.astro';
 </Layout>
 
 <style is:global>
-  .stop-card-link {
+  .stop-card-link, .route-fav-card {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -184,16 +158,6 @@ import Layout from '../layouts/Layout.astro';
   }
 
   .mt-2 { margin-top: 2rem; }
-
-  .route-fav-card {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    margin-bottom: 1rem;
-    text-decoration: none;
-    color: inherit;
-  }
 
   .route-fav-header {
     display: flex;

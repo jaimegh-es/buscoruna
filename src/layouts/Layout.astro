@@ -398,35 +398,42 @@ const { title } = Astro.props;
         const time = typeof targetBus.tiempo === 'number' ? targetBus.tiempo : parseInt(targetBus.tiempo);
         document.getElementById('track-eta-val')!.textContent = time.toString();
         const arrivalTime = new Date(Date.now() + time * 60000);
-        document.getElementById('track-status')!.textContent = `Llegada estimada: ${arrivalTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
-        if (time === 0) document.getElementById('track-status')!.textContent = '¡Estás llegando a tu destino!';
+        document.getElementById('track-status')!.textContent = `Llegada: ${arrivalTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
+        if (time === 0) document.getElementById('track-status')!.textContent = '¡Llegando a destino!';
       } else {
-        // Step 2: Fallback - Check full line info (func=2) to find where the bus is
+        // Step 2: Fallback - Check full line info (func=2)
         const lineData = await API.getLineInfo(info.lineId);
         let foundInLine = false;
         let stopsLeft = -1;
 
         if (lineData && lineData.paradas && catalog) {
-          const allStopsInLine: any[] = [];
-          lineData.paradas.forEach((dir: any) => {
-            if (dir.paradas) dir.paradas.forEach((p: any) => allStopsInLine.push(p));
-          });
+          // Normalize lineData paradas into a flat list of stops with their buses
+          const stopsWithBuses = [];
+          if (lineData.paradas) {
+            for (const dir of lineData.paradas) {
+              if (dir.paradas) {
+                for (const p of dir.paradas) {
+                  if (p.buses && p.buses.some((b: any) => b.bus.toString() === info.busId.toString())) {
+                    stopsWithBuses.push(parseInt(p.id.toString()));
+                  }
+                }
+              }
+            }
+          }
 
-          // Find the bus in the line's stop list
-          const busStopEntry = allStopsInLine.find(p => p.buses && p.buses.find((b: any) => b.bus.toString() === info.busId.toString()));
-          
-          if (busStopEntry) {
-            const busAtStopId = busStopEntry.id;
+          if (stopsWithBuses.length > 0) {
+            const busAtStopId = stopsWithBuses[0];
+            const targetDestIdNum = parseInt(info.destinationStopId.toString());
             
-            // Find which route of this line contains both our current bus position and destination
             const line = catalog.actualizacion.lineas.find(l => l.id.toString() === info.lineId.toString());
             if (line) {
               for (const route of line.rutas) {
-                const busIdx = route.paradas.indexOf(busAtStopId);
-                const destIdx = route.paradas.indexOf(info.destinationStopId);
+                const routeParadas = route.paradas.map(p => parseInt(p.toString()));
+                const bIdx = routeParadas.indexOf(busAtStopId);
+                const dIdx = routeParadas.indexOf(targetDestIdNum);
                 
-                if (busIdx !== -1 && destIdx !== -1 && busIdx <= destIdx) {
-                  stopsLeft = destIdx - busIdx;
+                if (bIdx !== -1 && dIdx !== -1 && bIdx <= dIdx) {
+                  stopsLeft = dIdx - bIdx;
                   foundInLine = true;
                   break;
                 }
@@ -436,9 +443,9 @@ const { title } = Astro.props;
         }
 
         if (foundInLine) {
-          const estimatedMins = stopsLeft * 2.5; // Average time per stop in Coruña
-          document.getElementById('track-eta-val')!.textContent = Math.round(estimatedMins).toString();
-          document.getElementById('track-status')!.textContent = `Aún lejos de destino (~${stopsLeft} paradas)`;
+          const estimatedMins = Math.max(1, Math.round(stopsLeft * 2.5));
+          document.getElementById('track-eta-val')!.textContent = estimatedMins.toString();
+          document.getElementById('track-status')!.textContent = `~${stopsLeft} paradas para llegar`;
         } else {
           document.getElementById('track-status')!.textContent = 'Buscando bus...';
           document.getElementById('track-eta-val')!.textContent = '--';
@@ -453,12 +460,20 @@ const { title } = Astro.props;
     }
   }
 
-  document.getElementById('stop-tracking')?.addEventListener('click', () => {
-    tracking.clear();
-  });
+  // Initialize tracking UI immediately on load
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    updateTrackingUI();
+  } else {
+    window.addEventListener('DOMContentLoaded', updateTrackingUI);
+  }
 
+  // Update when tracking is updated globally
   window.addEventListener('tracking-updated', () => {
     updateTrackingUI();
+  });
+
+  document.getElementById('stop-tracking')?.addEventListener('click', () => {
+    tracking.clear();
   });
 
   window.addEventListener('request-refresh', () => {
