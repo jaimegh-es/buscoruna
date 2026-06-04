@@ -1,0 +1,344 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="Detalle de Parada - BusCoruña">
+  <section class="stop-detail-page">
+    <div id="stop-header" class="card">
+      <div class="header-main">
+        <div class="stop-id-badge" id="display-stop-id">...</div>
+        <h2 id="display-stop-name">Cargando...</h2>
+        <button id="favorite-btn" class="fav-btn">
+          <span class="icon-outline">☆</span>
+          <span class="icon-filled" style="display: none;">⭐</span>
+        </button>
+      </div>
+      <p id="display-stop-address" class="text-muted"></p>
+    </div>
+
+    <div id="stop-map" style="height: 200px; margin-bottom: 1.5rem; border-radius: 12px; z-index: 1;"></div>
+
+    <div id="eta-container">
+      <h3>Próximos buses</h3>
+      <div id="eta-list" class="grid-list">
+        <div class="loading">Consultando tiempos...</div>
+      </div>
+    </div>
+
+    <div id="stop-lines" class="mt-2">
+      <h3>Líneas en esta parada</h3>
+      <div id="lines-passing" class="flex-wrap gap-1"></div>
+    </div>
+  </section>
+
+  <script>
+    import { storage } from '../../utils/storage';
+    import { API } from '../../services/api';
+
+    // Get ID from URL
+    const pathParts = window.location.pathname.split('/');
+    const stopId = parseInt(pathParts[pathParts.length - 1] || pathParts[pathParts.length - 2]);
+
+    let map: any = null;
+    let stopData: any = null;
+
+    async function init() {
+      if (isNaN(stopId)) {
+        window.location.href = '/stops';
+        return;
+      }
+
+      const catalog = storage.getCatalog();
+      if (!catalog) {
+        // Wait for catalog if not ready
+        window.addEventListener('catalog-loaded', () => init());
+        return;
+      }
+
+      stopData = catalog.paradas[stopId];
+      if (!stopData) {
+        document.getElementById('display-stop-name')!.textContent = 'Parada no encontrada';
+        return;
+      }
+
+      renderStopInfo();
+      initMap();
+      fetchETAs();
+      updateFavoriteUI();
+
+      // Refresh ETAs every 30s
+      setInterval(fetchETAs, 30000);
+    }
+
+    function renderStopInfo() {
+      const catalog = storage.getCatalog();
+      document.getElementById('display-stop-id')!.textContent = stopId.toString();
+      document.getElementById('display-stop-name')!.textContent = stopData.nombre;
+      
+      const linesContainer = document.getElementById('lines-passing')!;
+      linesContainer.innerHTML = stopData.enlaces.map((lId: any) => {
+        const line = catalog?.actualizacion.lineas.find((cl: any) => cl.id.toString() === lId.toString());
+        const name = line ? line.lin_comer : lId;
+        const color = line ? `#${line.color}` : '#333';
+        return `
+          <a href="/lines?id=${lId}" class="line-tag-large" style="border-left: 4px solid ${color}">
+            ${name}
+          </a>
+        `;
+      }).join('');
+    }
+
+    function initMap() {
+      if (!map && stopData) {
+        // @ts-ignore
+        map = L.map('stop-map', { zoomControl: false }).setView([stopData.posy, stopData.posx], 17);
+        // @ts-ignore
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OSM'
+        }).addTo(map);
+        // @ts-ignore
+        L.marker([stopData.posy, stopData.posx]).addTo(map);
+      }
+    }
+
+    async function fetchETAs() {
+      const container = document.getElementById('eta-list')!;
+      const catalog = storage.getCatalog();
+      if (!catalog) return;
+
+      try {
+        const data = await API.getStopArrivals(stopId);
+        if (data.resultado === 'OK' && data.buses && data.buses.lineas && data.buses.lineas.length > 0) {
+          container.innerHTML = data.buses.lineas.map((l: any, idx: number) => {
+            const lineData = catalog.actualizacion.lineas.find((cl: any) => cl.id.toString() === l.linea.toString());
+            const color = lineData ? `#${lineData.color}` : 'var(--primary)';
+            const commercialName = lineData ? lineData.lin_comer : l.linea;
+            
+            return `
+              <div class="card eta-card expandable" style="border-left: 6px solid ${color}" data-idx="${idx}">
+                <div class="eta-main-info">
+                  <div class="eta-line-info">
+                    <span class="line-num-badge" style="background-color: ${color}">${commercialName}</span>
+                    <div class="eta-dest">
+                      <strong>${l.buses[0]?.destino || 'En ruta'}</strong>
+                      ${l.buses.length > 1 ? `<small class="next-buses">Ver +${l.buses.length - 1} buses próximos</small>` : ''}
+                    </div>
+                  </div>
+                  <div class="eta-time-container" style="color: ${color}; background-color: ${color}15">
+                    <span class="time-val">${l.buses[0]?.tiempo ?? '?'}</span>
+                    <span class="time-unit">min</span>
+                  </div>
+                </div>
+                
+                ${l.buses.length > 1 ? `
+                  <div class="eta-extra-buses" id="extra-${idx}" style="display: none;">
+                    ${l.buses.slice(1).map((b: any) => `
+                      <div class="extra-bus-row">
+                        <span>Próximo bus: <strong>${b.destino || 'En ruta'}</strong></span>
+                        <span class="extra-time"><strong>${b.tiempo}</strong> min</span>
+                      </div>
+                    `).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('');
+
+          // Add click listeners to toggle expansion
+          container.querySelectorAll('.expandable').forEach(card => {
+            card.addEventListener('click', () => {
+              const idx = card.getAttribute('data-idx');
+              const extra = document.getElementById(`extra-${idx}`);
+              if (extra) {
+                const isHidden = extra.style.display === 'none';
+                extra.style.display = isHidden ? 'block' : 'none';
+                card.classList.toggle('is-expanded', isHidden);
+              }
+            });
+          });
+
+        } else {
+          container.innerHTML = '<div class="empty-state-small">No hay buses próximos en este momento.</div>';
+        }
+      } catch (err) {
+        container.innerHTML = '<div class="error">Error al conectar con el servidor.</div>';
+      }
+    }
+
+    function updateFavoriteUI() {
+      const favs = storage.getFavorites();
+      const isFav = favs.includes(stopId);
+      const outline = document.querySelector('.icon-outline') as HTMLElement;
+      const filled = document.querySelector('.icon-filled') as HTMLElement;
+      
+      if (isFav) {
+        outline.style.display = 'none';
+        filled.style.display = 'inline';
+      } else {
+        outline.style.display = 'inline';
+        filled.style.display = 'none';
+      }
+    }
+
+    document.getElementById('favorite-btn')?.addEventListener('click', () => {
+      storage.toggleFavorite(stopId);
+      updateFavoriteUI();
+    });
+
+    init();
+  </script>
+</Layout>
+
+<style is:global>
+  .stop-detail-page {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .header-main {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .stop-id-badge {
+    background: #333;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 800;
+    font-size: 0.9rem;
+  }
+
+  .fav-btn {
+    margin-left: auto;
+    background: none;
+    font-size: 1.5rem;
+    padding: 0.5rem;
+  }
+
+  .mt-2 { margin-top: 2rem; }
+  
+  .line-tag-large {
+    background: white;
+    border: 1px solid #ddd;
+    color: #333;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-weight: 700;
+    text-decoration: none;
+    display: inline-block;
+    margin: 0.25rem;
+  }
+
+  .eta-line-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .line-num-badge {
+    background: var(--primary);
+    color: white;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-weight: 800;
+  }
+
+  .eta-dest strong {
+    font-size: 0.95rem;
+    display: block;
+  }
+
+  .eta-time-container {
+    text-align: right;
+    background: #f0fdf4;
+    color: #166534;
+    padding: 0.5rem;
+    border-radius: 8px;
+    min-width: 60px;
+  }
+
+  .time-val {
+    font-size: 1.5rem;
+    font-weight: 800;
+    display: block;
+    line-height: 1;
+  }
+
+  .time-unit {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .empty-state-small {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+    background: white;
+    border-radius: 12px;
+    border: 2px dashed #eee;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .eta-card.expandable {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-direction: column;
+    padding: 0;
+  }
+
+  .eta-main-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 1rem;
+  }
+
+  .eta-extra-buses {
+    width: 100%;
+    padding: 0.5rem 1rem 1rem 1rem;
+    border-top: 1px solid #eee;
+    background: #fafafa;
+    border-bottom-right-radius: 12px;
+  }
+
+  .extra-bus-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px dashed #eee;
+  }
+
+  .extra-bus-row:last-child {
+    border-bottom: none;
+  }
+
+  .extra-time {
+    color: #444;
+  }
+
+  .is-expanded {
+    background: #fdfdfd;
+  }
+
+  .next-buses {
+    font-size: 0.75rem;
+    color: #3b82f6;
+    display: block;
+    margin-top: 2px;
+    font-weight: 600;
+  }
+</style>

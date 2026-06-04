@@ -1,0 +1,50 @@
+---
+---
+<script>
+  import { API } from '../services/api';
+  import { storage } from '../utils/storage';
+
+  async function loadCatalog() {
+    const existing = storage.getCatalog();
+    
+    // Force refresh if missing or has old structure (paradas as array)
+    const isOldStructure = existing && (Array.isArray(existing.paradas) || !existing.paradas);
+    
+    if (!existing || isOldStructure) {
+      console.log('Loading or refreshing catalog (old structure detected or missing)...');
+      try {
+        const catalog = await API.getCatalog();
+        if (catalog.resultado === 'OK') {
+          const raw = catalog.iTranvias;
+          
+          // Transform paradas array to a Record/Map by ID
+          const paradasRecord: any = {};
+          if (raw && Array.isArray(raw.paradas)) {
+            raw.paradas.forEach((s: any) => {
+              paradasRecord[s.id] = s;
+            });
+          } else if (raw && raw.actualizacion && Array.isArray(raw.actualizacion.paradas)) {
+            // Some API versions might put paradas inside actualizacion
+            raw.actualizacion.paradas.forEach((s: any) => {
+              paradasRecord[s.id] = s;
+            });
+          }
+
+          const transformedCatalog = {
+            actualizacion: raw.actualizacion,
+            paradas: paradasRecord
+          };
+
+          storage.setCatalog(transformedCatalog);
+          console.log('Catalog cached successfully.');
+          window.dispatchEvent(new CustomEvent('catalog-loaded'));
+        }
+      } catch (err) {
+        console.error('Failed to load catalog:', err);
+      }
+    }
+  }
+
+  // Load on start
+  loadCatalog();
+</script>

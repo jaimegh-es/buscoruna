@@ -1,0 +1,218 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Paradas - BusCoruña">
+	<section class="stops-page">
+	  <div class="header-section">
+	    <h2>Paradas</h2>
+	    <button id="refresh-gps" class="btn-icon" title="Localizar por GPS">📍</button>
+	  </div>
+
+    <div class="search-container card">
+      <input type="text" id="stop-search-input" placeholder="Buscar por nombre o número de parada..." autocomplete="off" />
+      <div id="search-results-count" class="search-hint"></div>
+    </div>
+
+	  <div id="nearby-map" style="height: 250px; margin-bottom: 1.5rem; border-radius: 12px; z-index: 1;"></div>
+
+	  <div id="stops-container">
+	    <div class="loading">Iniciando...</div>
+	  </div>
+	</section>
+
+	<script>
+	  import { storage } from '../utils/storage';
+	  import { API } from '../services/api';
+
+	  let map: any = null;
+	  let markers: any[] = [];
+	  let userMarker: any = null;
+    let currentLat = 43.3623;
+    let currentLon = -8.4115;
+
+	  async function loadNearbyStops() {
+	    const container = document.getElementById('stops-container');
+	    if (!container) return;
+
+	    container.innerHTML = '<div class="loading">Buscando ubicación...</div>';
+
+	    if (!navigator.geolocation) {
+	      container.innerHTML = '<p class="error">Tu navegador no soporta geolocalización.</p>';
+        showStopsList(currentLat, currentLon); // Fallback to center
+	      return;
+	    }
+
+	    navigator.geolocation.getCurrentPosition(async (pos) => {
+	      currentLat = pos.coords.latitude;
+        currentLon = pos.coords.longitude;
+	      initMap(currentLat, currentLon);
+	      showStopsList(currentLat, currentLon);
+	    }, (err) => {
+	      // Default to A Coruña center if GPS fails
+	      initMap(currentLat, currentLon);
+	      showStopsList(currentLat, currentLon);
+	      console.warn('Geolocation failed, using center:', err.message);
+	    }, { enableHighAccuracy: true, timeout: 5000 });
+	  }
+
+	  function initMap(lat: number, lon: number) {
+	    if (!map) {
+	      // @ts-ignore
+	      map = L.map('nearby-map').setView([lat, lon], 16);
+	      // @ts-ignore
+	      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+	        attribution: '© OSM'
+	      }).addTo(map);
+	    } else {
+	      map.setView([lat, lon], 16);
+	    }
+
+	    if (userMarker) userMarker.remove();
+	    // @ts-ignore
+	    userMarker = L.circleMarker([lat, lon], {
+	      radius: 8,
+	      fillColor: "#3b82f6",
+	      color: "#fff",
+	      weight: 2,
+	      opacity: 1,
+	      fillOpacity: 0.8
+	    }).addTo(map).bindPopup("Tú estás aquí");
+	  }
+
+	  function showStopsList(lat: number, lon: number, filterQuery: string = '') {
+	    const container = document.getElementById('stops-container')!;
+	    const catalog = storage.getCatalog();
+      const hint = document.getElementById('search-results-count')!;
+
+	    if (!catalog || !catalog.paradas) {
+	      container.innerHTML = '<p class="loading-small">Cargando catálogo de paradas...</p>';
+	      return;
+	    }
+
+	    markers.forEach(m => m.remove());
+	    markers = [];
+
+	    let stops = Object.values(catalog.paradas);
+	    
+      if (filterQuery) {
+        stops = stops.filter((s: any) => 
+          s.nombre.toLowerCase().includes(filterQuery.toLowerCase()) || 
+          s.id.toString().includes(filterQuery)
+        );
+        hint.textContent = `Encontradas ${stops.length} paradas`;
+      } else {
+        hint.textContent = '';
+      }
+
+	    if (stops.length === 0) {
+	      container.innerHTML = '<p class="empty-state-small">No se encontraron paradas.</p>';
+	      return;
+	    }
+
+	    const nearby = stops
+	      .map((s: any) => ({
+	        ...s,
+	        dist: calculateDistance(lat, lon, s.posy, s.posx)
+	      }))
+	      .sort((a, b) => a.dist - b.dist)
+	      .slice(0, 20);
+
+	    container.innerHTML = `
+	      <div class="stops-list">
+	        ${nearby.map((s: any) => `
+	          <a href="/stop/${s.id}" class="card stop-card-link">
+	            <div class="stop-info">
+	              <strong>${s.nombre}</strong>
+	              <small>${filterQuery ? `Parada ${s.id}` : `A ${Math.round(s.dist)} metros`}</small>
+	              <div class="stop-lines">
+	                ${s.enlaces.slice(0, 5).map((l: any) => `<span class="line-tag">${l}</span>`).join('')}
+	              </div>
+	            </div>
+	            <div class="stop-arrow">→</div>
+	          </a>
+	        `).join('')}
+	      </div>
+	    `;
+
+      // @ts-ignore
+      const bounds = L.latLngBounds([[lat, lon]]);
+      nearby.forEach(s => {
+        // @ts-ignore
+        const m = L.marker([s.posy, s.posx]).addTo(map).bindPopup(s.nombre);
+        markers.push(m);
+        bounds.extend([s.posy, s.posx]);
+      });
+
+      if (map && nearby.length > 0) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+	  }
+
+    // Search input listener
+    document.getElementById('stop-search-input')?.addEventListener('input', (e) => {
+      const query = (e.target as HTMLInputElement).value.trim();
+      showStopsList(currentLat, currentLon, query);
+    });
+
+	  function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+	    const R = 6371e3; // metres
+	    const φ1 = lat1 * Math.PI/180;
+	    const φ2 = lat2 * Math.PI/180;
+	    const Δφ = (lat2-lat1) * Math.PI/180;
+	    const Δλ = (lon2-lon1) * Math.PI/180;
+	    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+	              Math.cos(φ1) * Math.cos(φ2) *
+	              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+	    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+	    return R * c;
+	  }
+
+    loadNearbyStops();
+    document.getElementById('refresh-gps')?.addEventListener('click', loadNearbyStops);
+    
+    // Listen for catalog loading if it wasn't ready
+    window.addEventListener('catalog-loaded', () => {
+      loadNearbyStops();
+    });
+  </script>
+</Layout>
+
+<style is:global>
+  .header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .btn-icon {
+    background: white;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  }
+
+  .stop-card-link {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.1s;
+  }
+
+  .stop-card-link:active {
+    transform: scale(0.98);
+  }
+
+  .stop-arrow {
+    font-size: 1.5rem;
+    color: #ccc;
+    font-weight: 300;
+  }
+</style>

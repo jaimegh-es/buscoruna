@@ -1,0 +1,432 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Líneas - BusCoruña">
+	<section class="lines-page">
+    <div id="lines-view">
+      <h2>Líneas de bus</h2>
+      <div id="lines-list" class="grid-list">Cargando líneas...</div>
+    </div>
+
+    <div id="line-detail-view" style="display: none;">
+      <button id="back-to-lines" class="btn-back">← Volver</button>
+      <div id="line-info-header"></div>
+      <div id="line-map" style="height: 300px; margin: 1rem 0; border-radius: 12px;"></div>
+      <div id="line-stops-list"></div>
+    </div>
+  </section>
+
+  <script>
+    import { API } from '../services/api';
+    import { storage } from '../utils/storage';
+    
+    let map: any = null;
+    let busMarkers: any[] = [];
+    let routeLayer: any = null;
+    let refreshInterval: any = null;
+
+    async function loadLines() {
+      const params = new URLSearchParams(window.location.search);
+      const lineIdParam = params.get('id');
+
+      const data = await API.getLines();
+      const list = document.getElementById('lines-list');
+      if (list && data.resultado === 'OK') {
+        list.innerHTML = data.lineas.map((l: any) => `
+          <div class="card line-card clickable" data-id="${l.id}" style="border-left: 8px solid #${l.color_linea}">
+            <div class="line-num" style="background-color: #${l.color_linea}">${l.nom_comer}</div>
+            <div class="line-desc">
+              <strong>${l.orig_linea}</strong>
+              <span>${l.dest_linea}</span>
+            </div>
+          </div>
+        `).join('');
+
+        list.querySelectorAll('.line-card').forEach(card => {
+          card.addEventListener('click', () => {
+            const id = card.getAttribute('data-id');
+            const color = (card as HTMLElement).style.borderLeftColor;
+            if (id) {
+              // Update URL without reload
+              history.pushState({}, '', `/lines?id=${id}`);
+              showLineDetail(parseInt(id), color);
+            }
+          });
+        });
+
+        // Auto-load line if param exists
+        if (lineIdParam) {
+          const line = data.lineas.find((l: any) => l.id === lineIdParam);
+          if (line) showLineDetail(parseInt(lineIdParam), `#${line.color_linea}`);
+        }
+      }
+    }
+
+    async function showLineDetail(lineId: number, color: string) {
+      document.getElementById('lines-view')!.style.display = 'none';
+      const detailView = document.getElementById('line-detail-view')!;
+      detailView.style.display = 'block';
+      
+      const header = document.getElementById('line-info-header')!;
+      header.innerHTML = '<p>Cargando detalles de la línea...</p>';
+
+      const catalog = storage.getCatalog();
+      const lineData = catalog?.actualizacion.lineas.find((l: any) => l.id === lineId);
+
+      if (!lineData) return;
+
+      header.innerHTML = `
+        <div class="line-header-detail" style="border-bottom: 4px solid #${lineData.color}">
+          <span class="badge" style="background-color: #${lineData.color}">${lineData.lin_comer}</span>
+          <div class="line-title-fav">
+            <h2>${lineData.nombre_orig} - ${lineData.nombre_dest}</h2>
+          </div>
+        </div>
+      `;
+
+      initMap();
+      plotRoute(lineData);
+      startLiveTracking(lineId);
+
+      const stopsList = document.getElementById('line-stops-list')!;
+      // Show first route by default
+      const paradas = lineData.rutas[0].paradas;
+      
+      if (!catalog || !catalog.paradas) {
+        stopsList.innerHTML = '<p>Catálogo cargando...</p>';
+        return;
+      }
+
+      stopsList.innerHTML = `
+        <h3>Paradas (Sentido Ida)</h3>
+        <div class="vertical-stops">
+          ${paradas.map((pId: any, idx: number) => {
+            const s = catalog.paradas[pId];
+            return `
+              <div class="stop-item" data-id="${pId}">
+                <div class="stop-dot" style="background-color: #${lineData.color}"></div>
+                <div class="stop-content-nav">
+                  <a href="/stop/${pId}" class="stop-name-link">${s?.nombre || `Parada ${pId}`}</a>
+                  <button class="center-stop-btn" data-lat="${s?.posy}" data-lon="${s?.posx}">📍</button>
+                </div>
+                <div class="bus-container-list"></div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+
+      stopsList.querySelectorAll('.center-stop-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const lat = parseFloat(btn.getAttribute('data-lat')!);
+          const lon = parseFloat(btn.getAttribute('data-lon')!);
+          if (map && lat && lon) {
+            map.setView([lat, lon], 17);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        });
+      });
+    }
+
+    function initMap() {
+      if (!map) {
+        // @ts-ignore
+        map = L.map('line-map').setView([43.3623, -8.4115], 13);
+        // @ts-ignore
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap'
+        }).addTo(map);
+      }
+      setTimeout(() => map.invalidateSize(), 100);
+    }
+
+    function plotRoute(lineData: any) {
+      if (!map) return;
+      if (routeLayer) routeLayer.remove();
+      
+      const catalog = storage.getCatalog();
+      if (!catalog || !catalog.paradas) return;
+
+      // For simplicity, plot the points of the first route
+      const points = lineData.rutas[0].paradas.map((pId: any) => {
+        const s = catalog.paradas[pId];
+        return s ? [s.posy, s.posx] : null;
+      }).filter(Boolean);
+
+      if (points.length > 0) {
+        // @ts-ignore
+        routeLayer = L.polyline(points, { color: `#${lineData.color}`, weight: 5 }).addTo(map);
+        map.fitBounds(routeLayer.getBounds(), { padding: [20, 20] });
+      }
+    }
+
+    async function startLiveTracking(lineId: number) {
+      if (refreshInterval) clearInterval(refreshInterval);
+      
+      const updateBuses = async () => {
+        try {
+          const data = await API.getMapData(lineId, 'B');
+          if (data.resultado === 'OK' && data.mapas && data.mapas[0]) {
+            busMarkers.forEach(m => m.remove());
+            busMarkers = [];
+            
+            // Flatten buses from all directions
+            const allBuses: any[] = [];
+            data.mapas[0].buses.forEach((direction: any) => {
+              if (direction.buses) {
+                direction.buses.forEach((b: any) => {
+                  allBuses.push({
+                    ...b,
+                    sentido: direction.sentido
+                  });
+                });
+              }
+            });
+
+            allBuses.forEach((b: any) => {
+              // @ts-ignore
+              const marker = L.marker([b.posy, b.posx], {
+                // @ts-ignore
+                icon: L.divIcon({
+                  className: 'bus-marker-container',
+                  html: `<div class="bus-icon-marker" title="Bus ${b.bus}">🚌</div>`,
+                  iconSize: [30, 30]
+                })
+              }).addTo(map);
+              marker.bindPopup(`Bus: ${b.bus}<br>Hacia: ${b.destino || 'desconocido'}`);
+              busMarkers.push(marker);
+            });
+
+            // Update stops list to show bus icons near stops (simple version)
+            updateBusPositionsInList(allBuses);
+          }
+        } catch (err) {
+          console.error('Error tracking buses:', err);
+        }
+      };
+
+      updateBuses();
+      refreshInterval = setInterval(updateBuses, 15000);
+    }
+
+    function updateBusPositionsInList(buses: any[]) {
+      // Clear existing bus indicators
+      document.querySelectorAll('.bus-here-badge').forEach(el => el.remove());
+
+      const catalog = storage.getCatalog();
+      if (!catalog || !catalog.paradas) return;
+
+      buses.forEach(bus => {
+        // Find the closest stop to the bus coordinates
+        let closestStopId = null;
+        let minDist = 0.003; // ~300m threshold
+
+        // We only check stops that are in the current displayed line
+        const stopItems = document.querySelectorAll('.stop-item');
+        stopItems.forEach(item => {
+          const sId = item.getAttribute('data-id');
+          const s = catalog.paradas[sId!];
+          if (s) {
+            const d = Math.sqrt(Math.pow(s.posy - bus.posy, 2) + Math.pow(s.posx - bus.posx, 2));
+            if (d < minDist) {
+              minDist = d;
+              closestStopId = sId;
+            }
+          }
+        });
+
+        if (closestStopId) {
+          const stopItem = document.querySelector(`.stop-item[data-id="${closestStopId}"]`);
+          if (stopItem) {
+            const badge = document.createElement('div');
+            badge.className = 'bus-here-badge';
+            badge.innerHTML = `🚌 <small>${bus.bus}</small>`;
+            stopItem.querySelector('.bus-container-list')?.appendChild(badge);
+          }
+        }
+      });
+    }
+
+    document.getElementById('back-to-lines')?.addEventListener('click', () => {
+      document.getElementById('line-detail-view')!.style.display = 'none';
+      document.getElementById('lines-view')!.style.display = 'block';
+      if (refreshInterval) clearInterval(refreshInterval);
+    });
+
+    loadLines();
+
+    window.addEventListener('catalog-loaded', () => {
+      loadLines();
+    });
+  </script>
+</Layout>
+
+<style is:global>
+  .grid-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .line-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem;
+  }
+
+  .line-num {
+    color: white;
+    font-weight: 800;
+    width: 45px;
+    height: 45px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+
+  .line-desc {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .line-desc strong {
+    font-size: 0.95rem;
+  }
+
+  .line-desc span {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .btn-back {
+    background: none;
+    color: var(--primary);
+    font-weight: 700;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+  }
+
+  .line-header-detail {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding-bottom: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .line-title-fav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex: 1;
+  }
+
+  .line-header-detail h2 {
+    font-size: 1.25rem;
+  }
+
+  .badge {
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 6px;
+    font-weight: 800;
+  }
+
+  .vertical-stops {
+    margin-top: 1rem;
+    position: relative;
+    padding-left: 1rem;
+  }
+
+  .vertical-stops::before {
+    content: '';
+    position: absolute;
+    left: 1.4rem;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #ddd;
+    z-index: 0;
+  }
+
+  .stop-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .stop-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 0 0 2px #ddd;
+  }
+
+  .bus-marker-container {
+    background: white;
+    border: 2px solid var(--primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  }
+
+  .bus-icon-marker {
+    font-size: 1.2rem;
+  }
+
+  .bus-container-list {
+    margin-left: auto;
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .bus-here-badge {
+    background: #e0f2f1;
+    color: #00695c;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid #00695c;
+  }
+  .stop-content-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 1;
+    gap: 0.5rem;
+  }
+
+  .stop-name-link {
+    text-decoration: none;
+    color: var(--text);
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  .stop-name-link:hover {
+    color: var(--primary);
+  }
+
+  .center-stop-btn {
+    background: #f1f5f9;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.8rem;
+  }
+</style>

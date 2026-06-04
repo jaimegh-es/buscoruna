@@ -1,0 +1,647 @@
+---
+---
+<trip-calculator class="card">
+  <form id="calc-form">
+    <div class="input-group">
+      <label for="origin">Origen</label>
+      <div class="input-with-action">
+        <input type="text" id="origin" placeholder="Mi ubicación o parada..." autocomplete="off" />
+        <button type="button" id="get-location-origin" class="geo-btn" title="Usar GPS">📍</button>
+      </div>
+      <div id="origin-results" class="autocomplete-results"></div>
+    </div>
+
+    <div class="input-group">
+      <label for="destination">Destino</label>
+      <div class="input-with-action">
+        <input type="text" id="destination" placeholder="¿A dónde vas?" autocomplete="off" />
+        <button type="button" id="get-location-dest" class="geo-btn" title="Seleccionar en mapa">🗺️</button>
+      </div>
+      <div id="destination-results" class="autocomplete-results"></div>
+    </div>
+
+    <!-- Map Modal -->
+    <div id="map-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Selecciona una parada</h3>
+          <button type="button" id="close-map" class="close-btn">&times;</button>
+        </div>
+        <div id="selection-map"></div>
+        <div class="modal-footer">
+          <p id="selected-stop-info">Toca una parada en el mapa</p>
+          <button type="button" id="confirm-selection" class="btn-primary" disabled>Confirmar</button>
+        </div>
+      </div>
+    </div>
+
+
+    <div class="input-group">
+      <label for="time">Hora de llegada deseada</label>
+      <input type="time" id="arrival-time" />
+    </div>
+
+    <button type="submit" class="btn-primary">Calcular Ruta</button>
+  </form>
+
+  <div id="results" class="results-container">
+    <!-- Results will be injected here -->
+  </div>
+</trip-calculator>
+
+<style>
+  .input-group {
+    margin-bottom: 1.5rem;
+    position: relative;
+  }
+
+  label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--text-muted);
+  }
+
+  input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    background: #fafafa;
+  }
+
+  input:focus {
+    border-color: var(--primary);
+    background: #fff;
+    outline: none;
+  }
+
+  .input-with-action {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .geo-btn {
+    padding: 0 1rem;
+    background: #eee;
+    border-radius: 8px;
+    font-size: 1.25rem;
+  }
+
+  /* Modal Styles */
+  .modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 2000;
+    padding: 1rem;
+  }
+
+  .modal-content {
+    background: white;
+    width: 100%;
+    max-width: 500px;
+    height: 80vh;
+    margin: 5vh auto;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .modal-header {
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #eee;
+  }
+
+  #selection-map {
+    flex: 1;
+    width: 100%;
+    background: #e5e7eb;
+  }
+
+  .modal-footer {
+    padding: 1rem;
+    border-top: 1px solid #eee;
+  }
+
+  #selected-stop-info {
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  .close-btn {
+    font-size: 1.5rem;
+    background: none;
+    color: var(--text-muted);
+  }
+
+  .autocomplete-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    z-index: 1000;
+    display: none;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .autocomplete-item {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .autocomplete-item:hover {
+    background: #f9fafb;
+  }
+
+  .autocomplete-item .icon { font-size: 1.25rem; }
+  .autocomplete-item .info { display: flex; flex-direction: column; }
+  .autocomplete-item .info strong { font-size: 0.95rem; }
+  .autocomplete-item .info small { font-size: 0.75rem; color: #6b7280; }
+
+  .results-container {
+    margin-top: 2rem;
+  }
+
+  .route-summary-header {
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #eee;
+  }
+
+  .results-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .result-card {
+    padding: 1rem;
+  }
+
+  .result-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .line-badge {
+    color: white;
+    font-weight: 800;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    min-width: 45px;
+    text-align: center;
+  }
+
+  .travel-summary {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .travel-summary strong { font-size: 1.1rem; }
+  .travel-summary small { color: var(--text-muted); }
+
+  .bus-status {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem;
+    border-radius: 8px;
+    background: #f8fafc;
+  }
+
+  .bus-status.success { background: #f0fdf4; color: #166534; }
+  .bus-status.warning { background: #fffbeb; color: #92400e; }
+  .bus-status.error { background: #fef2f2; color: #991b1b; }
+
+  .bus-status .eta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 50px;
+  }
+
+  .bus-status .eta .time { font-size: 1.5rem; font-weight: 800; line-height: 1; }
+  .bus-status .eta .unit { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+
+  .bus-status .details p { margin: 0; font-size: 0.85rem; }
+</style>
+
+<script>
+  import { storage } from '../utils/storage';
+  import { API } from '../services/api';
+  import { Geocoding } from '../services/geocoding';
+
+  class TripCalculator extends HTMLElement {
+    private selectedOrigin: any = null;
+    private selectedDestination: any = null;
+    private catalog: any = null;
+    private map: any = null;
+    private markers: any[] = [];
+    private currentSelectionTarget: 'origin' | 'destination' | null = null;
+    private tempSelectedStop: any = null;
+
+    constructor() {
+      super();
+    }
+
+    connectedCallback() {
+      this.catalog = storage.getCatalog();
+      this.setupForm();
+      this.setupAutocomplete('origin');
+      this.setupAutocomplete('destination');
+      this.setupGeoButtons();
+      this.setupMapModal();
+    }
+
+    setupForm() {
+      const form = this.querySelector('#calc-form');
+      form?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.calculate();
+      });
+    }
+
+    setupGeoButtons() {
+      this.querySelector('#get-location-origin')?.addEventListener('click', () => {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition((pos) => {
+            const { latitude, longitude } = pos.coords;
+            const closest = this.findClosestStop(latitude, longitude);
+            if (closest) {
+              const input = this.querySelector('#origin') as HTMLInputElement;
+              input.value = "Mi ubicación (" + closest.nombre + ")";
+              this.selectedOrigin = closest;
+            }
+          });
+        }
+      });
+
+      this.querySelector('#get-location-dest')?.addEventListener('click', () => {
+        this.openMap('destination');
+      });
+    }
+
+    setupMapModal() {
+      const closeBtn = this.querySelector('#close-map');
+      const confirmBtn = this.querySelector('#confirm-selection');
+      
+      closeBtn?.addEventListener('click', () => this.closeMap());
+      confirmBtn?.addEventListener('click', () => this.confirmMapSelection());
+    }
+
+    openMap(target: 'origin' | 'destination') {
+      this.currentSelectionTarget = target;
+      const modal = this.querySelector('#map-modal') as HTMLElement;
+      modal.style.display = 'block';
+
+      if (!this.map) {
+        // @ts-ignore
+        this.map = L.map('selection-map').setView([43.3623, -8.4115], 13);
+        // @ts-ignore
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OSM'
+        }).addTo(this.map);
+      }
+
+      setTimeout(() => {
+        this.map.invalidateSize();
+        
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition((pos) => {
+            const { latitude, longitude } = pos.coords;
+            this.map.setView([latitude, longitude], 16);
+            this.showNearbyStopsOnMap(latitude, longitude);
+          }, (err) => {
+            console.error('Geolocation error:', err);
+            this.showNearbyStopsOnMap(43.3623, -8.4115);
+          }, { enableHighAccuracy: true });
+        } else {
+          this.showNearbyStopsOnMap(43.3623, -8.4115);
+        }
+      }, 200);
+    }
+
+    showNearbyStopsOnMap(lat: number, lon: number) {
+      if (!this.catalog) this.catalog = storage.getCatalog();
+      if (!this.catalog) return;
+
+      this.markers.forEach(m => m.remove());
+      this.markers = [];
+
+      const stops = Object.values(this.catalog.paradas);
+      const nearby = stops
+        .map((s: any) => ({
+          ...s,
+          dist: Math.sqrt(Math.pow(s.posy - lat, 2) + Math.pow(s.posx - lon, 2))
+        }))
+        .sort((a, b) => a.dist - b.dist)
+        .slice(0, 30);
+
+      nearby.forEach((s: any) => {
+        // @ts-ignore
+        const marker = L.marker([s.posy, s.posx]).addTo(this.map);
+        marker.bindPopup(`<strong>${s.nombre}</strong><br>Parada ${s.id}`);
+        marker.on('click', () => {
+          this.tempSelectedStop = s;
+          const info = this.querySelector('#selected-stop-info');
+          if (info) info.innerHTML = `Seleccionada: <strong>${s.nombre}</strong>`;
+          const confirmBtn = this.querySelector('#confirm-selection') as HTMLButtonElement;
+          if (confirmBtn) confirmBtn.disabled = false;
+        });
+        this.markers.push(marker);
+      });
+    }
+
+
+    confirmMapSelection() {
+      if (!this.tempSelectedStop || !this.currentSelectionTarget) return;
+      
+      const input = this.querySelector(`#${this.currentSelectionTarget}`) as HTMLInputElement;
+      input.value = this.tempSelectedStop.nombre;
+      
+      if (this.currentSelectionTarget === 'origin') this.selectedOrigin = this.tempSelectedStop;
+      else this.selectedDestination = this.tempSelectedStop;
+      
+      this.closeMap();
+    }
+
+    closeMap() {
+      const modal = this.querySelector('#map-modal') as HTMLElement;
+      modal.style.display = 'none';
+      this.tempSelectedStop = null;
+      this.currentSelectionTarget = null;
+      const confirmBtn = this.querySelector('#confirm-selection') as HTMLButtonElement;
+      if (confirmBtn) confirmBtn.disabled = true;
+      const info = this.querySelector('#selected-stop-info');
+      if (info) info.textContent = 'Toca una parada en el mapa';
+    }
+
+
+    setupAutocomplete(inputId: string) {
+      const input = this.querySelector(`#${inputId}`) as HTMLInputElement;
+      const resultsDiv = this.querySelector(`#${inputId}-results`) as HTMLDivElement;
+      let timeout: any = null;
+
+      input?.addEventListener('input', () => {
+        clearTimeout(timeout);
+        const query = input.value.trim().toLowerCase();
+        
+        if (query.length < 3) {
+          resultsDiv.style.display = 'none';
+          return;
+        }
+
+        timeout = setTimeout(async () => {
+          this.catalog = storage.getCatalog();
+          
+          // 1. Search Stops in Catalog
+          let matchedStops: any[] = [];
+          if (this.catalog && this.catalog.paradas) {
+            const stops = Object.values(this.catalog.paradas);
+            matchedStops = stops
+              .filter((s: any) => 
+                s.nombre.toLowerCase().includes(query) || 
+                s.id.toString().includes(query)
+              )
+              .slice(0, 3);
+          }
+
+          // 2. Search Places/Addresses
+          let places: any[] = [];
+          try {
+            places = await Geocoding.search(query);
+          } catch (err) {
+            console.error('Geocoding search failed:', err);
+          }
+
+          if (matchedStops.length > 0 || places.length > 0) {
+            resultsDiv.innerHTML = `
+              ${matchedStops.map((s: any) => `
+                <div class="autocomplete-item stop" data-type="stop" data-id="${s.id}" data-name="${s.nombre}">
+                  <span class="icon">🚏</span>
+                  <div class="info">
+                    <strong>${s.nombre}</strong>
+                    <small>Parada ${s.id}</small>
+                  </div>
+                </div>
+              `).join('')}
+              ${places.map((p: any) => `
+                <div class="autocomplete-item place" data-type="place" data-lat="${p.lat}" data-lon="${p.lon}" data-name="${p.full_name}">
+                  <span class="icon">📍</span>
+                  <div class="info">
+                    <strong>${p.name}</strong>
+                    <small>${p.full_name}</small>
+                  </div>
+                </div>
+              `).join('')}
+            `;
+            resultsDiv.style.display = 'block';
+
+            resultsDiv.querySelectorAll('.autocomplete-item').forEach(item => {
+              item.addEventListener('click', () => {
+                const type = item.getAttribute('data-type');
+                const name = item.getAttribute('data-name');
+                input.value = name || '';
+                resultsDiv.style.display = 'none';
+                
+                const currentCatalog = storage.getCatalog();
+                if (type === 'stop') {
+                  const id = item.getAttribute('data-id');
+                  const stop = currentCatalog?.paradas[id!];
+                  if (inputId === 'origin') this.selectedOrigin = stop;
+                  else this.selectedDestination = stop;
+                } else {
+                  const lat = parseFloat(item.getAttribute('data-lat') || '0');
+                  const lon = parseFloat(item.getAttribute('data-lon') || '0');
+                  const closestStop = this.findClosestStop(lat, lon);
+                  if (inputId === 'origin') this.selectedOrigin = closestStop;
+                  else this.selectedDestination = closestStop;
+                }
+              });
+            });
+          } else if (query.length >= 3) {
+            resultsDiv.innerHTML = `<div class="autocomplete-item"><small>No se encontraron resultados para "${query}"</small></div>`;
+            resultsDiv.style.display = 'block';
+          } else {
+            resultsDiv.style.display = 'none';
+          }
+        }, 300);
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!this.contains(e.target as Node)) {
+          resultsDiv.style.display = 'none';
+        }
+      });
+    }
+
+    findClosestStop(lat: number, lon: number) {
+      if (!this.catalog) this.catalog = storage.getCatalog();
+      const stops = Object.values(this.catalog.paradas);
+      let closest = null;
+      let minDist = Infinity;
+      
+      stops.forEach((s: any) => {
+        // Simple Euclidean distance (fine for small areas)
+        const d = Math.sqrt(Math.pow(s.posy - lat, 2) + Math.pow(s.posx - lon, 2));
+        if (d < minDist) {
+          minDist = d;
+          closest = s;
+        }
+      });
+      return closest;
+    }
+
+
+
+    async calculate() {
+      const resultsDiv = this.querySelector('#results');
+      if (!this.selectedOrigin || !this.selectedDestination) {
+        alert("Por favor, selecciona origen y destino de la lista.");
+        return;
+      }
+
+      if (resultsDiv) resultsDiv.innerHTML = '<div class="loading">Buscando la mejor combinación...</div>';
+
+      this.catalog = storage.getCatalog();
+      if (!this.catalog) return;
+
+      const possibleLines: any[] = [];
+      const lines = this.catalog.actualizacion.lineas;
+      
+      lines.forEach((line: any) => {
+        line.rutas.forEach((route: any) => {
+          const originIdx = route.paradas.indexOf(parseInt(this.selectedOrigin.id));
+          const destIdx = route.paradas.indexOf(parseInt(this.selectedDestination.id));
+          
+          if (originIdx !== -1 && destIdx !== -1 && originIdx < destIdx) {
+            const stopsCount = destIdx - originIdx;
+            const estimatedTravelMins = stopsCount * 2; 
+            
+            if (!possibleLines.find(pl => pl.lineId === line.id)) {
+              possibleLines.push({
+                lineId: line.id,
+                lineComer: line.lin_comer,
+                color: line.color,
+                stopsCount,
+                estimatedTravelMins,
+                originStop: this.selectedOrigin,
+                destStop: this.selectedDestination
+              });
+            }
+          }
+        });
+      });
+
+      if (possibleLines.length === 0) {
+        if (resultsDiv) resultsDiv.innerHTML = `
+          <div class="empty-state">
+            <p>No se encontró una ruta directa entre estas paradas.</p>
+            <small>Estamos trabajando para incluir rutas con transbordos próximamente.</small>
+          </div>
+        `;
+        return;
+      }
+
+      possibleLines.sort((a, b) => a.stopsCount - b.stopsCount);
+
+      if (resultsDiv) {
+        resultsDiv.innerHTML = `
+          <div class="route-summary-header">
+            <h3>Rutas de <strong>${this.selectedOrigin.nombre}</strong> a <strong>${this.selectedDestination.nombre}</strong></h3>
+          </div>
+          <div class="results-list">
+            ${possibleLines.slice(0, 3).map(l => `
+              <div class="card result-card" style="border-left: 5px solid #${l.color}">
+                <div class="result-header">
+                  <span class="line-badge" style="background-color: #${l.color}">${l.lineComer}</span>
+                  <div class="travel-summary">
+                    <strong>~${l.estimatedTravelMins} min</strong> de trayecto
+                    <small>${l.stopsCount} paradas</small>
+                  </div>
+                </div>
+                <div class="real-time-info" data-stop-id="${l.originStop.id}" data-line-id="${l.lineId}" data-travel-mins="${l.estimatedTravelMins}">
+                  <div class="loading-small">Consultando tiempo real...</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+        
+        this.fetchRealTime(possibleLines.slice(0, 3));
+      }
+    }
+
+    async fetchRealTime(lines: any[]) {
+      for (const l of lines) {
+        try {
+          const data = await API.getStopArrivals(l.originStop.id);
+          const infoDiv = this.querySelector(`.real-time-info[data-stop-id="${l.originStop.id}"][data-line-id="${l.lineId}"]`);
+          
+          if (!infoDiv) continue;
+
+          if (data.resultado === 'OK' && data.buses && data.buses.lineas) {
+            const lineInfo = data.buses.lineas.find((bl: any) => bl.linea.toString() === l.lineId.toString());
+            
+            if (lineInfo && lineInfo.buses && lineInfo.buses.length > 0) {
+              const bus = lineInfo.buses[0];
+              const arrivalAtDest = new Date();
+              arrivalAtDest.setMinutes(arrivalAtDest.getMinutes() + bus.tiempo + l.estimatedTravelMins);
+              
+              infoDiv.innerHTML = `
+                <div class="bus-status success">
+                  <div class="eta">
+                    <span class="time">${bus.tiempo}</span>
+                    <span class="unit">min</span>
+                  </div>
+                  <div class="details">
+                    <p>Pasa por origen a las <strong>${this.formatTime(new Date(Date.now() + bus.tiempo * 60000))}</strong></p>
+                    <p>Llegada estimada: <strong>${this.formatTime(arrivalAtDest)}</strong></p>
+                  </div>
+                </div>
+              `;
+            } else {
+              infoDiv.innerHTML = `<div class="bus-status warning">Sin buses próximos en tiempo real.</div>`;
+            }
+          } else {
+            infoDiv.innerHTML = `<div class="bus-status warning">Sin buses próximos en tiempo real.</div>`;
+          }
+        } catch (err) {
+          console.error(err);
+          const infoDiv = this.querySelector(`.real-time-info[data-stop-id="${l.originStop.id}"][data-line-id="${l.lineId}"]`);
+          if (infoDiv) infoDiv.innerHTML = `<div class="bus-status error">Error de conexión.</div>`;
+        }
+      }
+    }
+
+    formatTime(date: Date) {
+      return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    }
+  }
+
+  customElements.define('trip-calculator', TripCalculator);
+</script>

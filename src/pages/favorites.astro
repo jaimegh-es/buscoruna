@@ -1,0 +1,135 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Favoritos - BusCoruña">
+	<section class="favorites-page">
+    <h2>Mis Favoritos</h2>
+    <div id="favorites-container">
+      <div class="loading">Cargando tus favoritos...</div>
+    </div>
+  </section>
+
+  <script>
+    import { storage } from '../utils/storage';
+    import { API } from '../services/api';
+
+    async function loadFavorites() {
+      const container = document.getElementById('favorites-container');
+      if (!container) return;
+
+      const favIds = storage.getFavorites();
+      const catalog = storage.getCatalog();
+
+      if (favIds.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <span class="icon">⭐</span>
+            <p>Aún no tienes paradas favoritas.</p>
+            <p><small>Pulsa la estrella en cualquier parada para guardarla.</small></p>
+          </div>
+        `;
+        return;
+      }
+
+      if (!catalog) {
+        container.innerHTML = '<p>Error: Datos del sistema no disponibles.</p>';
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="stops-list">
+          ${favIds.map(id => {
+            const s = catalog.paradas[id];
+            if (!s) return '';
+            return `
+              <a href="/stop/${s.id}" class="card stop-card-link">
+                <div class="stop-info">
+                  <strong>${s.nombre}</strong>
+                  <small>Parada ${s.id}</small>
+                  <div class="stop-lines">
+                    ${s.enlaces.slice(0, 5).map((l: any) => `<span class="line-tag">${l}</span>`).join('')}
+                  </div>
+                </div>
+                <div class="stop-arrow">→</div>
+              </a>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    async function fetchArrivals(stopId: number) {
+      const div = document.getElementById(`arrivals-${stopId}`);
+      if (!div) return;
+      
+      div.innerHTML = '<small>Cargando...</small>';
+      
+      try {
+        const data = await API.getStopArrivals(stopId);
+        if (data.resultado === 'OK' && data.buses.lineas.length > 0) {
+          div.innerHTML = `
+            <div class="arrival-items">
+              ${data.buses.lineas.slice(0, 3).map((l: any) => `
+                <div class="arrival-row">
+                  <span class="l-name">${l.linea}</span>
+                  <span class="l-time">${l.buses[0]?.tiempo || '?'} min</span>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        } else {
+          div.innerHTML = '<small>Sin buses próximos</small>';
+        }
+      } catch (err) {
+        div.innerHTML = '<small>Error</small>';
+      }
+    }
+
+    loadFavorites();
+
+    window.addEventListener('catalog-loaded', () => {
+      loadFavorites();
+    });
+  </script>
+</Layout>
+
+<style is:global>
+  .stop-card-link {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .stop-lines {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 0.5rem;
+  }
+
+  .line-tag {
+    background: #eee;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+  }
+
+  .empty-state .icon {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: 1rem;
+    opacity: 0.3;
+  }
+</style>
