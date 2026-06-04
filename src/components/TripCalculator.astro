@@ -1,4 +1,5 @@
 ---
+import Icon from './Icon.astro';
 ---
 <trip-calculator>
   <div class="card main-calculator-card">
@@ -7,7 +8,9 @@
         <label for="origin">Origen</label>
         <div class="input-with-action">
           <input type="text" id="origin" placeholder="Mi ubicación o parada..." autocomplete="off" />
-          <button type="button" id="get-location-origin" class="geo-btn" title="Usar GPS">📍</button>
+          <button type="button" id="get-location-origin" class="geo-btn" title="Usar GPS">
+            <Icon name="location" size={20} />
+          </button>
         </div>
         <div id="origin-results" class="autocomplete-results"></div>
       </div>
@@ -16,7 +19,9 @@
         <label for="destination">Destino</label>
         <div class="input-with-action">
           <input type="text" id="destination" placeholder="¿A dónde vas?" autocomplete="off" />
-          <button type="button" id="get-location-dest" class="geo-btn" title="Seleccionar en mapa">🗺️</button>
+          <button type="button" id="get-location-dest" class="geo-btn" title="Seleccionar en mapa">
+            <Icon name="map" size={20} />
+          </button>
         </div>
         <div id="destination-results" class="autocomplete-results"></div>
       </div>
@@ -26,7 +31,9 @@
         <div class="modal-content">
           <div class="modal-header">
             <h3>Selecciona una parada</h3>
-            <button type="button" id="close-map" class="close-btn">&times;</button>
+            <button type="button" id="close-map" class="close-btn">
+              <Icon name="x" size={24} />
+            </button>
           </div>
           <div id="selection-map"></div>
           <div class="modal-footer">
@@ -41,7 +48,9 @@
         <div class="modal-content">
           <div class="modal-header">
             <h3>Detalle de la ruta</h3>
-            <button type="button" id="close-route-detail" class="close-btn">&times;</button>
+            <button type="button" id="close-route-detail" class="close-btn">
+              <Icon name="x" size={24} />
+            </button>
           </div>
           <div id="route-map" style="flex: 1; min-height: 250px;"></div>
           <div class="modal-footer" id="route-detail-info">
@@ -290,6 +299,27 @@
     transform: scale(0.95);
   }
 
+  .btn-track-route {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #94a3b8;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+  }
+
+  .btn-track-route:active {
+    color: #3b82f6;
+    border-color: #3b82f6;
+    background: #f0f7ff;
+    transform: scale(1.1);
+  }
+
   .fav-route-btn {
     background: none;
     border: none;
@@ -363,6 +393,17 @@
   import { storage } from '../utils/storage';
   import { API } from '../services/api';
   import { Geocoding } from '../services/geocoding';
+  import { 
+    createIcons, 
+    MapPin, 
+    Bus, 
+    Star, 
+    Heart, 
+    RefreshCw, 
+    X, 
+    Navigation,
+    Map
+  } from 'lucide';
 
   class TripCalculator extends HTMLElement {
     private selectedOrigin: any = null;
@@ -392,6 +433,23 @@
       window.addEventListener('request-refresh', () => {
         if (this.selectedOrigin && this.selectedDestination) {
           this.calculateRefresh();
+        }
+      });
+      
+      this.renderIcons();
+    }
+
+    renderIcons() {
+      createIcons({
+        icons: {
+          MapPin,
+          Bus,
+          Star,
+          Heart,
+          RefreshCw,
+          X,
+          Navigation,
+          Map
         }
       });
     }
@@ -593,7 +651,7 @@
             resultsDiv.innerHTML = `
               ${matchedStops.map((s: any) => `
                 <div class="autocomplete-item stop" data-type="stop" data-id="${s.id}" data-name="${s.nombre}">
-                  <span class="icon">🚏</span>
+                  <span class="icon"><i data-lucide="map-pin" style="width: 18px; height: 18px;"></i></span>
                   <div class="info">
                     <strong>${s.nombre}</strong>
                     <small>Parada ${s.id}</small>
@@ -602,7 +660,7 @@
               `).join('')}
               ${places.map((p: any) => `
                 <div class="autocomplete-item place" data-type="place" data-lat="${p.lat}" data-lon="${p.lon}" data-name="${p.full_name}">
-                  <span class="icon">📍</span>
+                  <span class="icon"><i data-lucide="navigation" style="width: 18px; height: 18px;"></i></span>
                   <div class="info">
                     <strong>${p.name}</strong>
                     <small>${p.full_name}</small>
@@ -611,6 +669,7 @@
               `).join('')}
             `;
             resultsDiv.style.display = 'block';
+            this.renderIcons();
 
             resultsDiv.querySelectorAll('.autocomplete-item').forEach(item => {
               item.addEventListener('click', () => {
@@ -763,6 +822,45 @@
           });
         });
 
+        // Add track route listeners
+        resultsDiv.querySelectorAll('.btn-track-route').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const lineId = parseInt(btn.getAttribute('data-line')!);
+            const originId = parseInt(btn.getAttribute('data-origin')!);
+            const destId = parseInt(btn.getAttribute('data-dest')!);
+            
+            try {
+              const data = await API.getStopArrivals(originId);
+              if (data.resultado === 'OK' && data.buses && data.buses.lineas) {
+                const lineInfo = data.buses.lineas.find((bl: any) => bl.linea.toString() === lineId.toString());
+                if (lineInfo && lineInfo.buses && lineInfo.buses.length > 0) {
+                  const bus = lineInfo.buses[0];
+                  if (bus.bus) {
+                    import('../utils/tracking').then(({ tracking }) => {
+                      tracking.set({
+                        busId: bus.bus.toString(),
+                        lineId: lineId,
+                        destinationStopId: destId,
+                        originStopId: originId,
+                        lastEta: null,
+                        arrivalTime: null
+                      });
+                      alert(`¡Seguimiento iniciado para el bus ${bus.bus}!`);
+                    });
+                  } else {
+                    alert('No se pudo identificar el número de bus para seguimiento.');
+                  }
+                } else {
+                  alert('No hay buses próximos para esta línea en este momento.');
+                }
+              }
+            } catch (err) {
+              alert('Error al obtener datos de tiempo real.');
+            }
+          });
+        });
+
         const toFetch = [...directRoutes.slice(0,2), ...nearbyRoutes.slice(0,2)];
         this.fetchRealTime(toFetch);
 
@@ -777,11 +875,16 @@
             
             storage.toggleFavoriteRoute(origin, dest, line, lineName);
             
-            // Toggle emoji
-            const isFav = btn.textContent?.trim() === '❤️';
-            btn.textContent = isFav ? '🤍' : '❤️';
+            // Toggle icon fill
+            const icon = btn.querySelector('svg');
+            if (icon) {
+              const isFilled = icon.getAttribute('fill') !== 'none';
+              icon.setAttribute('fill', isFilled ? 'none' : 'currentColor');
+            }
           });
         });
+
+        this.renderIcons();
       }
     }
 
@@ -1014,11 +1117,14 @@
               <small>${l.stopsCount} paradas</small>
             </div>
             <div class="route-actions-row">
+              <button class="btn-track-route" data-line="${l.lineId}" data-origin="${l.originStop.id}" data-dest="${l.destStop.id}" title="Seguir este bus">
+                <i data-lucide="navigation" style="width: 16px; height: 16px;"></i>
+              </button>
               <a href="/stop/${l.originStop.id}" class="btn-view-stop" data-dest="${l.destStop.id}">
                 Ver parada
               </a>
               <button class="fav-route-btn" data-origin="${l.originStop.id}" data-dest="${l.destStop.id}" data-line="${l.lineId}" data-line-name="${l.lineComer}">
-                ${isFav ? '❤️' : '🤍'}
+                <i data-lucide="heart" style="width: 20px; height: 20px; fill: ${isFav ? 'currentColor' : 'none'}"></i>
               </button>
             </div>
           </div>
@@ -1043,11 +1149,14 @@
               <small>Bájate en <strong>${l.destStop.nombre}</strong> y camina ${l.walkToDest}m (${Math.round(l.walkToDest/60)} min)</small>
             </div>
             <div class="route-actions-row">
+              <button class="btn-track-route" data-line="${l.lineId}" data-origin="${l.originStop.id}" data-dest="${l.destStop.id}" title="Seguir este bus">
+                <i data-lucide="navigation" style="width: 16px; height: 16px;"></i>
+              </button>
               <a href="/stop/${l.originStop.id}" class="btn-view-stop" data-dest="${l.destStop.id}">
                 Ver parada
               </a>
               <button class="fav-route-btn" data-origin="${l.originStop.id}" data-dest="${l.destStop.id}" data-line="${l.lineId}" data-line-name="${l.lineComer}">
-                ${isFav ? '❤️' : '🤍'}
+                <i data-lucide="heart" style="width: 20px; height: 20px; fill: ${isFav ? 'currentColor' : 'none'}"></i>
               </button>
             </div>
           </div>
@@ -1064,7 +1173,7 @@
           <div class="result-header">
             <div class="transfer-badges">
               <span class="line-badge" style="background-color: #${r.l1.color}">${r.l1.lin_comer}</span>
-              <span class="transfer-icon">🔄</span>
+              <span class="transfer-icon"><i data-lucide="refresh-cw" style="width: 18px; height: 18px;"></i></span>
               <span class="line-badge" style="background-color: #${r.l2.color}">${r.l2.lin_comer}</span>
             </div>
             <div class="travel-summary">

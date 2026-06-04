@@ -1,10 +1,10 @@
-# 🚌 BusCoruña PWA
+# 🚌 Coruña Bus PWA
 
-![BusCoruña Banner](https://raw.githubusercontent.com/AstroJS/astro/main/assets/astro-logo-light.svg)
+![Coruña Bus Banner](https://raw.githubusercontent.com/AstroJS/astro/main/assets/astro-logo-light.svg)
 
 > **Tu asistente inteligente para el transporte público en A Coruña.** 
 
-BusCoruña es una Progressive Web App (PWA) moderna diseñada para ofrecer la mejor experiencia de usuario al consultar tiempos de llegada, planear rutas y realizar el seguimiento de autobuses en tiempo real.
+Coruña Bus es una Progressive Web App (PWA) moderna diseñada para ofrecer la mejor experiencia de usuario al consultar tiempos de llegada, planear rutas y realizar el seguimiento de autobuses en tiempo real.
 
 ## ✨ Características Principales
 
@@ -14,6 +14,7 @@ BusCoruña es una Progressive Web App (PWA) moderna diseñada para ofrecer la me
 - ⭐ **Favoritos Personalizados**: Guarda tus paradas y rutas habituales para un acceso instantáneo.
 - 🌙 **Diseño Mobile-First**: Una interfaz limpia, rápida y optimizada para su uso en movimiento, con los colores corporativos de la ciudad.
 - 📡 **Modo Offline**: Gracias al cacheo inteligente del catálogo, la búsqueda de paradas y líneas funciona incluso sin conexión.
+- 🛡️ **Privacidad Total**: Sin anuncios, sin rastreadores y sin necesidad de crear una cuenta.
 
 ## 🚀 Tecnologías Utilizadas
 
@@ -27,8 +28,8 @@ BusCoruña es una Progressive Web App (PWA) moderna diseñada para ofrecer la me
 
 1. **Clonar el repositorio**:
    ```bash
-   git clone https://github.com/tu-usuario/buscoruna.git
-   cd buscoruna
+   git clone https://github.com/tu-usuario/corunabus.git
+   cd corunabus
    ```
 
 2. **Instalar dependencias**:
@@ -56,5 +57,7 @@ Este proyecto está optimizado para ejecutarse en el edge de Cloudflare:
 4. ¡Listo! Cloudflare se encargará de desplegar cada commit automáticamente.
 
 ---
+
+**Aviso Legal:** Coruña Bus es una aplicación independiente de carácter informativo. No tiene relación oficial con la Compañía de Tranvías de La Coruña ni con el Ayuntamiento de A Coruña. Los datos se ofrecen "tal cual" para facilitar la movilidad urbana.
 
 Desarrollado con ❤️ para los ciudadanos de A Coruña.

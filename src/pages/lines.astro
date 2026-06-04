@@ -1,8 +1,9 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import Icon from '../components/Icon.astro';
 ---
 
-<Layout title="Líneas - BusCoruña">
+<Layout title="Líneas - Coruña Bus">
 	<section class="lines-page">
     <div id="lines-view">
       <h2>Líneas de bus</h2>
@@ -10,7 +11,9 @@ import Layout from '../layouts/Layout.astro';
     </div>
 
     <div id="line-detail-view" style="display: none;">
-      <button id="back-to-lines" class="btn-back">← Volver</button>
+      <button id="back-to-lines" class="btn-back">
+        <Icon name="chevron-left" size={20} class="icon-back" /> Volver
+      </button>
       <div id="line-info-header"></div>
       <div id="line-map" style="height: 300px; margin: 1rem 0; border-radius: 12px;"></div>
       <div id="line-stops-list"></div>
@@ -20,11 +23,22 @@ import Layout from '../layouts/Layout.astro';
   <script>
     import { API } from '../services/api';
     import { storage } from '../utils/storage';
+    import { createIcons, Bus, MapPin, ChevronLeft } from 'lucide';
     
     let map: any = null;
     let busMarkers: any[] = [];
     let routeLayer: any = null;
     let refreshInterval: any = null;
+
+    function renderIcons() {
+      createIcons({
+        icons: {
+          Bus,
+          MapPin,
+          ChevronLeft
+        }
+      });
+    }
 
     async function loadLines() {
       const params = new URLSearchParams(window.location.search);
@@ -119,7 +133,9 @@ import Layout from '../layouts/Layout.astro';
                 <div class="stop-dot" style="background-color: #${lineData.color}"></div>
                 <div class="stop-content-nav">
                   <a href="/stop/${pId}" class="stop-name-link">${s?.nombre || `Parada ${pId}`}</a>
-                  <button class="center-stop-btn" data-lat="${s?.posy}" data-lon="${s?.posx}">📍</button>
+                  <button class="center-stop-btn" data-lat="${s?.posy}" data-lon="${s?.posx}">
+                    <i data-lucide="map-pin" style="width: 14px; height: 14px;"></i>
+                  </button>
                 </div>
                 <div class="bus-container-list"></div>
               </div>
@@ -127,6 +143,8 @@ import Layout from '../layouts/Layout.astro';
           }).join('')}
         </div>
       `;
+
+      renderIcons();
 
       stopsList.querySelectorAll('.center-stop-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {

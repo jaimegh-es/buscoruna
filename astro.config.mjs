@@ -12,22 +12,18 @@ export default defineConfig({
       VitePWA({
         registerType: 'autoUpdate',
         manifest: {
-          name: 'BusCoruña',
-          short_name: 'BusCoruña',
+          name: 'Coruña Bus',
+          short_name: 'Coruña Bus',
           description: 'Buses de A Coruña en tiempo real',
           theme_color: '#f44336',
           background_color: '#f5f5f7',
           display: 'standalone',
           icons: [
             {
-              src: 'pwa-192x192.png',
-              sizes: '192x192',
-              type: 'image/png'
-            },
-            {
-              src: 'pwa-512x512.png',
+              src: 'logo.png',
               sizes: '512x512',
-              type: 'image/png'
+              type: 'image/png',
+              purpose: 'any maskable'
             }
           ]
         },

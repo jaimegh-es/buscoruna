@@ -1,0 +1,56 @@
+---
+import { 
+  RefreshCw, 
+  Pencil, 
+  Search, 
+  MapPin, 
+  Bus, 
+  Star, 
+  Heart, 
+  Map as MapIcon, 
+  X, 
+  ChevronRight, 
+  ChevronLeft,
+  LocateFixed,
+  ShieldCheck,
+  Ban
+} from '@lucide/astro';
+
+interface Props {
+  name: 'refresh' | 'edit' | 'search' | 'stop' | 'bus' | 'star' | 'heart' | 'map' | 'x' | 'chevron-right' | 'chevron-left' | 'location' | 'star-outline' | 'heart-outline' | 'shield' | 'ban';
+  class?: string;
+  size?: number;
+}
+
+const { name, class: className, size = 24 } = Astro.props;
+
+const iconMap = {
+  refresh: RefreshCw,
+  edit: Pencil,
+  search: Search,
+  stop: MapPin,
+  bus: Bus,
+  star: Star,
+  heart: Heart,
+  map: MapIcon,
+  x: X,
+  'chevron-right': ChevronRight,
+  'chevron-left': ChevronLeft,
+  location: LocateFixed,
+  'star-outline': Star,
+  'heart-outline': Heart,
+  shield: ShieldCheck,
+  ban: Ban
+};
+
+const SelectedIcon = iconMap[name];
+const isOutline = name.endsWith('-outline');
+---
+
+{SelectedIcon && (
+  <SelectedIcon 
+    class={className} 
+    size={size} 
+    fill={isOutline ? "none" : (name === 'star' || name === 'heart' ? "currentColor" : "none")}
+  />
+)}

@@ -1,0 +1,334 @@
+---
+import Icon from './Icon.astro';
+---
+
+<div id="landing-page" class="landing-overlay" style="display: none;">
+  <div class="landing-content">
+    <!-- Hero Section -->
+    <div class="landing-hero-section">
+      <img src="/logo.png" alt="Coruña Bus" class="landing-logo" />
+      <h1>Coruña<span>Bus</span></h1>
+      <p class="hero-tagline">Tu tiempo es oro. Muévete por Coruña con inteligencia.</p>
+      <button id="open-app-btn" class="btn-primary start-btn">
+        Entrar a la App
+      </button>
+    </div>
+
+    <div class="landing-scroll-area">
+      <!-- Feature 1: Planificador -->
+      <section class="feature-section">
+        <div class="feature-info">
+          <div class="feature-icon-box">
+            <Icon name="search" size={24} />
+          </div>
+          <h2>Planificador de Rutas</h2>
+          <p>Dinos a dónde quieres ir y a qué hora necesitas llegar. Nosotros calculamos la mejor combinación y te decimos exactamente cuánto te queda para coger el bus.</p>
+          <ul class="feature-list">
+            <li>Busca paradas cercanas automáticamente.</li>
+            <li>Acceso directo a detalles de ruta y paradas.</li>
+            <li>Horarios optimizados en tiempo real.</li>
+          </ul>
+        </div>
+        <div class="feature-video-container">
+          <video autoplay loop muted playsinline class="demo-video">
+            <source src="/demos/calculadora-rutas.mp4" type="video/mp4" />
+          </video>
+        </div>
+      </section>
+
+      <!-- Feature 2: Calculadora de Tiempo -->
+      <section class="feature-section alt">
+        <div class="feature-info">
+          <div class="feature-icon-box">
+            <Icon name="refresh" size={24} />
+          </div>
+          <h2>Calculadora de Tiempo</h2>
+          <p>Visualiza en segundos a qué hora llegará tu bus. ¿Vas con retraso? ¿Llegas justo? Compruébalo al instante y avisa a quien te espera.</p>
+        </div>
+        <div class="feature-video-container">
+          <video autoplay loop muted playsinline class="demo-video">
+            <source src="/demos/calculadora-tiempo.mp4" type="video/mp4" />
+          </video>
+        </div>
+      </section>
+
+      <!-- Feature 3: Buscador de Paradas -->
+      <section class="feature-section">
+        <div class="feature-info">
+          <div class="feature-icon-box">
+            <Icon name="stop" size={24} />
+          </div>
+          <h2>Buscador de Paradas</h2>
+          <p>Encuentra todas las paradas de la ciudad. Filtra por número, nombre o simplemente usa tu ubicación para ver qué tienes más cerca.</p>
+        </div>
+        <div class="feature-video-container">
+          <video autoplay loop muted playsinline class="demo-video">
+            <source src="/demos/paradas.mp4" type="video/mp4" />
+          </video>
+        </div>
+      </section>
+
+      <!-- Feature 4: Privacidad y Sin Instalación -->
+      <section class="feature-section alt">
+        <div class="feature-info">
+          <div class="feature-icon-box">
+            <Icon name="shield" size={24} />
+          </div>
+          <h2>Privacidad y Sin Instalación</h2>
+          <p>Accede directamente desde tu navegador sin descargar nada de la App Store. Respetamos tu privacidad: la app no accede a tus archivos, contactos ni datos personales.</p>
+          <ul class="feature-list">
+            <li>Sin acceso al sistema ni archivos.</li>
+            <li>No requiere cuenta ni registro.</li>
+            <li>Instalación opcional como Web App.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Feature 5: 100% Libre de Anuncios -->
+      <section class="feature-section">
+        <div class="feature-info">
+          <div class="feature-icon-box">
+            <Icon name="ban" size={24} />
+          </div>
+          <h2>100% Libre de Anuncios</h2>
+          <p>Disfruta de una experiencia limpia y enfocada en lo que importa: llegar a tiempo. Sin banners molestos, sin rastreadores y sin interrupciones publicitarias.</p>
+        </div>
+      </section>
+
+      <footer class="landing-footer">
+        <img src="/logo.png" alt="Coruña Bus" class="footer-logo" />
+        <p>Coruña Bus - 2026</p>
+        <button id="open-app-footer-btn" class="btn-secondary">
+          Abrir App Web
+        </button>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<style>
+  .landing-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg);
+    z-index: 9999;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .landing-content {
+    max-width: 600px;
+    margin: 0 auto;
+    background: white;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .landing-hero-section {
+    padding: 4rem 2rem 3rem;
+    text-align: center;
+    background: linear-gradient(to bottom, #fff, var(--bg));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    border-bottom: 1px solid #eee;
+  }
+
+  .landing-logo {
+    width: 100px;
+    height: 100px;
+    border-radius: 24px;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  }
+
+  .landing-hero-section h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+  }
+
+  .landing-hero-section h1 span {
+    font-weight: 300;
+  }
+
+  .hero-tagline {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+    line-height: 1.4;
+  }
+
+  .start-btn {
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    width: 100%;
+    max-width: 250px;
+  }
+
+  .feature-section {
+    padding: 3rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .feature-section.alt {
+    background: #fafafa;
+  }
+
+  .feature-icon-box {
+    width: 48px;
+    height: 48px;
+    background: var(--primary);
+    color: white;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+  }
+
+  .feature-info h2 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin-bottom: 1rem;
+  }
+
+  .feature-info p {
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+  }
+
+  .feature-list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .feature-list li {
+    padding-left: 1.5rem;
+    position: relative;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+    color: var(--text);
+  }
+
+  .feature-list li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: var(--primary);
+    font-weight: bold;
+  }
+
+  .feature-video-container {
+    width: 100%;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+    background: #000;
+    aspect-ratio: 9 / 16;
+  }
+
+  .demo-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .landing-footer {
+    padding: 4rem 2rem;
+    text-align: center;
+    background: var(--text);
+    color: white;
+  }
+
+  .footer-logo {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    opacity: 0.8;
+  }
+
+  .landing-footer p {
+    font-size: 0.8rem;
+    opacity: 0.6;
+    margin-bottom: 2rem;
+  }
+
+  /* Tablet/Desktop adjustments */
+  @media (min-width: 600px) {
+    .landing-overlay {
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(10px);
+    }
+    
+    .landing-content {
+      box-shadow: 0 0 100px rgba(0,0,0,0.5);
+    }
+
+    .feature-video-container {
+      max-width: 300px;
+      margin: 0 auto;
+    }
+  }
+</style>
+
+<script>
+  const landing = document.getElementById('landing-page');
+  const openAppBtns = [
+    document.getElementById('open-app-btn'),
+    document.getElementById('open-app-footer-btn')
+  ];
+
+  function hideLanding() {
+    if (landing) landing.style.display = 'none';
+    localStorage.setItem('landing-viewed', 'true');
+    window.scrollTo(0, 0);
+  }
+
+  function showLanding() {
+    if (landing) landing.style.display = 'block';
+  }
+
+  // Initial check
+  if (!localStorage.getItem('landing-viewed')) {
+    showLanding();
+  }
+
+  openAppBtns.forEach(btn => {
+    btn?.addEventListener('click', hideLanding);
+  });
+
+  // Shortcut to show landing again: Double click on header title
+  // We use a broader listener since Layout components are shared
+  window.addEventListener('load', () => {
+    const mainHeaderTitle = document.querySelector('.main-header .header-content h1');
+    
+    mainHeaderTitle?.addEventListener('dblclick', () => {
+      showLanding();
+    });
+
+    // Mobile multiple taps
+    let tapCount = 0;
+    let tapTimer: any = null;
+    mainHeaderTitle?.addEventListener('touchstart', () => {
+      tapCount++;
+      clearTimeout(tapTimer);
+      tapTimer = setTimeout(() => { tapCount = 0; }, 400);
+      
+      if (tapCount >= 2) {
+        showLanding();
+        tapCount = 0;
+      }
+    });
+  });
+</script>

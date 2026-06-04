@@ -1,12 +1,34 @@
 const BASE_URL = '/api/proxy';
 
+let activeRequests = 0;
+
+export function isApiLoading() {
+  return activeRequests > 0;
+}
+
+function updateLoadingState(delta: number) {
+  activeRequests += delta;
+  if (activeRequests === 1 && delta === 1) {
+    window.dispatchEvent(new CustomEvent('api-loading-start'));
+  } else if (activeRequests === 0) {
+    window.dispatchEvent(new CustomEvent('api-loading-end'));
+  }
+}
+
 export async function getQuery(func: number, dato: string) {
   const url = `${BASE_URL}?func=${func}&dato=${dato}`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`API error: ${response.statusText}`);
+  
+  updateLoadingState(1);
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`API error: ${response.statusText}`);
+    }
+    return await response.json();
+  } finally {
+    updateLoadingState(-1);
   }
-  return response.json();
 }
 
 export const API = {

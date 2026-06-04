@@ -1,4 +1,4 @@
-# BusCoruña PWA: Project Specification
+# Coruña Bus PWA: Project Specification
 
 A modern, high-performance Progressive Web App for the A Coruña bus system, focusing on intelligent trip planning and real-time data.
 

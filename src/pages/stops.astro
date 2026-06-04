@@ -1,12 +1,15 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import Icon from '../components/Icon.astro';
 ---
 
-<Layout title="Paradas - BusCoruña">
+<Layout title="Paradas - Coruña Bus">
 	<section class="stops-page">
 	  <div class="header-section">
 	    <h2>Paradas</h2>
-	    <button id="refresh-gps" class="btn-icon" title="Localizar por GPS">📍</button>
+	    <button id="refresh-gps" class="btn-icon" title="Localizar por GPS">
+				<Icon name="location" size={24} />
+			</button>
 	  </div>
 
     <div class="search-container card">
@@ -24,6 +27,7 @@ import Layout from '../layouts/Layout.astro';
 	<script>
 	  import { storage } from '../utils/storage';
 	  import { API } from '../services/api';
+		import { createIcons, MapPin, ChevronRight, LocateFixed } from 'lucide';
 
 	  let map: any = null;
 	  let markers: any[] = [];
@@ -146,11 +150,19 @@ import Layout from '../layouts/Layout.astro';
                   }).join('')}
 	              </div>
 	            </div>
-	            <div class="stop-arrow">→</div>
+	            <div class="stop-arrow"><i data-lucide="chevron-right"></i></div>
 	          </a>
 	        `).join('')}
 	      </div>
 	    `;
+
+      createIcons({
+        icons: {
+          MapPin,
+          ChevronRight,
+          LocateFixed
+        }
+      });
 
       // @ts-ignore
       const bounds = L.latLngBounds([[lat, lon]]);

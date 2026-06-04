@@ -1,8 +1,9 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import Icon from '../components/Icon.astro';
 ---
 
-<Layout title="Favoritos - BusCoruña">
+<Layout title="Favoritos - Coruña Bus">
 	<section class="favorites-page">
     <h2>Mis Favoritos</h2>
     <div id="favorites-container">
@@ -14,6 +15,7 @@ import Layout from '../layouts/Layout.astro';
     import { storage } from '../utils/storage';
     import { API } from '../services/api';
     import { tracking } from '../utils/tracking';
+    import { createIcons, Star, Heart, ChevronRight } from 'lucide';
 
     async function loadFavorites() {
       const container = document.getElementById('favorites-container');
@@ -26,11 +28,12 @@ import Layout from '../layouts/Layout.astro';
       if (favIds.length === 0 && favRoutes.length === 0) {
         container.innerHTML = `
           <div class="empty-state">
-            <span class="icon">⭐</span>
+            <span class="icon"><i data-lucide="star"></i></span>
             <p>Aún no tienes favoritos.</p>
             <p><small>Pulsa la estrella en una parada o el corazón en una ruta para guardarla.</small></p>
           </div>
         `;
+        createIcons({ icons: { Star } });
         return;
       }
 
@@ -66,14 +69,14 @@ import Layout from '../layouts/Layout.astro';
                         return `<span class="line-tag" style="background-color: #${info.color}">${info.name}</span>`;
                       }).join('')}
                     </div>
-                  </div>
-                  <div class="stop-arrow">→</div>
-                </a>
-              `;
-            }).join('')}
-          </div>
-        `;
-      }
+                    </div>
+                    <div class="stop-arrow"><i data-lucide="chevron-right"></i></div>
+                    </a>
+                    `;
+                    }).join('')}
+                    </div>
+                    `;
+                    }
 
       if (favRoutes.length > 0) {
         html += `
@@ -93,16 +96,17 @@ import Layout from '../layouts/Layout.astro';
                       <strong>${origin?.nombre || 'Origen'} &rarr; ${dest?.nombre || 'Destino'}</strong>
                       <small>Desde parada ${r.originId}</small>
                     </div>
-                  </div>
-                  <div class="stop-arrow">→</div>
-                </a>
-              `;
-            }).join('')}
-          </div>
-        `;
-      }
+                    </div>
+                    <div class="stop-arrow"><i data-lucide="chevron-right"></i></div>
+                    </a>
+                    `;
+                    }).join('')}
+                    </div>
+                    `;
+                    }
 
       container.innerHTML = html;
+      createIcons({ icons: { Star, Heart, ChevronRight } });
 
       // Add listeners to favorite route links to set target destination
       container.querySelectorAll('.favorite-route-link').forEach(link => {

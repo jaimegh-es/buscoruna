@@ -4,6 +4,9 @@ interface Props {
 }
 
 import CatalogLoader from '../components/CatalogLoader.astro';
+import Icon from '../components/Icon.astro';
+import InstallPopup from '../components/InstallPopup.astro';
+import Landing from '../components/Landing.astro';
 
 const { title } = Astro.props;
 ---
@@ -12,27 +15,67 @@ const { title } = Astro.props;
 <html lang="es">
 	<head>
 		<meta charset="UTF-8" />
-		<meta name="description" content="BusCoruña - Planificador de buses en tiempo real para A Coruña" />
+		<meta name="description" content="Coruña Bus - El mejor planificador de rutas y tiempos en tiempo real para los buses de A Coruña. Consulta paradas, líneas y horarios actualizados." />
+		<meta name="keywords" content="bus coruña, tranvias coruña, tiempos bus coruña, paradas bus coruña, transporte publico a coruña" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="generator" content={Astro.generator} />
+    
+    <!-- SEO & Social Media -->
+		<meta property="og:title" content={title || 'Coruña Bus - Tiempos en tiempo real'} />
+		<meta property="og:description" content="Planifica tu ruta y consulta tiempos de llegada de los buses de A Coruña en tiempo real." />
+		<meta property="og:image" content="/logo.png" />
+		<meta property="og:type" content="website" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content="Coruña Bus" />
+		<meta name="twitter:description" content="Tiempos y rutas de bus en A Coruña al instante." />
+		<meta name="twitter:image" content="/logo.png" />
+
 		<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 		<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-		<title>{title}</title>
+		<title>{title.replace('BusCoruña', 'Coruña Bus')}</title>
 	</head>
 	<body>
 		<CatalogLoader />
-		<header>
+    <Landing />
+    <InstallPopup />
+    
+    <!-- Global Loader Overlay -->
+    <div id="global-api-loader" class="global-loader-overlay">
+      <div class="loader-content">
+        <img src="/logo.png" alt="Cargando..." class="loader-logo-pulsing" />
+        <span class="loader-text">Cargando datos</span>
+      </div>
+    </div>
+
+		<header class="main-header">
 			<div class="header-content">
-				<h1>Bus<span>Coruña</span></h1>
+				<div class="logo-container">
+					<img src="/logo.png" alt="Coruña Bus Logo" class="header-logo" id="header-logo" />
+					<h1>Coruña<span>Bus</span></h1>
+				</div>
 				<div class="header-actions">
 					<div id="last-update" class="last-update">...</div>
-					<button id="global-refresh-btn" class="refresh-btn" title="Actualizar datos">🔄</button>
+					<button id="global-refresh-btn" class="refresh-btn" title="Actualizar datos">
+						<Icon name="refresh" size={18} />
+					</button>
 				</div>
 			</div>
 		</header>
 		<main>
 			<slot />
+      
+      <footer class="global-recommendation">
+        <div class="card recommendation-card">
+          <Icon name="heart" size={20} class="text-primary" />
+          <p>¿Te gusta Coruña Bus? ¡Recomiéndalo a tus amigos!</p>
+          <button id="share-app-btn" class="btn-share-subtle">Compartir App</button>
+        </div>
+
+        <div class="legal-disclaimer">
+          <p><strong>Aviso Legal:</strong> Coruña Bus es una aplicación independiente de carácter informativo. No tiene relación oficial con la Compañía de Tranvías de La Coruña ni con el Ayuntamiento de A Coruña. Los datos mostrados se ofrecen "tal cual" para facilitar la movilidad urbana.</p>
+        </div>
+      </footer>
 		</main>
 
     <!-- Tracking Bar -->
@@ -44,26 +87,41 @@ const { title } = Astro.props;
             <strong>Hacia <span id="track-dest-name">...</span></strong>
             <small id="track-status">Calculando llegada...</small>
           </div>
+          <button id="edit-tracking-dest" class="edit-track-btn" title="Cambiar destino">
+						<Icon name="edit" size={14} />
+					</button>
         </div>
         <div class="tracking-eta" id="track-eta-val">--</div>
-        <button id="stop-tracking" class="stop-track-btn">✕</button>
+        <button id="stop-tracking" class="stop-track-btn">
+					<Icon name="x" size={20} />
+				</button>
+      </div>
+    </div>
+
+    <!-- Global Destination Modal (Fallback) -->
+    <div id="global-destination-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-content card">
+        <h3>¿A qué parada vas?</h3>
+        <p class="text-muted small">Selecciona tu destino en la línea <strong id="modal-line-name">...</strong></p>
+        <div id="global-stops-list-modal" class="modal-list"></div>
+        <button id="close-global-modal" class="btn-secondary mt-1">Cancelar</button>
       </div>
     </div>
 		<nav class="bottom-nav">
 			<a href="/" class="nav-item">
-				<span class="icon">🔍</span>
+				<span class="icon"><Icon name="search" /></span>
 				<span class="label">Planear</span>
 			</a>
 			<a href="/stops" class="nav-item">
-				<span class="icon">🚏</span>
+				<span class="icon"><Icon name="stop" /></span>
 				<span class="label">Paradas</span>
 			</a>
 			<a href="/lines" class="nav-item">
-				<span class="icon">🚌</span>
+				<span class="icon"><Icon name="bus" /></span>
 				<span class="label">Líneas</span>
 			</a>
 			<a href="/favorites" class="nav-item">
-				<span class="icon">⭐</span>
+				<span class="icon"><Icon name="star" /></span>
 				<span class="label">Favoritos</span>
 			</a>
 		</nav>
@@ -97,7 +155,7 @@ const { title } = Astro.props;
 		min-height: 100vh;
 	}
 
-	header {
+	.main-header {
 		position: fixed;
 		top: 0;
 		left: 0;
@@ -119,10 +177,71 @@ const { title } = Astro.props;
 		width: 100%;
 	}
 
+	.logo-container {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.header-logo {
+		height: 32px;
+		width: auto;
+	}
+
 	.header-content h1 {
 		font-size: 1.5rem;
 		font-weight: 800;
 	}
+
+  /* Global Loading Spinner */
+  .global-loader-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(245, 245, 247, 0.7);
+    backdrop-filter: blur(2px);
+    z-index: 5000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .global-loader-overlay.active {
+    display: flex;
+  }
+
+  .loader-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .loader-logo-pulsing {
+    width: 100px;
+    height: 100px;
+    border-radius: 24px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+    animation: logo-pulse 1.5s ease-in-out infinite;
+    object-fit: cover;
+  }
+
+  @keyframes logo-pulse {
+    0% { transform: scale(0.92); opacity: 0.8; }
+    50% { transform: scale(1.08); opacity: 1; }
+    100% { transform: scale(0.92); opacity: 0.8; }
+  }
+
+  .loader-text {
+    font-weight: 700;
+    color: var(--primary);
+    font-size: 0.9rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-shadow: 0 2px 4px rgba(255,255,255,0.5);
+  }
 
 	.header-content h1 span {
 		font-weight: 300;
@@ -324,12 +443,136 @@ const { title } = Astro.props;
     opacity: 0.5;
     padding: 4px;
   }
+
+  .edit-track-btn {
+    background: rgba(255,255,255,0.1);
+    border: none;
+    color: white;
+    font-size: 0.8rem;
+    padding: 4px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: 0.5rem;
+  }
+
+  /* Modal Overlay (Reuse) */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.6);
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    backdrop-filter: blur(4px);
+  }
+
+  .modal-list {
+    margin: 1rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+
+  .modal-list-item {
+    padding: 1rem;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+    background: #f9f9f9;
+  }
+
+  .modal-list-item:active { background: #eee; }
+  .modal-list-item strong { display: block; font-size: 0.95rem; color: #333; }
+  .modal-list-item small { color: #666; }
+
+  .btn-secondary {
+    background: #eee;
+    color: #333;
+    padding: 0.75rem;
+    border-radius: 8px;
+    font-weight: 600;
+    width: 100%;
+  }
+
+  .mt-1 { margin-top: 1rem; }
+  .text-muted { color: #666; }
+  .small { font-size: 0.85rem; }
+
+  .global-recommendation {
+    margin-top: 3rem;
+    padding-bottom: 2rem;
+    text-align: center;
+  }
+
+  .recommendation-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    background: #fff;
+    border: 1px dashed var(--primary);
+  }
+
+  .recommendation-card p {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .btn-share-subtle {
+    background: var(--bg);
+    padding: 0.5rem 1.5rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--primary);
+  }
+
+  .text-primary {
+    color: var(--primary);
+  }
+
+  .legal-disclaimer {
+    margin-top: 2rem;
+    padding: 1rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.4;
+    border-top: 1px solid #eee;
+  }
 </style>
 
 <script>
   import { tracking } from '../utils/tracking';
-  import { API } from '../services/api';
+  import { API, isApiLoading } from '../services/api';
   import { storage } from '../utils/storage';
+
+	const globalLoader = document.getElementById('global-api-loader');
+
+	function checkInitialLoading() {
+		if (isApiLoading()) {
+			globalLoader?.classList.add('active');
+		}
+	}
+
+	window.addEventListener('api-loading-start', () => {
+		globalLoader?.classList.add('active');
+	});
+	window.addEventListener('api-loading-end', () => {
+		globalLoader?.classList.remove('active');
+	});
+
+	// Initialize state
+	checkInitialLoading();
 
 	function updateLastRefreshTime() {
 		const el = document.getElementById('last-update');
@@ -353,18 +596,24 @@ const { title } = Astro.props;
 
   // Tracking logic
   let trackingInterval: any = null;
+  let isUpdating = false;
 
   async function updateTrackingUI() {
+    if (isUpdating) return;
     const info = tracking.get();
     const bar = document.getElementById('tracking-bar');
     if (!bar) return;
 
     if (!info) {
       bar.style.display = 'none';
-      if (trackingInterval) clearInterval(trackingInterval);
+      if (trackingInterval) {
+        clearInterval(trackingInterval);
+        trackingInterval = null;
+      }
       return;
     }
 
+    isUpdating = true;
     bar.style.display = 'block';
     document.getElementById('track-bus-id')!.textContent = info.busId;
     
@@ -383,9 +632,10 @@ const { title } = Astro.props;
       let busFoundAtStop = false;
       let targetBus: any = null;
 
-      if (data.resultado === 'OK' && data.buses && data.buses.lineas) {
+      if (data && data.resultado === 'OK' && data.buses && Array.isArray(data.buses.lineas)) {
         for (const l of data.buses.lineas) {
-          const b = l.buses.find((bus: any) => bus.bus.toString() === info.busId.toString());
+          if (!Array.isArray(l.buses)) continue;
+          const b = l.buses.find((bus: any) => bus.bus && bus.bus.toString() === info.busId.toString());
           if (b) {
             targetBus = b;
             busFoundAtStop = true;
@@ -395,10 +645,17 @@ const { title } = Astro.props;
       }
 
       if (busFoundAtStop && targetBus) {
-        const time = typeof targetBus.tiempo === 'number' ? targetBus.tiempo : parseInt(targetBus.tiempo);
+        let time = typeof targetBus.tiempo === 'number' ? targetBus.tiempo : parseInt(targetBus.tiempo);
+        if (isNaN(time)) time = 0; // Fallback for ">>>", "PRX", etc.
+        
         document.getElementById('track-eta-val')!.textContent = time.toString();
         const arrivalTime = new Date(Date.now() + time * 60000);
-        document.getElementById('track-status')!.textContent = `Llegada: ${arrivalTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
+        let timeStr = '--:--';
+        try {
+          timeStr = arrivalTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        } catch (e) { /* ignore invalid date */ }
+        
+        document.getElementById('track-status')!.textContent = `Llegada: ${timeStr}`;
         if (time === 0) document.getElementById('track-status')!.textContent = '¡Llegando a destino!';
       } else {
         // Step 2: Fallback - Check full line info (func=2)
@@ -409,11 +666,11 @@ const { title } = Astro.props;
         if (lineData && lineData.paradas && catalog) {
           // Normalize lineData paradas into a flat list of stops with their buses
           const stopsWithBuses = [];
-          if (lineData.paradas) {
+          if (Array.isArray(lineData.paradas)) {
             for (const dir of lineData.paradas) {
-              if (dir.paradas) {
+              if (Array.isArray(dir.paradas)) {
                 for (const p of dir.paradas) {
-                  if (p.buses && p.buses.some((b: any) => b.bus.toString() === info.busId.toString())) {
+                  if (Array.isArray(p.buses) && p.buses.some((b: any) => b.bus && b.bus.toString() === info.busId.toString())) {
                     stopsWithBuses.push(parseInt(p.id.toString()));
                   }
                 }
@@ -425,9 +682,10 @@ const { title } = Astro.props;
             const busAtStopId = stopsWithBuses[0];
             const targetDestIdNum = parseInt(info.destinationStopId.toString());
             
-            const line = catalog.actualizacion.lineas.find(l => l.id.toString() === info.lineId.toString());
-            if (line) {
+            const line = catalog.actualizacion.lineas.find((l: any) => l.id.toString() === info.lineId.toString());
+            if (line && Array.isArray(line.rutas)) {
               for (const route of line.rutas) {
+                if (!Array.isArray(route.paradas)) continue;
                 const routeParadas = route.paradas.map(p => parseInt(p.toString()));
                 const bIdx = routeParadas.indexOf(busAtStopId);
                 const dIdx = routeParadas.indexOf(targetDestIdNum);
@@ -452,7 +710,10 @@ const { title } = Astro.props;
         }
       }
     } catch (err) {
-      console.warn('Failed to update tracking ETA');
+      console.warn('Failed to update tracking ETA', err);
+      document.getElementById('track-status')!.textContent = 'Error de conexión';
+    } finally {
+      isUpdating = false;
     }
 
     if (!trackingInterval) {
@@ -480,8 +741,87 @@ const { title } = Astro.props;
     updateTrackingUI();
   });
 
-  // Initial load
-  updateTrackingUI();
+  // Modal logic for fallback
+  document.getElementById('edit-tracking-dest')?.addEventListener('click', async () => {
+    const info = tracking.get();
+    if (!info) return;
+
+    const modal = document.getElementById('global-destination-modal')!;
+    const list = document.getElementById('global-stops-list-modal')!;
+    const lineNameEl = document.getElementById('modal-line-name')!;
+    
+    modal.style.display = 'flex';
+    list.innerHTML = '<div class="small">Cargando paradas...</div>';
+
+    try {
+      const catalog = storage.getCatalog();
+      const lineData = await API.getLineInfo(info.lineId);
+      
+      if (lineData && Array.isArray(lineData.paradas) && catalog) {
+        lineNameEl.textContent = info.lineId.toString();
+        const line = catalog.actualizacion.lineas.find((l: any) => l.id.toString() === info.lineId.toString());
+        if (line) lineNameEl.textContent = line.lin_comer;
+
+        // Find current bus position to filter upcoming stops
+        let currentBusStopId: number | null = null;
+        for (const dir of lineData.paradas) {
+          if (Array.isArray(dir.paradas)) {
+            for (const p of dir.paradas) {
+              if (Array.isArray(p.buses) && p.buses.some((b: any) => b.bus && b.bus.toString() === info.busId.toString())) {
+                currentBusStopId = parseInt(p.id.toString());
+                break;
+              }
+            }
+          }
+          if (currentBusStopId) break;
+        }
+
+        // Get all stops on the line (from catalog for names)
+        const allStopIds: number[] = [];
+        if (line) {
+          line.rutas.forEach((r: any) => {
+            r.paradas.forEach((sId: any) => {
+              if (!allStopIds.includes(parseInt(sId))) allStopIds.push(parseInt(sId));
+            });
+          });
+        }
+
+        // Filter: if we know where the bus is, only show stops after it.
+        // For simplicity, if we don't know, show all.
+        list.innerHTML = allStopIds.map(sId => {
+          const s = catalog.paradas[sId];
+          return `
+            <div class="modal-list-item" data-stop="${sId}">
+              <strong>${s?.nombre || sId}</strong>
+              <small>Parada ${sId}</small>
+            </div>
+          `;
+        }).join('');
+
+        list.querySelectorAll('.modal-list-item').forEach(item => {
+          item.addEventListener('click', () => {
+            const newDestId = parseInt(item.getAttribute('data-stop')!);
+            const currentInfo = tracking.get();
+            if (currentInfo) {
+              tracking.set({
+                ...currentInfo,
+                destinationStopId: newDestId
+              });
+            }
+            modal.style.display = 'none';
+          });
+        });
+      } else {
+        list.innerHTML = '<div class="small">No se pudieron cargar las paradas de esta línea.</div>';
+      }
+    } catch (err) {
+      list.innerHTML = '<div class="small">Error al conectar con el servidor.</div>';
+    }
+  });
+
+  document.getElementById('close-global-modal')?.addEventListener('click', () => {
+    document.getElementById('global-destination-modal')!.style.display = 'none';
+  });
 
 	// Auto refresh every 30 seconds
 	setInterval(() => {
@@ -491,4 +831,23 @@ const { title } = Astro.props;
 
 	// Initial time
 	updateLastRefreshTime();
+
+  // Share functionality
+  document.getElementById('share-app-btn')?.addEventListener('click', async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Coruña Bus',
+          text: '¡Mira esta app para moverte por Coruña en bus!',
+          url: window.location.origin
+        });
+      } catch (err) {
+        console.error('Error sharing:', err);
+      }
+    } else {
+      // Fallback: copy to clipboard
+      navigator.clipboard.writeText(window.location.origin);
+      alert('Enlace copiado al portapapeles. ¡Gracias por compartir!');
+    }
+  });
 </script>

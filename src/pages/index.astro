@@ -1,51 +1,51 @@
 ---
-import Layout from '../layouts/Layout.astro';
-import TripCalculator from '../components/TripCalculator.astro';
+import Layout from "../layouts/Layout.astro";
+import TripCalculator from "../components/TripCalculator.astro";
 ---
 
-<Layout title="BusCoruña - Planificador">
-	<section class="welcome">
-		<h2>¿A dónde quieres ir?</h2>
-		<p>Calcula la mejor combinación de buses en tiempo real.</p>
-	</section>
+<Layout title="Coruña Bus | La webapp definitiva todo en uno">
+    <section class="welcome">
+        <h2>¿A dónde quieres ir?</h2>
+        <p>Calcula la mejor combinación de buses en tiempo real.</p>
+    </section>
 
-	<TripCalculator />
+    <TripCalculator />
 
-	<section class="quick-links">
-		<div class="card">
-			<h3>Paradas cercanas</h3>
-			<p>Encuentra las paradas a tu alrededor.</p>
-			<a href="/stops" class="btn-secondary">Ver paradas</a>
-		</div>
-	</section>
+    <section class="quick-links">
+        <div class="card">
+            <h3>Paradas cercanas</h3>
+            <p>Encuentra las paradas a tu alrededor.</p>
+            <a href="/stops" class="btn-secondary">Ver paradas</a>
+        </div>
+    </section>
 </Layout>
 
 <style>
-	.welcome {
-		margin-bottom: 2rem;
-	}
+    .welcome {
+        margin-bottom: 2rem;
+    }
 
-	.welcome h2 {
-		font-size: 1.75rem;
-		margin-bottom: 0.5rem;
-	}
+    .welcome h2 {
+        font-size: 1.75rem;
+        margin-bottom: 0.5rem;
+    }
 
-	.welcome p {
-		color: var(--text-muted);
-	}
+    .welcome p {
+        color: var(--text-muted);
+    }
 
-	.quick-links h3 {
-		margin-bottom: 0.5rem;
-	}
+    .quick-links h3 {
+        margin-bottom: 0.5rem;
+    }
 
-	.btn-secondary {
-		display: inline-block;
-		margin-top: 1rem;
-		padding: 0.5rem 1rem;
-		background: #eee;
-		color: var(--text);
-		text-decoration: none;
-		border-radius: 6px;
-		font-weight: 600;
-	}
+    .btn-secondary {
+        display: inline-block;
+        margin-top: 1rem;
+        padding: 0.5rem 1rem;
+        background: #eee;
+        color: var(--text);
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: 600;
+    }
 </style>

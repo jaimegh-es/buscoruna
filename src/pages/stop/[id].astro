@@ -1,16 +1,18 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import Icon from '../../components/Icon.astro';
 ---
 
-<Layout title="Detalle de Parada - BusCoruña">
+<Layout title="Detalle de Parada - Coruña Bus">
   <section class="stop-detail-page">
     <div id="stop-header" class="card">
       <div class="header-main">
         <div class="stop-id-badge" id="display-stop-id">...</div>
         <h2 id="display-stop-name">Cargando...</h2>
         <button id="favorite-btn" class="fav-btn">
-          <span class="icon-outline">☆</span>
-          <span class="icon-filled" style="display: none;">⭐</span>
+          <div id="fav-icon-container">
+            <Icon name="star-outline" />
+          </div>
         </button>
       </div>
       <p id="display-stop-address" class="text-muted"></p>
@@ -45,6 +47,7 @@ import Layout from '../../layouts/Layout.astro';
     import { storage } from '../../utils/storage';
     import { API } from '../../services/api';
     import { tracking } from '../../utils/tracking';
+    import { createIcons, Star, Navigation } from 'lucide';
 
     // Get ID from URL
     const pathParts = window.location.pathname.split('/');
@@ -53,6 +56,15 @@ import Layout from '../../layouts/Layout.astro';
     let map: any = null;
     let stopData: any = null;
     let pendingTracking: { busId: string, lineId: number } | null = null;
+
+    function renderIcons() {
+      createIcons({
+        icons: {
+          Star,
+          Navigation
+        }
+      });
+    }
 
     async function init() {
       if (isNaN(stopId)) {
@@ -152,7 +164,7 @@ import Layout from '../../layouts/Layout.astro';
                     </div>
                     ${l.buses[0]?.bus ? `
                       <button class="btn-track-subtle" data-bus="${l.buses[0].bus}" data-line="${l.linea}" title="Subir a este bus">
-                        📍
+                        <i data-lucide="navigation" style="width: 18px; height: 18px;"></i>
                       </button>
                     ` : ''}
                   </div>
@@ -168,7 +180,9 @@ import Layout from '../../layouts/Layout.astro';
                         </div>
                         <div class="extra-bus-right">
                           <span class="extra-time"><strong>${b.tiempo}</strong> min</span>
-                          ${b.bus ? `<button class="btn-track-subtle-small" data-bus="${b.bus}" data-line="${l.linea}">📍</button>` : ''}
+                          ${b.bus ? `<button class="btn-track-subtle-small" data-bus="${b.bus}" data-line="${l.linea}">
+                            <i data-lucide="navigation" style="width: 14px; height: 14px;"></i>
+                          </button>` : ''}
                         </div>
                       </div>
                     `).join('')}
@@ -177,6 +191,8 @@ import Layout from '../../layouts/Layout.astro';
               </div>
             `;
           }).join('');
+
+          renderIcons();
 
           // Add click listeners to rows for expansion
           container.querySelectorAll('.clickable-row').forEach(row => {
@@ -281,16 +297,14 @@ import Layout from '../../layouts/Layout.astro';
     function updateFavoriteUI() {
       const favs = storage.getFavorites();
       const isFav = favs.includes(stopId);
-      const outline = document.querySelector('.icon-outline') as HTMLElement;
-      const filled = document.querySelector('.icon-filled') as HTMLElement;
+      const container = document.getElementById('fav-icon-container')!;
       
       if (isFav) {
-        outline.style.display = 'none';
-        filled.style.display = 'inline';
+        container.innerHTML = '<i data-lucide="star" style="fill: currentColor; color: #facc15;"></i>';
       } else {
-        outline.style.display = 'inline';
-        filled.style.display = 'none';
+        container.innerHTML = '<i data-lucide="star"></i>';
       }
+      renderIcons();
     }
 
     document.getElementById('favorite-btn')?.addEventListener('click', () => {
