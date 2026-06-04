@@ -379,26 +379,46 @@ const { title } = Astro.props;
       const data = await API.getStopArrivals(info.destinationStopId);
       if (data.resultado === 'OK' && data.buses && data.buses.lineas) {
         let busFound = false;
+        let targetBus: any = null;
+        let targetLineId: any = null;
+
+        // First attempt: Find by line AND bus ID
         for (const l of data.buses.lineas) {
-          // Compare using string for safety as IDs might be returned differently
           if (l.linea.toString() === info.lineId.toString()) {
-            const b = l.buses.find((bus: any) => bus.bus === info.busId);
+            const b = l.buses.find((bus: any) => bus.bus.toString() === info.busId.toString());
             if (b) {
+              targetBus = b;
+              targetLineId = l.linea;
               busFound = true;
-              const time = typeof b.tiempo === 'number' ? b.tiempo : parseInt(b.tiempo);
-              document.getElementById('track-eta-val')!.textContent = time.toString();
-              
-              const arrivalTime = new Date(Date.now() + time * 60000);
-              document.getElementById('track-status')!.textContent = `Llegada estimada: ${arrivalTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
-              
-              if (time === 0) {
-                document.getElementById('track-status')!.textContent = '¡Estás llegando a tu destino!';
-              }
               break;
             }
           }
         }
+
+        // Second attempt: Fallback search across all lines (bus IDs are unique in the fleet)
         if (!busFound) {
+          for (const l of data.buses.lineas) {
+            const b = l.buses.find((bus: any) => bus.bus.toString() === info.busId.toString());
+            if (b) {
+              targetBus = b;
+              targetLineId = l.linea;
+              busFound = true;
+              break;
+            }
+          }
+        }
+
+        if (busFound && targetBus) {
+          const time = typeof targetBus.tiempo === 'number' ? targetBus.tiempo : parseInt(targetBus.tiempo);
+          document.getElementById('track-eta-val')!.textContent = time.toString();
+          
+          const arrivalTime = new Date(Date.now() + time * 60000);
+          document.getElementById('track-status')!.textContent = `Llegada estimada: ${arrivalTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
+          
+          if (time === 0) {
+            document.getElementById('track-status')!.textContent = '¡Estás llegando a tu destino!';
+          }
+        } else {
           document.getElementById('track-status')!.textContent = 'Buscando bus...';
           document.getElementById('track-eta-val')!.textContent = '--';
         }
