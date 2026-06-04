@@ -13,6 +13,7 @@ import Layout from '../layouts/Layout.astro';
   <script>
     import { storage } from '../utils/storage';
     import { API } from '../services/api';
+    import { tracking } from '../utils/tracking';
 
     async function loadFavorites() {
       const container = document.getElementById('favorites-container');
@@ -108,7 +109,7 @@ import Layout from '../layouts/Layout.astro';
         link.addEventListener('click', (e) => {
           const destId = link.getAttribute('data-dest');
           if (destId) {
-            storage.setTargetDestination(parseInt(destId));
+            tracking.setTargetDestination(parseInt(destId));
           }
         });
       });
