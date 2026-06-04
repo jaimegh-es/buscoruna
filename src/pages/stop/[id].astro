@@ -25,6 +25,16 @@ import Layout from '../../layouts/Layout.astro';
       </div>
     </div>
 
+    <!-- Destination Selector Modal -->
+    <div id="destination-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-content card">
+        <h3>¿A qué parada vas?</h3>
+        <p class="text-muted small">Selecciona tu destino para calcular la llegada.</p>
+        <div id="stops-list-modal" class="modal-list"></div>
+        <button id="close-modal" class="btn-secondary mt-1">Cancelar</button>
+      </div>
+    </div>
+
     <div id="stop-lines" class="mt-2">
       <h3>Líneas en esta parada</h3>
       <div id="lines-passing" class="flex-wrap gap-1"></div>
@@ -34,6 +44,7 @@ import Layout from '../../layouts/Layout.astro';
   <script>
     import { storage } from '../../utils/storage';
     import { API } from '../../services/api';
+    import { tracking } from '../../utils/tracking';
 
     // Get ID from URL
     const pathParts = window.location.pathname.split('/');
@@ -41,6 +52,7 @@ import Layout from '../../layouts/Layout.astro';
 
     let map: any = null;
     let stopData: any = null;
+    let pendingTracking: { busId: string, lineId: number } | null = null;
 
     async function init() {
       if (isNaN(stopId)) {
@@ -70,6 +82,10 @@ import Layout from '../../layouts/Layout.astro';
       setInterval(fetchETAs, 30000);
 
       window.addEventListener('request-refresh', fetchETAs);
+
+      document.getElementById('close-modal')?.addEventListener('click', () => {
+        document.getElementById('destination-modal')!.style.display = 'none';
+      });
     }
 
     function renderStopInfo() {
@@ -108,6 +124,8 @@ import Layout from '../../layouts/Layout.astro';
       const catalog = storage.getCatalog();
       if (!catalog) return;
 
+      const targetDestId = tracking.getTargetDestination();
+
       try {
         const data = await API.getStopArrivals(stopId);
         if (data.resultado === 'OK' && data.buses && data.buses.lineas && data.buses.lineas.length > 0) {
@@ -117,15 +135,14 @@ import Layout from '../../layouts/Layout.astro';
             const commercialName = lineData ? lineData.lin_comer : l.linea;
             
             return `
-              <div class="card eta-card expandable" style="border-left: 6px solid ${color}" data-idx="${idx}">
-                <div class="eta-main-info">
+              <div class="card eta-card" style="border-left: 6px solid ${color}">
+                <div class="eta-main-info" data-idx="${idx}">
                   <div class="eta-line-info">
                     <span class="line-num-badge" style="background-color: ${color}">${commercialName}</span>
                     <div class="eta-dest">
                       <strong>${l.buses[0]?.destino || ''}</strong>
                       <div class="eta-bus-info">
                         ${l.buses[0]?.bus ? `<span class="bus-id">Bus: ${l.buses[0].bus}</span>` : ''}
-                        ${l.buses.length > 1 ? `<span class="next-buses">Ver +${l.buses.length - 1} buses próximos</span>` : ''}
                       </div>
                     </div>
                   </div>
@@ -135,15 +152,28 @@ import Layout from '../../layouts/Layout.astro';
                   </div>
                 </div>
                 
+                <div class="eta-actions">
+                  ${l.buses[0]?.bus ? `
+                    <button class="btn-track-action" data-bus="${l.buses[0].bus}" data-line="${l.linea}">
+                      <span class="btn-icon">📍</span>
+                      Subir a este bus
+                    </button>
+                  ` : ''}
+                  ${l.buses.length > 1 ? `<button class="btn-expand-alt" data-idx="${idx}">Ver +${l.buses.length - 1} buses próximos</button>` : ''}
+                </div>
+
                 ${l.buses.length > 1 ? `
                   <div class="eta-extra-buses" id="extra-${idx}" style="display: none;">
-                    ${l.buses.slice(1).map((b: any) => `
+                    ${l.buses.slice(1).map((b: any, bIdx: number) => `
                       <div class="extra-bus-row">
                         <div class="extra-bus-main">
                           <span>Próximo bus: <strong>${b.destino || ''}</strong></span>
                           ${b.bus ? `<small class="extra-bus-id">Bus: ${b.bus}</small>` : ''}
                         </div>
-                        <span class="extra-time"><strong>${b.tiempo}</strong> min</span>
+                        <div class="extra-bus-right">
+                          <span class="extra-time"><strong>${b.tiempo}</strong> min</span>
+                          ${b.bus ? `<button class="btn-track-small-alt" data-bus="${b.bus}" data-line="${l.linea}">📍</button>` : ''}
+                        </div>
                       </div>
                     `).join('')}
                   </div>
@@ -152,15 +182,32 @@ import Layout from '../../layouts/Layout.astro';
             `;
           }).join('');
 
-          // Add click listeners to toggle expansion
-          container.querySelectorAll('.expandable').forEach(card => {
-            card.addEventListener('click', () => {
-              const idx = card.getAttribute('data-idx');
+          // Add click listeners
+          container.querySelectorAll('.btn-expand-alt').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const idx = btn.getAttribute('data-idx');
               const extra = document.getElementById(`extra-${idx}`);
               if (extra) {
                 const isHidden = extra.style.display === 'none';
                 extra.style.display = isHidden ? 'block' : 'none';
-                card.classList.toggle('is-expanded', isHidden);
+                btn.textContent = isHidden ? 'Ocultar próximos' : `Ver +${extra.children.length} buses próximos`;
+              }
+            });
+          });
+
+          container.querySelectorAll('.btn-track-action, .btn-track-small-alt').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const busId = btn.getAttribute('data-bus')!;
+              const lineId = parseInt(btn.getAttribute('data-line')!);
+              
+              if (targetDestId) {
+                // If we already have a target destination from the planner, use it directly
+                pendingTracking = { busId, lineId };
+                startTracking(targetDestId);
+                tracking.clearTargetDestination(); // Reset planner target
+              } else {
+                openDestinationSelector(busId, lineId);
               }
             });
           });
@@ -171,6 +218,63 @@ import Layout from '../../layouts/Layout.astro';
       } catch (err) {
         container.innerHTML = '<div class="error">Error al conectar con el servidor.</div>';
       }
+    }
+
+    function openDestinationSelector(busId: string, lineId: number) {
+      pendingTracking = { busId, lineId };
+      const catalog = storage.getCatalog();
+      if (!catalog) return;
+
+      const line = catalog.actualizacion.lineas.find(l => l.id === lineId);
+      if (!line) return;
+
+      // Find which route contains the current stop
+      const route = line.rutas.find(r => r.paradas.includes(stopId));
+      if (!route) return;
+
+      // Filter stops that are AFTER the current stop in the route
+      const currentIdx = route.paradas.indexOf(stopId);
+      const upcomingStopIds = route.paradas.slice(currentIdx + 1);
+
+      const modalList = document.getElementById('stops-list-modal')!;
+      if (upcomingStopIds.length === 0) {
+        modalList.innerHTML = '<p class="text-muted">No hay paradas posteriores en esta ruta.</p>';
+      } else {
+        modalList.innerHTML = upcomingStopIds.map(sId => {
+          const s = catalog.paradas[sId];
+          return `
+            <div class="modal-list-item" data-stop="${sId}">
+              <strong>${s?.nombre || sId}</strong>
+              <small>Parada ${sId}</small>
+            </div>
+          `;
+        }).join('');
+
+        modalList.querySelectorAll('.modal-list-item').forEach(item => {
+          item.addEventListener('click', () => {
+            const destStopId = parseInt(item.getAttribute('data-stop')!);
+            startTracking(destStopId);
+          });
+        });
+      }
+
+      document.getElementById('destination-modal')!.style.display = 'flex';
+    }
+
+    function startTracking(destStopId: number) {
+      if (!pendingTracking) return;
+
+      tracking.set({
+        busId: pendingTracking.busId,
+        lineId: pendingTracking.lineId,
+        destinationStopId: destStopId,
+        originStopId: stopId,
+        lastEta: null,
+        arrivalTime: null
+      });
+
+      document.getElementById('destination-modal')!.style.display = 'none';
+      alert(`¡Seguimiento iniciado! Te avisaremos cuando llegues a tu destino.`);
     }
 
     function updateFavoriteUI() {
@@ -298,11 +402,11 @@ import Layout from '../../layouts/Layout.astro';
     to { opacity: 1; transform: translateY(0); }
   }
 
-  .eta-card.expandable {
-    cursor: pointer;
+  .eta-card {
     transition: all 0.2s ease;
     flex-direction: column;
     padding: 0;
+    overflow: hidden;
   }
 
   .eta-main-info {
@@ -369,5 +473,133 @@ import Layout from '../../layouts/Layout.astro';
     color: #3b82f6;
     display: block;
     font-weight: 600;
+  }
+
+  /* Modal Styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    backdrop-filter: blur(4px);
+  }
+
+  .modal-content {
+    width: 100%;
+    max-width: 400px;
+    max-height: 80vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  }
+
+  .modal-list {
+    margin: 1rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .modal-list-item {
+    padding: 1rem;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .modal-list-item:active {
+    background: #f0f0f0;
+    transform: scale(0.98);
+  }
+
+  .modal-list-item strong {
+    display: block;
+    font-size: 0.95rem;
+  }
+
+  .modal-list-item small {
+    color: var(--text-muted);
+  }
+
+  .btn-secondary {
+    background: #eee;
+    color: #333;
+    padding: 0.75rem;
+    border-radius: 8px;
+    font-weight: 600;
+    width: 100%;
+  }
+
+  /* Action Buttons */
+  .eta-actions {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0 1rem 1rem 1rem;
+  }
+
+  .btn-track-action {
+    flex-grow: 1;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 0.75rem;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+    transition: all 0.2s;
+  }
+
+  .btn-track-action:active {
+    background: #2563eb;
+    transform: scale(0.98);
+  }
+
+  .btn-expand-alt {
+    background: #f3f4f6;
+    color: #4b5563;
+    padding: 0.75rem;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s;
+  }
+
+  .btn-expand-alt:active {
+    background: #e5e7eb;
+  }
+
+  .extra-bus-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .btn-track-small-alt {
+    background: #3b82f6;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
   }
 </style>

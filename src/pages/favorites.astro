@@ -19,14 +19,15 @@ import Layout from '../layouts/Layout.astro';
       if (!container) return;
 
       const favIds = storage.getFavorites();
+      const favRoutes = storage.getFavoriteRoutes();
       const catalog = storage.getCatalog();
 
-      if (favIds.length === 0) {
+      if (favIds.length === 0 && favRoutes.length === 0) {
         container.innerHTML = `
           <div class="empty-state">
             <span class="icon">⭐</span>
-            <p>Aún no tienes paradas favoritas.</p>
-            <p><small>Pulsa la estrella en cualquier parada para guardarla.</small></p>
+            <p>Aún no tienes favoritos.</p>
+            <p><small>Pulsa la estrella en una parada o el corazón en una ruta para guardarla.</small></p>
           </div>
         `;
         return;
@@ -37,26 +38,70 @@ import Layout from '../layouts/Layout.astro';
         return;
       }
 
-      container.innerHTML = `
-        <div class="stops-list">
-          ${favIds.map(id => {
-            const s = catalog.paradas[id];
-            if (!s) return '';
-            return `
-              <a href="/stop/${s.id}" class="card stop-card-link">
-                <div class="stop-info">
-                  <strong>${s.nombre}</strong>
-                  <small>Parada ${s.id}</small>
-                  <div class="stop-lines">
-                    ${s.enlaces.slice(0, 5).map((l: any) => `<span class="line-tag">${l}</span>`).join('')}
+      const lines = catalog.actualizacion.lineas || [];
+      const lineMap = lines.reduce((acc: any, line: any) => {
+        acc[line.id] = { name: line.lin_comer, color: line.color };
+        return acc;
+      }, {});
+
+      let html = '';
+
+      if (favIds.length > 0) {
+        html += `
+          <h3 class="section-title">Paradas favoritas</h3>
+          <div class="stops-list">
+            ${favIds.map(id => {
+              const s = catalog.paradas[id];
+              if (!s) return '';
+              return `
+                <a href="/stop/${s.id}" class="card stop-card-link">
+                  <div class="stop-info">
+                    <strong>${s.nombre}</strong>
+                    <small>Parada ${s.id}</small>
+                    <div class="stop-lines">
+                      ${s.enlaces.map((lId: any) => {
+                        const info = lineMap[lId];
+                        if (!info) return '';
+                        return `<span class="line-tag" style="background-color: #${info.color}">${info.name}</span>`;
+                      }).join('')}
+                    </div>
                   </div>
-                </div>
-                <div class="stop-arrow">→</div>
-              </a>
-            `;
-          }).join('')}
-        </div>
-      `;
+                  <div class="stop-arrow">→</div>
+                </a>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
+
+      if (favRoutes.length > 0) {
+        html += `
+          <h3 class="section-title mt-2">Rutas favoritas</h3>
+          <div class="routes-list">
+            ${favRoutes.map(r => {
+              const origin = catalog.paradas[r.originId];
+              const dest = catalog.paradas[r.destId];
+              const line = lines.find((l: any) => l.id === r.lineId);
+              const color = line ? `#${line.color}` : 'var(--primary)';
+              
+              return `
+                <a href="/stop/${r.originId}" class="card route-fav-card" style="border-left: 5px solid ${color}">
+                  <div class="route-fav-header">
+                    <span class="line-badge-small" style="background-color: ${color}">${r.lineName}</span>
+                    <div class="route-fav-text">
+                      <strong>${origin?.nombre || 'Origen'} &rarr; ${dest?.nombre || 'Destino'}</strong>
+                      <small>Desde parada ${r.originId}</small>
+                    </div>
+                  </div>
+                  <div class="stop-arrow">→</div>
+                </a>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
+
+      container.innerHTML = html;
     }
 
     async function fetchArrivals(stopId: number) {
@@ -113,11 +158,66 @@ import Layout from '../layouts/Layout.astro';
   }
 
   .line-tag {
-    background: #eee;
     padding: 2px 6px;
     border-radius: 4px;
     font-size: 0.7rem;
     font-weight: 700;
+    color: white;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: var(--text);
+  }
+
+  .mt-2 { margin-top: 2rem; }
+
+  .route-fav-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .route-fav-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-grow: 1;
+    min-width: 0;
+  }
+
+  .line-badge-small {
+    color: white;
+    font-weight: 800;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    min-width: 35px;
+    text-align: center;
+  }
+
+  .route-fav-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .route-fav-text strong {
+    font-size: 0.95rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .route-fav-text small {
+    font-size: 0.75rem;
+    color: var(--text-muted);
   }
 
   .empty-state {

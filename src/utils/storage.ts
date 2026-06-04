@@ -24,5 +24,29 @@ export const storage = {
     }
     localStorage.setItem('favorites', JSON.stringify(favs));
     return favs;
+  },
+  getFavoriteRoutes: (): any[] => {
+    const data = localStorage.getItem('favorite_routes');
+    return data ? JSON.parse(data) : [];
+  },
+  toggleFavoriteRoute: (originId: number, destId: number, lineId: number, lineName: string) => {
+    const favs = storage.getFavoriteRoutes();
+    const routeId = `${originId}-${destId}-${lineId}`;
+    const index = favs.findIndex((f: any) => f.routeId === routeId);
+    
+    if (index > -1) {
+      favs.splice(index, 1);
+    } else {
+      favs.push({
+        routeId,
+        originId,
+        destId,
+        lineId,
+        lineName,
+        createdAt: new Date().toISOString()
+      });
+    }
+    localStorage.setItem('favorite_routes', JSON.stringify(favs));
+    return favs;
   }
 };

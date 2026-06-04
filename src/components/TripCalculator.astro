@@ -264,6 +264,20 @@
   .travel-summary {
     display: flex;
     flex-direction: column;
+    flex-grow: 1;
+  }
+
+  .fav-route-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    padding: 0.5rem;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+
+  .fav-route-btn:active {
+    transform: scale(1.2);
   }
 
   .travel-summary strong { font-size: 1.1rem; }
@@ -707,12 +721,37 @@
           card.addEventListener('click', () => {
             const idx = parseInt(card.getAttribute('data-idx') || '0');
             const route = this.lastResults[idx];
+            
+            // Save target destination for tracking integration
+            if (route.destStop) {
+              import('../utils/tracking').then(({ tracking }) => {
+                tracking.setTargetDestination(route.destStop.id);
+              });
+            }
+
             if (route) this.showRouteOnMap(route);
           });
         });
 
         const toFetch = [...directRoutes.slice(0,2), ...nearbyRoutes.slice(0,2)];
         this.fetchRealTime(toFetch);
+
+        // Add favorite button listeners
+        resultsDiv.querySelectorAll('.fav-route-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const origin = parseInt(btn.getAttribute('data-origin')!);
+            const dest = parseInt(btn.getAttribute('data-dest')!);
+            const line = parseInt(btn.getAttribute('data-line')!);
+            const lineName = btn.getAttribute('data-line-name')!;
+            
+            storage.toggleFavoriteRoute(origin, dest, line, lineName);
+            
+            // Toggle emoji
+            const isFav = btn.textContent?.trim() === '❤️';
+            btn.textContent = isFav ? '🤍' : '❤️';
+          });
+        });
       }
     }
 
@@ -932,6 +971,10 @@
     }
 
     renderDirectRouteCard(l: any, idx: number) {
+      const favRoutes = storage.getFavoriteRoutes();
+      const routeId = `${l.originStop.id}-${l.destStop.id}-${l.lineId}`;
+      const isFav = favRoutes.some((f: any) => f.routeId === routeId);
+
       return `
         <div class="card result-card direct" data-idx="${idx}" style="border-left: 5px solid #${l.color}">
           <div class="result-header">
@@ -940,6 +983,9 @@
               <strong>Ruta directa (~${l.estimatedTravelMins} min)</strong>
               <small>${l.stopsCount} paradas</small>
             </div>
+            <button class="fav-route-btn" data-origin="${l.originStop.id}" data-dest="${l.destStop.id}" data-line="${l.lineId}" data-line-name="${l.lineComer}">
+              ${isFav ? '❤️' : '🤍'}
+            </button>
           </div>
           <div class="real-time-info" data-stop-id="${l.originStop.id}" data-line-id="${l.lineId}" data-travel-mins="${l.estimatedTravelMins}">
             <div class="loading-small">Consultando tiempo real...</div>
@@ -949,6 +995,10 @@
     }
 
     renderNearbyRouteCard(l: any, idx: number) {
+      const favRoutes = storage.getFavoriteRoutes();
+      const routeId = `${l.originStop.id}-${l.destStop.id}-${l.lineId}`;
+      const isFav = favRoutes.some((f: any) => f.routeId === routeId);
+
       return `
         <div class="card result-card nearby" data-idx="${idx}" style="border-left: 5px solid #${l.color}">
           <div class="result-header">
@@ -957,6 +1007,9 @@
               <strong>Hacia parada cercana (~${l.estimatedTravelMins} min)</strong>
               <small>Bájate en <strong>${l.destStop.nombre}</strong> y camina ${l.walkToDest}m (${Math.round(l.walkToDest/60)} min)</small>
             </div>
+            <button class="fav-route-btn" data-origin="${l.originStop.id}" data-dest="${l.destStop.id}" data-line="${l.lineId}" data-line-name="${l.lineComer}">
+              ${isFav ? '❤️' : '🤍'}
+            </button>
           </div>
           <div class="real-time-info" data-stop-id="${l.originStop.id}" data-line-id="${l.lineId}" data-travel-mins="${l.estimatedTravelMins}">
             <div class="loading-small">Consultando tiempo real...</div>

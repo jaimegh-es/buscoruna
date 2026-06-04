@@ -34,6 +34,21 @@ const { title } = Astro.props;
 		<main>
 			<slot />
 		</main>
+
+    <!-- Tracking Bar -->
+    <div id="tracking-bar" class="tracking-bar" style="display: none;">
+      <div class="tracking-content">
+        <div class="tracking-main">
+          <span class="tracking-bus-badge" id="track-bus-id">...</span>
+          <div class="tracking-text">
+            <strong>Hacia <span id="track-dest-name">...</span></strong>
+            <small id="track-status">Calculando llegada...</small>
+          </div>
+        </div>
+        <div class="tracking-eta" id="track-eta-val">--</div>
+        <button id="stop-tracking" class="stop-track-btn">✕</button>
+      </div>
+    </div>
 		<nav class="bottom-nav">
 			<a href="/" class="nav-item">
 				<span class="icon">🔍</span>
@@ -229,9 +244,93 @@ const { title } = Astro.props;
 	input {
 		font-family: inherit;
 	}
+
+  /* Tracking Bar Styles */
+  .tracking-bar {
+    position: fixed;
+    bottom: calc(var(--nav-height) + 10px);
+    left: 10px;
+    right: 10px;
+    background: #1c212a;
+    color: white;
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    z-index: 1500;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    animation: slideUp 0.3s ease-out;
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .tracking-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .tracking-main {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-grow: 1;
+    min-width: 0;
+  }
+
+  .tracking-bus-badge {
+    background: var(--primary);
+    color: white;
+    font-weight: 800;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+  }
+
+  .tracking-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .tracking-text strong {
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tracking-text small {
+    font-size: 0.75rem;
+    opacity: 0.8;
+  }
+
+  .tracking-eta {
+    background: rgba(255,255,255,0.1);
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-weight: 800;
+    font-size: 1.25rem;
+    min-width: 45px;
+    text-align: center;
+  }
+
+  .stop-track-btn {
+    background: none;
+    color: white;
+    font-size: 1.25rem;
+    opacity: 0.5;
+    padding: 4px;
+  }
 </style>
 
 <script>
+  import { tracking } from '../utils/tracking';
+  import { API } from '../services/api';
+  import { storage } from '../utils/storage';
+
 	function updateLastRefreshTime() {
 		const el = document.getElementById('last-update');
 		if (el) {
@@ -251,6 +350,82 @@ const { title } = Astro.props;
 			updateLastRefreshTime();
 		}, 1000);
 	});
+
+  // Tracking logic
+  let trackingInterval: any = null;
+
+  async function updateTrackingUI() {
+    const info = tracking.get();
+    const bar = document.getElementById('tracking-bar');
+    if (!bar) return;
+
+    if (!info) {
+      bar.style.display = 'none';
+      if (trackingInterval) clearInterval(trackingInterval);
+      return;
+    }
+
+    bar.style.display = 'block';
+    document.getElementById('track-bus-id')!.textContent = info.busId;
+    
+    const catalog = storage.getCatalog();
+    if (catalog) {
+      const destStop = catalog.paradas[info.destinationStopId];
+      document.getElementById('track-dest-name')!.textContent = destStop?.nombre || info.destinationStopId.toString();
+    }
+
+    // Recalculate ETA
+    try {
+      const data = await API.getStopArrivals(info.destinationStopId);
+      if (data.resultado === 'OK' && data.buses && data.buses.lineas) {
+        let busFound = false;
+        for (const l of data.buses.lineas) {
+          // Compare using string for safety as IDs might be returned differently
+          if (l.linea.toString() === info.lineId.toString()) {
+            const b = l.buses.find((bus: any) => bus.bus === info.busId);
+            if (b) {
+              busFound = true;
+              const time = typeof b.tiempo === 'number' ? b.tiempo : parseInt(b.tiempo);
+              document.getElementById('track-eta-val')!.textContent = time.toString();
+              
+              const arrivalTime = new Date(Date.now() + time * 60000);
+              document.getElementById('track-status')!.textContent = `Llegada estimada: ${arrivalTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
+              
+              if (time === 0) {
+                document.getElementById('track-status')!.textContent = '¡Estás llegando a tu destino!';
+              }
+              break;
+            }
+          }
+        }
+        if (!busFound) {
+          document.getElementById('track-status')!.textContent = 'Buscando bus...';
+          document.getElementById('track-eta-val')!.textContent = '--';
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to update tracking ETA');
+    }
+
+    if (!trackingInterval) {
+      trackingInterval = setInterval(updateTrackingUI, 15000); // More frequent update for active tracking
+    }
+  }
+
+  document.getElementById('stop-tracking')?.addEventListener('click', () => {
+    tracking.clear();
+  });
+
+  window.addEventListener('tracking-updated', () => {
+    updateTrackingUI();
+  });
+
+  window.addEventListener('request-refresh', () => {
+    updateTrackingUI();
+  });
+
+  // Initial load
+  updateTrackingUI();
 
 	// Auto refresh every 30 seconds
 	setInterval(() => {
