@@ -121,7 +121,10 @@ import Layout from '../../layouts/Layout.astro';
                     <span class="line-num-badge" style="background-color: ${color}">${commercialName}</span>
                     <div class="eta-dest">
                       <strong>${l.buses[0]?.destino || 'En ruta'}</strong>
-                      ${l.buses.length > 1 ? `<small class="next-buses">Ver +${l.buses.length - 1} buses próximos</small>` : ''}
+                      <div class="eta-bus-info">
+                        ${l.buses[0]?.bus ? `<span class="bus-id">Bus: ${l.buses[0].bus}</span>` : ''}
+                        ${l.buses.length > 1 ? `<span class="next-buses">Ver +${l.buses.length - 1} buses próximos</span>` : ''}
+                      </div>
                     </div>
                   </div>
                   <div class="eta-time-container" style="color: ${color}; background-color: ${color}15">
@@ -134,7 +137,10 @@ import Layout from '../../layouts/Layout.astro';
                   <div class="eta-extra-buses" id="extra-${idx}" style="display: none;">
                     ${l.buses.slice(1).map((b: any) => `
                       <div class="extra-bus-row">
-                        <span>Próximo bus: <strong>${b.destino || 'En ruta'}</strong></span>
+                        <div class="extra-bus-main">
+                          <span>Próximo bus: <strong>${b.destino || 'En ruta'}</strong></span>
+                          ${b.bus ? `<small class="extra-bus-id">Bus: ${b.bus}</small>` : ''}
+                        </div>
                         <span class="extra-time"><strong>${b.tiempo}</strong> min</span>
                       </div>
                     `).join('')}
@@ -334,11 +340,32 @@ import Layout from '../../layouts/Layout.astro';
     background: #fdfdfd;
   }
 
+  .eta-bus-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .bus-id {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .extra-bus-main {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .extra-bus-id {
+    font-size: 0.7rem;
+    color: #888;
+  }
+
   .next-buses {
     font-size: 0.75rem;
     color: #3b82f6;
     display: block;
-    margin-top: 2px;
     font-weight: 600;
   }
 </style>

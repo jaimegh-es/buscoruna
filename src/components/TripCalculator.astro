@@ -81,13 +81,27 @@
   .input-with-action {
     display: flex;
     gap: 0.5rem;
+    align-items: center;
   }
 
   .geo-btn {
-    padding: 0 1rem;
-    background: #eee;
-    border-radius: 8px;
+    padding: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 50%;
+    min-width: 40px;
+    height: 40px;
     font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: all 0.2s;
+  }
+
+  .geo-btn:active {
+    background: #f0f0f0;
+    transform: scale(0.95);
   }
 
   /* Modal Styles */
@@ -248,6 +262,32 @@
   .bus-status .eta .unit { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
 
   .bus-status .details p { margin: 0; font-size: 0.85rem; }
+  .result-card.nearby {
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+  }
+
+  .transfer-badges {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .transfer-icon {
+    font-size: 1.2rem;
+  }
+
+  .transfer-details {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px dashed #ddd;
+    font-size: 0.9rem;
+    color: var(--text);
+  }
+
+  .transfer-details p {
+    margin: 0.25rem 0;
+  }
 </style>
 
 <script>
@@ -528,46 +568,51 @@
       if (resultsDiv) resultsDiv.innerHTML = '<div class="loading">Buscando la mejor combinación...</div>';
 
       this.catalog = storage.getCatalog();
-      if (!this.catalog) return;
+      if (!this.catalog || !this.catalog.actualizacion || !this.catalog.actualizacion.lineas) {
+        if (resultsDiv) resultsDiv.innerHTML = '<div class="error">Error: El catálogo de líneas no está disponible.</div>';
+        return;
+      }
 
-      const possibleLines: any[] = [];
-      const lines = this.catalog.actualizacion.lineas;
-      
-      lines.forEach((line: any) => {
-        line.rutas.forEach((route: any) => {
-          const originIdx = route.paradas.indexOf(parseInt(this.selectedOrigin.id));
-          const destIdx = route.paradas.indexOf(parseInt(this.selectedDestination.id));
-          
-          if (originIdx !== -1 && destIdx !== -1 && originIdx < destIdx) {
-            const stopsCount = destIdx - originIdx;
-            const estimatedTravelMins = stopsCount * 2; 
-            
-            if (!possibleLines.find(pl => pl.lineId === line.id)) {
-              possibleLines.push({
-                lineId: line.id,
-                lineComer: line.lin_comer,
-                color: line.color,
-                stopsCount,
-                estimatedTravelMins,
-                originStop: this.selectedOrigin,
-                destStop: this.selectedDestination
-              });
-            }
-          }
-        });
-      });
+      const originId = parseInt(this.selectedOrigin.id);
+      const destId = parseInt(this.selectedDestination.id);
+      const allLines = this.catalog.actualizacion.lineas;
+      const allStops = this.catalog.actualizacion.paradas;
 
-      if (possibleLines.length === 0) {
+      // 1. Direct Routes
+      let directRoutes = this.findDirectRoutes(originId, destId, allLines);
+
+      // 2. If no direct routes, try "nearby" stops (within ~400m)
+      let nearbyRoutes: any[] = [];
+      if (directRoutes.length === 0) {
+        const nearbyDestinations = this.findNearbyStops(this.selectedDestination.posy, this.selectedDestination.posx, 400)
+          .filter(s => s.id !== destId);
+
+        for (const nearbyStop of nearbyDestinations) {
+          const routes = this.findDirectRoutes(originId, nearbyStop.id, allLines);
+          routes.forEach(r => nearbyRoutes.push({ ...r, isNearby: true, walkToDest: Math.round(nearbyStop.dist) }));
+        }
+      }
+
+      // 3. Transfer Routes (1-transfer)
+      let transferRoutes: any[] = [];
+      if (directRoutes.length < 2) {
+        transferRoutes = this.findTransferRoutes(originId, destId, allLines, allStops);
+      }
+
+      if (directRoutes.length === 0 && nearbyRoutes.length === 0 && transferRoutes.length === 0) {
         if (resultsDiv) resultsDiv.innerHTML = `
           <div class="empty-state">
-            <p>No se encontró una ruta directa entre estas paradas.</p>
-            <small>Estamos trabajando para incluir rutas con transbordos próximamente.</small>
+            <p>No se encontró una ruta entre estas paradas.</p>
+            <small>Intenta seleccionar paradas principales o puntos de interés cercanos.</small>
           </div>
         `;
         return;
       }
 
-      possibleLines.sort((a, b) => a.stopsCount - b.stopsCount);
+      // Sort and combine
+      directRoutes.sort((a, b) => a.stopsCount - b.stopsCount);
+      nearbyRoutes.sort((a, b) => (a.stopsCount + a.walkToDest/50) - (b.stopsCount + b.walkToDest/50));
+      transferRoutes.sort((a, b) => (a.totalStops) - (b.totalStops));
 
       if (resultsDiv) {
         resultsDiv.innerHTML = `
@@ -575,25 +620,177 @@
             <h3>Rutas de <strong>${this.selectedOrigin.nombre}</strong> a <strong>${this.selectedDestination.nombre}</strong></h3>
           </div>
           <div class="results-list">
-            ${possibleLines.slice(0, 3).map(l => `
-              <div class="card result-card" style="border-left: 5px solid #${l.color}">
-                <div class="result-header">
-                  <span class="line-badge" style="background-color: #${l.color}">${l.lineComer}</span>
-                  <div class="travel-summary">
-                    <strong>~${l.estimatedTravelMins} min</strong> de trayecto
-                    <small>${l.stopsCount} paradas</small>
-                  </div>
-                </div>
-                <div class="real-time-info" data-stop-id="${l.originStop.id}" data-line-id="${l.lineId}" data-travel-mins="${l.estimatedTravelMins}">
-                  <div class="loading-small">Consultando tiempo real...</div>
-                </div>
-              </div>
-            `).join('')}
+            ${directRoutes.slice(0, 2).map(l => this.renderDirectRouteCard(l)).join('')}
+            ${nearbyRoutes.slice(0, 2).map(l => this.renderNearbyRouteCard(l)).join('')}
+            ${transferRoutes.slice(0, 2).map(l => this.renderTransferRouteCard(l)).join('')}
           </div>
         `;
         
-        this.fetchRealTime(possibleLines.slice(0, 3));
+        // Fetch real-time for direct and nearby
+        const toFetch = [...directRoutes.slice(0,2), ...nearbyRoutes.slice(0,2)];
+        this.fetchRealTime(toFetch);
       }
+    }
+
+    findDirectRoutes(originId: number, destId: number, lines: any[]) {
+      const results: any[] = [];
+      lines.forEach((line: any) => {
+        if (!line.rutas) return;
+        line.rutas.forEach((route: any) => {
+          const originIdx = route.paradas.indexOf(originId);
+          const destIdx = route.paradas.indexOf(destId);
+          if (originIdx !== -1 && destIdx !== -1 && originIdx < destIdx) {
+            const stopsCount = destIdx - originIdx;
+            if (!results.find(r => r.lineId === line.id)) {
+              results.push({
+                lineId: line.id,
+                lineComer: line.lin_comer,
+                color: line.color,
+                stopsCount,
+                estimatedTravelMins: stopsCount * 2,
+                originStop: this.catalog.actualizacion.paradas.find((s: any) => s.id === originId),
+                destStop: this.catalog.actualizacion.paradas.find((s: any) => s.id === destId)
+              });
+            }
+          }
+        });
+      });
+      return results;
+    }
+
+    findTransferRoutes(originId: number, destId: number, lines: any[], stops: any[]) {
+      const results: any[] = [];
+      const originStop = stops.find(s => s.id === originId);
+      const destStop = stops.find(s => s.id === destId);
+      if (!originStop || !destStop) return [];
+
+      const linesAtOrigin = originStop.enlaces;
+      const linesAtDest = destStop.enlaces;
+
+      linesAtOrigin.forEach((l1Id: any) => {
+        const line1 = lines.find(l => l.id === l1Id);
+        if (!line1) return;
+
+        line1.rutas.forEach((r1: any) => {
+          const oIdx = r1.paradas.indexOf(originId);
+          if (oIdx === -1) return;
+
+          // Check stops after origin for possible transfers
+          for (let i = oIdx + 1; i < r1.paradas.length; i++) {
+            const transferStopId = r1.paradas[i];
+            const transferStop = stops.find(s => s.id === transferStopId);
+            if (!transferStop) continue;
+
+            // Does any line at this stop go to the destination?
+            const linesAtTransfer = transferStop.enlaces;
+            const commonLines = linesAtTransfer.filter((lId: any) => linesAtDest.includes(lId));
+
+            commonLines.forEach((l2Id: any) => {
+              if (l2Id === l1Id) return; // Skip same line
+              const line2 = lines.find(l => l.id === l2Id);
+              if (!line2) return;
+
+              line2.rutas.forEach((r2: any) => {
+                const tIdx = r2.paradas.indexOf(transferStopId);
+                const dIdx = r2.paradas.indexOf(destId);
+
+                if (tIdx !== -1 && dIdx !== -1 && tIdx < dIdx) {
+                  // Found a 1-transfer route!
+                  if (!results.find(r => r.l1 === l1Id && r.l2 === l2Id)) {
+                    results.push({
+                      l1: line1,
+                      l2: line2,
+                      transferStop: transferStop,
+                      stops1: i - oIdx,
+                      stops2: dIdx - tIdx,
+                      totalStops: (i - oIdx) + (dIdx - tIdx)
+                    });
+                  }
+                }
+              });
+            });
+          }
+        });
+      });
+      return results.slice(0, 3);
+    }
+
+    findNearbyStops(lat: number, lon: number, radiusMeters: number) {
+      if (!this.catalog) return [];
+      const stops = this.catalog.actualizacion.paradas;
+      return stops
+        .map((s: any) => ({
+          ...s,
+          dist: this.getDistance(lat, lon, s.posy, s.posx)
+        }))
+        .filter((s: any) => s.dist <= radiusMeters)
+        .sort((a: any, b: any) => a.dist - b.dist);
+    }
+
+    getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    renderDirectRouteCard(l: any) {
+      return `
+        <div class="card result-card direct" style="border-left: 5px solid #${l.color}">
+          <div class="result-header">
+            <span class="line-badge" style="background-color: #${l.color}">${l.lineComer}</span>
+            <div class="travel-summary">
+              <strong>Ruta directa (~${l.estimatedTravelMins} min)</strong>
+              <small>${l.stopsCount} paradas</small>
+            </div>
+          </div>
+          <div class="real-time-info" data-stop-id="${l.originStop.id}" data-line-id="${l.lineId}" data-travel-mins="${l.estimatedTravelMins}">
+            <div class="loading-small">Consultando tiempo real...</div>
+          </div>
+        </div>
+      `;
+    }
+
+    renderNearbyRouteCard(l: any) {
+      return `
+        <div class="card result-card nearby" style="border-left: 5px solid #${l.color}; background: #f0f9ff;">
+          <div class="result-header">
+            <span class="line-badge" style="background-color: #${l.color}">${l.lineComer}</span>
+            <div class="travel-summary">
+              <strong>Hacia parada cercana (~${l.estimatedTravelMins} min)</strong>
+              <small>Bájate en <strong>${l.destStop.nombre}</strong> y camina ${l.walkToDest}m (${Math.round(l.walkToDest/60)} min)</small>
+            </div>
+          </div>
+          <div class="real-time-info" data-stop-id="${l.originStop.id}" data-line-id="${l.lineId}" data-travel-mins="${l.estimatedTravelMins}">
+            <div class="loading-small">Consultando tiempo real...</div>
+          </div>
+        </div>
+      `;
+    }
+
+    renderTransferRouteCard(r: any) {
+      return `
+        <div class="card result-card transfer" style="border-left: 5px solid #${r.l1.color}">
+          <div class="result-header">
+            <div class="transfer-badges">
+              <span class="line-badge" style="background-color: #${r.l1.color}">${r.l1.lin_comer}</span>
+              <span class="transfer-icon">🔄</span>
+              <span class="line-badge" style="background-color: #${r.l2.color}">${r.l2.lin_comer}</span>
+            </div>
+            <div class="travel-summary">
+              <strong>Transbordo en ${r.transferStop.nombre}</strong>
+              <small>Total ${r.totalStops} paradas (${r.stops1} + ${r.stops2})</small>
+            </div>
+          </div>
+          <div class="transfer-details">
+            <p>1. Toma la línea <strong>${r.l1.lin_comer}</strong> hasta ${r.transferStop.nombre}</p>
+            <p>2. Cambia a la línea <strong>${r.l2.lin_comer}</strong> hacia tu destino</p>
+          </div>
+        </div>
+      `;
     }
 
     async fetchRealTime(lines: any[]) {
@@ -610,17 +807,19 @@
             if (lineInfo && lineInfo.buses && lineInfo.buses.length > 0) {
               const bus = lineInfo.buses[0];
               const arrivalAtDest = new Date();
-              arrivalAtDest.setMinutes(arrivalAtDest.getMinutes() + bus.tiempo + l.estimatedTravelMins);
+              const busTime = typeof bus.tiempo === 'number' ? bus.tiempo : parseInt(bus.tiempo) || 0;
+              arrivalAtDest.setMinutes(arrivalAtDest.getMinutes() + busTime + l.estimatedTravelMins);
               
               infoDiv.innerHTML = `
                 <div class="bus-status success">
                   <div class="eta">
-                    <span class="time">${bus.tiempo}</span>
+                    <span class="time">${busTime}</span>
                     <span class="unit">min</span>
                   </div>
                   <div class="details">
-                    <p>Pasa por origen a las <strong>${this.formatTime(new Date(Date.now() + bus.tiempo * 60000))}</strong></p>
+                    <p>Pasa por origen a las <strong>${this.formatTime(new Date(Date.now() + busTime * 60000))}</strong></p>
                     <p>Llegada estimada: <strong>${this.formatTime(arrivalAtDest)}</strong></p>
+                    ${bus.bus ? `<p><small>Vehículo nº: <strong>${bus.bus}</strong></small></p>` : ''}
                   </div>
                 </div>
               `;

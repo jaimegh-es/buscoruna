@@ -25,6 +25,10 @@ const { title } = Astro.props;
 		<header>
 			<div class="header-content">
 				<h1>Bus<span>Coruña</span></h1>
+				<div class="header-actions">
+					<div id="last-update" class="last-update">...</div>
+					<button id="global-refresh-btn" class="refresh-btn" title="Actualizar datos">🔄</button>
+				</div>
 			</div>
 		</header>
 		<main>
@@ -93,6 +97,13 @@ const { title } = Astro.props;
 		box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 	}
 
+	.header-content {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		width: 100%;
+	}
+
 	.header-content h1 {
 		font-size: 1.5rem;
 		font-weight: 800;
@@ -100,6 +111,45 @@ const { title } = Astro.props;
 
 	.header-content h1 span {
 		font-weight: 300;
+	}
+
+	.header-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.last-update {
+		font-size: 0.7rem;
+		opacity: 0.9;
+		text-align: right;
+		line-height: 1.2;
+	}
+
+	.refresh-btn {
+		background: rgba(255,255,255,0.2);
+		color: white;
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 1rem;
+		transition: background 0.2s;
+	}
+
+	.refresh-btn:active {
+		background: rgba(255,255,255,0.4);
+	}
+
+	.refresh-btn.spinning {
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		from { transform: rotate(0deg); }
+		to { transform: rotate(360deg); }
 	}
 
 	main {
@@ -153,5 +203,61 @@ const { title } = Astro.props;
 		cursor: pointer;
 		border: none;
 		outline: none;
+		font-family: inherit;
+	}
+
+	.btn-primary {
+		background-color: var(--primary);
+		color: white;
+		padding: 0.75rem 1.5rem;
+		border-radius: 8px;
+		font-weight: 700;
+		font-size: 1rem;
+		width: 100%;
+		transition: background 0.2s;
+	}
+
+	.btn-primary:active {
+		background-color: var(--primary-dark);
+	}
+
+	.btn-primary:disabled {
+		background-color: #ccc;
+		cursor: not-allowed;
+	}
+
+	input {
+		font-family: inherit;
 	}
 </style>
+
+<script>
+	function updateLastRefreshTime() {
+		const el = document.getElementById('last-update');
+		if (el) {
+			const now = new Date();
+			el.innerHTML = `Actualizado<br><strong>${now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong>`;
+		}
+	}
+
+	const refreshBtn = document.getElementById('global-refresh-btn');
+	refreshBtn?.addEventListener('click', () => {
+		refreshBtn.classList.add('spinning');
+		// Dispatch a global event that other components can listen to
+		window.dispatchEvent(new CustomEvent('request-refresh'));
+		
+		setTimeout(() => {
+			refreshBtn.classList.remove('spinning');
+			updateLastRefreshTime();
+		}, 1000);
+	});
+
+	// Auto refresh every 30 seconds
+	setInterval(() => {
+		window.dispatchEvent(new CustomEvent('request-refresh'));
+		updateLastRefreshTime();
+	}, 30000);
+
+	// Initial time
+	updateLastRefreshTime();
+</script>
