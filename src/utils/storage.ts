@@ -48,5 +48,8 @@ export const storage = {
     }
     localStorage.setItem('favorite_routes', JSON.stringify(favs));
     return favs;
+  },
+  setTargetDestination: (stopId: number) => {
+    localStorage.setItem('buscoruna_target_dest', stopId.toString());
   }
 };

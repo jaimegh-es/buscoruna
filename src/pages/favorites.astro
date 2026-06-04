@@ -85,7 +85,7 @@ import Layout from '../layouts/Layout.astro';
               const color = line ? `#${line.color}` : 'var(--primary)';
               
               return `
-                <a href="/stop/${r.originId}" class="card route-fav-card" style="border-left: 5px solid ${color}">
+                <a href="/stop/${r.originId}" class="card route-fav-card favorite-route-link" style="border-left: 5px solid ${color}" data-dest="${r.destId}">
                   <div class="route-fav-header">
                     <span class="line-badge-small" style="background-color: ${color}">${r.lineName}</span>
                     <div class="route-fav-text">
@@ -102,6 +102,16 @@ import Layout from '../layouts/Layout.astro';
       }
 
       container.innerHTML = html;
+
+      // Add listeners to favorite route links to set target destination
+      container.querySelectorAll('.favorite-route-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+          const destId = link.getAttribute('data-dest');
+          if (destId) {
+            storage.setTargetDestination(parseInt(destId));
+          }
+        });
+      });
     }
 
     async function fetchArrivals(stopId: number) {

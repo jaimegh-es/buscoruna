@@ -135,31 +135,29 @@ import Layout from '../../layouts/Layout.astro';
             const commercialName = lineData ? lineData.lin_comer : l.linea;
             
             return `
-              <div class="card eta-card" style="border-left: 6px solid ${color}">
-                <div class="eta-main-info" data-idx="${idx}">
+              <div class="card eta-card clickable-row" style="border-left: 6px solid ${color}" data-idx="${idx}">
+                <div class="eta-main-info">
                   <div class="eta-line-info">
                     <span class="line-num-badge" style="background-color: ${color}">${commercialName}</span>
                     <div class="eta-dest">
                       <strong>${l.buses[0]?.destino || ''}</strong>
                       <div class="eta-bus-info">
                         ${l.buses[0]?.bus ? `<span class="bus-id">Bus: ${l.buses[0].bus}</span>` : ''}
+                        ${l.buses.length > 1 ? `<span class="next-label">Ver +${l.buses.length - 1} buses</span>` : ''}
                       </div>
                     </div>
                   </div>
-                  <div class="eta-time-container" style="color: ${color}; background-color: ${color}15">
-                    <span class="time-val">${l.buses[0]?.tiempo ?? '?'}</span>
-                    <span class="time-unit">min</span>
+                  <div class="eta-right-actions">
+                    <div class="eta-time-container" style="color: ${color}; background-color: ${color}15">
+                      <span class="time-val">${l.buses[0]?.tiempo ?? '?'}</span>
+                      <span class="time-unit">min</span>
+                    </div>
+                    ${l.buses[0]?.bus ? `
+                      <button class="btn-track-subtle" data-bus="${l.buses[0].bus}" data-line="${l.linea}" title="Subir a este bus">
+                        📍
+                      </button>
+                    ` : ''}
                   </div>
-                </div>
-                
-                <div class="eta-actions">
-                  ${l.buses[0]?.bus ? `
-                    <button class="btn-track-action" data-bus="${l.buses[0].bus}" data-line="${l.linea}">
-                      <span class="btn-icon">📍</span>
-                      Subir a este bus
-                    </button>
-                  ` : ''}
-                  ${l.buses.length > 1 ? `<button class="btn-expand-alt" data-idx="${idx}">Ver +${l.buses.length - 1} buses próximos</button>` : ''}
                 </div>
 
                 ${l.buses.length > 1 ? `
@@ -172,7 +170,7 @@ import Layout from '../../layouts/Layout.astro';
                         </div>
                         <div class="extra-bus-right">
                           <span class="extra-time"><strong>${b.tiempo}</strong> min</span>
-                          ${b.bus ? `<button class="btn-track-small-alt" data-bus="${b.bus}" data-line="${l.linea}">📍</button>` : ''}
+                          ${b.bus ? `<button class="btn-track-subtle-small" data-bus="${b.bus}" data-line="${l.linea}">📍</button>` : ''}
                         </div>
                       </div>
                     `).join('')}
@@ -182,30 +180,33 @@ import Layout from '../../layouts/Layout.astro';
             `;
           }).join('');
 
-          // Add click listeners
-          container.querySelectorAll('.btn-expand-alt').forEach(btn => {
-            btn.addEventListener('click', () => {
-              const idx = btn.getAttribute('data-idx');
+          // Add click listeners to rows for expansion
+          container.querySelectorAll('.clickable-row').forEach(row => {
+            row.addEventListener('click', (e) => {
+              // Ignore if clicking the track button
+              if ((e.target as HTMLElement).closest('button')) return;
+
+              const idx = row.getAttribute('data-idx');
               const extra = document.getElementById(`extra-${idx}`);
               if (extra) {
                 const isHidden = extra.style.display === 'none';
                 extra.style.display = isHidden ? 'block' : 'none';
-                btn.textContent = isHidden ? 'Ocultar próximos' : `Ver +${extra.children.length} buses próximos`;
+                row.classList.toggle('is-expanded', isHidden);
               }
             });
           });
 
-          container.querySelectorAll('.btn-track-action, .btn-track-small-alt').forEach(btn => {
+          // Add track button listeners
+          container.querySelectorAll('.btn-track-subtle, .btn-track-subtle-small').forEach(btn => {
             btn.addEventListener('click', (e) => {
               e.stopPropagation();
               const busId = btn.getAttribute('data-bus')!;
               const lineId = parseInt(btn.getAttribute('data-line')!);
               
               if (targetDestId) {
-                // If we already have a target destination from the planner, use it directly
                 pendingTracking = { busId, lineId };
                 startTracking(targetDestId);
-                tracking.clearTargetDestination(); // Reset planner target
+                tracking.clearTargetDestination();
               } else {
                 openDestinationSelector(busId, lineId);
               }
@@ -409,6 +410,14 @@ import Layout from '../../layouts/Layout.astro';
     overflow: hidden;
   }
 
+  .clickable-row {
+    cursor: pointer;
+  }
+
+  .clickable-row:active {
+    background: #fdfdfd;
+  }
+
   .eta-main-info {
     display: flex;
     justify-content: space-between;
@@ -417,6 +426,55 @@ import Layout from '../../layouts/Layout.astro';
     padding: 1rem;
   }
 
+  .eta-right-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .btn-track-subtle {
+    background: white;
+    border: 1px solid #ddd;
+    color: #3b82f6;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: all 0.2s;
+  }
+
+  .btn-track-subtle:active {
+    transform: scale(0.9);
+    background: #f0f7ff;
+  }
+
+  .next-label {
+    font-size: 0.75rem;
+    color: #3b82f6;
+    font-weight: 700;
+    margin-top: 2px;
+    display: block;
+  }
+
+  .btn-track-subtle-small {
+    background: white;
+    border: 1px solid #ddd;
+    color: #3b82f6;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+
+  /* Restoring essential styles */
   .eta-extra-buses {
     width: 100%;
     padding: 0.5rem 1rem 1rem 1rem;
@@ -434,46 +492,13 @@ import Layout from '../../layouts/Layout.astro';
     border-bottom: 1px dashed #eee;
   }
 
-  .extra-bus-row:last-child {
-    border-bottom: none;
-  }
-
-  .extra-time {
-    color: #444;
-  }
-
-  .is-expanded {
-    background: #fdfdfd;
-  }
-
-  .eta-bus-info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .bus-id {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    font-weight: 600;
-  }
-
-  .extra-bus-main {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .extra-bus-id {
-    font-size: 0.7rem;
-    color: #888;
-  }
-
-  .next-buses {
-    font-size: 0.75rem;
-    color: #3b82f6;
-    display: block;
-    font-weight: 600;
-  }
+  .extra-bus-row:last-child { border-bottom: none; }
+  .extra-time { color: #444; }
+  .is-expanded { background: #fdfdfd; }
+  .eta-bus-info { display: flex; flex-direction: column; gap: 2px; }
+  .bus-id { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; }
+  .extra-bus-main { display: flex; flex-direction: column; }
+  .extra-bus-id { font-size: 0.7rem; color: #888; }
 
   /* Modal Styles */
   .modal-overlay {
@@ -517,19 +542,9 @@ import Layout from '../../layouts/Layout.astro';
     transition: background 0.2s;
   }
 
-  .modal-list-item:active {
-    background: #f0f0f0;
-    transform: scale(0.98);
-  }
-
-  .modal-list-item strong {
-    display: block;
-    font-size: 0.95rem;
-  }
-
-  .modal-list-item small {
-    color: var(--text-muted);
-  }
+  .modal-list-item:active { background: #f0f0f0; transform: scale(0.98); }
+  .modal-list-item strong { display: block; font-size: 0.95rem; }
+  .modal-list-item small { color: var(--text-muted); }
 
   .btn-secondary {
     background: #eee;
@@ -540,66 +555,9 @@ import Layout from '../../layouts/Layout.astro';
     width: 100%;
   }
 
-  /* Action Buttons */
-  .eta-actions {
-    display: flex;
-    gap: 0.5rem;
-    padding: 0 1rem 1rem 1rem;
-  }
-
-  .btn-track-action {
-    flex-grow: 1;
-    background: #3b82f6;
-    color: white;
-    border: none;
-    padding: 0.75rem;
-    border-radius: 10px;
-    font-weight: 700;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
-    transition: all 0.2s;
-  }
-
-  .btn-track-action:active {
-    background: #2563eb;
-    transform: scale(0.98);
-  }
-
-  .btn-expand-alt {
-    background: #f3f4f6;
-    color: #4b5563;
-    padding: 0.75rem;
-    border-radius: 10px;
-    font-weight: 600;
-    font-size: 0.85rem;
-    border: 1px solid #e5e7eb;
-    transition: all 0.2s;
-  }
-
-  .btn-expand-alt:active {
-    background: #e5e7eb;
-  }
-
   .extra-bus-right {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-  }
-
-  .btn-track-small-alt {
-    background: #3b82f6;
-    color: white;
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
   }
 </style>
