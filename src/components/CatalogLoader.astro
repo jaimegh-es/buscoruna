@@ -19,16 +19,20 @@
           
           // Transform paradas array to a Record/Map by ID
           const paradasRecord: any = {};
+          let stopCount = 0;
           if (raw && Array.isArray(raw.paradas)) {
             raw.paradas.forEach((s: any) => {
               paradasRecord[s.id] = s;
+              stopCount++;
             });
           } else if (raw && raw.actualizacion && Array.isArray(raw.actualizacion.paradas)) {
-            // Some API versions might put paradas inside actualizacion
             raw.actualizacion.paradas.forEach((s: any) => {
               paradasRecord[s.id] = s;
+              stopCount++;
             });
           }
+
+          console.log(`Parsed ${stopCount} stops from catalog.`);
 
           const transformedCatalog = {
             actualizacion: raw.actualizacion,

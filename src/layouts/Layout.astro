@@ -108,9 +108,13 @@ const { title } = Astro.props;
                 <div class="card recommendation-card">
                     <Icon name="heart" size={20} class="text-primary" />
                     <p>¿Te gusta Coruña Bus? ¡Recomiéndalo a tus amigos!</p>
-                    <button id="share-app-btn" class="btn-share-subtle"
-                        >Compartir App</button
-                    >
+                    <div class="recommendation-actions">
+                        <button id="share-app-btn" class="btn-share-subtle">Compartir App</button>
+                        <a href="https://github.com/jaimegh-es/buscoruna" target="_blank" class="btn-github-subtle">
+                             Sugerencias (GitHub)
+                        </a>
+                    </div>
+                    <p class="contact-info">¿Tienes dudas? Escríbenos a <a href="mailto:contacto@inled.es">contacto@inled.es</a></p>
                 </div>
 
                 <div class="legal-disclaimer">
@@ -625,13 +629,35 @@ const { title } = Astro.props;
         color: var(--text);
     }
 
-    .btn-share-subtle {
+    .recommendation-actions {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .btn-share-subtle, .btn-github-subtle {
         background: var(--bg);
         padding: 0.5rem 1.5rem;
         border-radius: 20px;
         font-size: 0.85rem;
         font-weight: 700;
         color: var(--primary);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .contact-info {
+        margin-top: 1rem;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .contact-info a {
+        color: var(--primary);
+        font-weight: 700;
+        text-decoration: none;
     }
 
     .text-primary {

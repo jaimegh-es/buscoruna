@@ -454,6 +454,10 @@ import Icon from './Icon.astro';
       this.setupMapModal();
       this.setupRouteDetailModal();
 
+      window.addEventListener('catalog-loaded', () => {
+        this.catalog = storage.getCatalog();
+      });
+
       window.addEventListener('request-refresh', () => {
         if (this.selectedOrigin && this.selectedDestination) {
           this.calculateRefresh();
@@ -531,7 +535,7 @@ import Icon from './Icon.astro';
 
           navigator.geolocation.getCurrentPosition((pos) => {
             const { latitude, longitude } = pos.coords;
-            const nearby = this.findNearbyStops(latitude, longitude, 1000).slice(0, 5);
+            const nearby = this.findNearbyStops(latitude, longitude, 2000).slice(0, 5);
             
             if (nearby.length > 0) {
               resultsDiv.innerHTML = `
@@ -632,7 +636,7 @@ import Icon from './Icon.astro';
 
     showNearbyStopsOnMap(lat: number, lon: number) {
       if (!this.catalog) this.catalog = storage.getCatalog();
-      if (!this.catalog) return;
+      if (!this.catalog || !this.catalog.paradas) return;
 
       this.markers.forEach(m => m.remove());
       this.markers = [];
@@ -641,7 +645,7 @@ import Icon from './Icon.astro';
       const nearby = stops
         .map((s: any) => ({
           ...s,
-          dist: Math.sqrt(Math.pow(s.posy - lat, 2) + Math.pow(s.posx - lon, 2))
+          dist: this.getDistance(lat, lon, s.posy, s.posx)
         }))
         .sort((a, b) => a.dist - b.dist)
         .slice(0, 30);
@@ -832,7 +836,7 @@ import Icon from './Icon.astro';
       }
 
       const allLines = this.catalog.actualizacion.lineas;
-      const allStops = this.catalog.actualizacion.paradas;
+      const allStopsArray = Object.values(this.catalog.paradas);
 
       // Prepare origin and destination stops
       let originStops = [];
@@ -896,7 +900,7 @@ import Icon from './Icon.astro';
         
         for (const oStop of topO) {
           for (const dStop of topD) {
-            const routes = this.findTransferRoutes(parseInt(oStop.id), parseInt(dStop.id), allLines, allStops);
+            const routes = this.findTransferRoutes(parseInt(oStop.id), parseInt(dStop.id), allLines, allStopsArray);
             routes.forEach(r => {
               const totalWalk = oStop.walkDist + dStop.walkDist;
               const routeObj = {
@@ -1196,8 +1200,8 @@ import Icon from './Icon.astro';
                 color: line.color,
                 stopsCount,
                 estimatedTravelMins: stopsCount * 2,
-                originStop: this.catalog.actualizacion.paradas.find((s: any) => s.id.toString() === sOriginId),
-                destStop: this.catalog.actualizacion.paradas.find((s: any) => s.id.toString() === sDestId)
+                originStop: this.catalog.paradas[sOriginId],
+                destStop: this.catalog.paradas[sDestId]
               });
             }
           }
@@ -1274,15 +1278,33 @@ import Icon from './Icon.astro';
     }
 
     findNearbyStops(lat: number, lon: number, radiusMeters: number) {
-      if (!this.catalog) return [];
-      const stops = this.catalog.actualizacion.paradas;
-      return stops
-        .map((s: any) => ({
-          ...s,
-          dist: this.getDistance(lat, lon, s.posy, s.posx)
-        }))
+      if (!this.catalog) this.catalog = storage.getCatalog();
+      if (!this.catalog || !this.catalog.paradas) {
+        console.warn('findNearbyStops: Catalog or paradas missing');
+        return [];
+      }
+      
+      const stops = Object.values(this.catalog.paradas);
+      console.log(`Searching in ${stops.length} stops...`);
+
+      const results = stops
+        .map((s: any) => {
+          // Force numbers to avoid string concatenation or NaN issues
+          const sLat = parseFloat(s.posy as any);
+          const sLon = parseFloat(s.posx as any);
+          
+          if (isNaN(sLat) || isNaN(sLon)) return { ...s, dist: Infinity };
+          
+          return {
+            ...s,
+            dist: this.getDistance(lat, lon, sLat, sLon)
+          };
+        })
         .filter((s: any) => s.dist <= radiusMeters)
         .sort((a: any, b: any) => a.dist - b.dist);
+
+      console.log(`findNearbyStops at ${lat}, ${lon} (r=${radiusMeters}m): found ${results.length} stops`);
+      return results;
     }
 
     getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
