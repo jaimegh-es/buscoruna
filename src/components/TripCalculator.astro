@@ -468,23 +468,25 @@ import Icon from './Icon.astro';
       this.catalog = storage.getCatalog();
       if (!this.catalog) return;
 
-      const originId = parseInt(this.selectedOrigin.id);
-      const destId = parseInt(this.selectedDestination.id);
       const allLines = this.catalog.actualizacion.lineas;
 
-      let directRoutes = this.findDirectRoutes(originId, destId, allLines);
-      let nearbyRoutes: any[] = [];
-      if (directRoutes.length === 0) {
-        const nearbyDestinations = this.findNearbyStops(this.selectedDestination.posy, this.selectedDestination.posx, 400)
-          .filter(s => s.id !== destId);
+      let originStops = this.selectedOrigin.type === 'stop' 
+        ? [{ ...this.selectedOrigin, walkDist: 0 }]
+        : this.findNearbyStops(this.selectedOrigin.posy, this.selectedOrigin.posx, 600).map(s => ({ ...s, walkDist: s.dist }));
 
-        for (const nearbyStop of nearbyDestinations) {
-          const routes = this.findDirectRoutes(originId, nearbyStop.id, allLines);
-          routes.forEach(r => nearbyRoutes.push({ ...r, isNearby: true, walkToDest: Math.round(nearbyStop.dist) }));
+      let destStops = this.selectedDestination.type === 'stop'
+        ? [{ ...this.selectedDestination, walkDist: 0 }]
+        : this.findNearbyStops(this.selectedDestination.posy, this.selectedDestination.posx, 800).map(s => ({ ...s, walkDist: s.dist }));
+
+      let routesFound: any[] = [];
+      for (const oStop of originStops) {
+        for (const dStop of destStops) {
+          const routes = this.findDirectRoutes(parseInt(oStop.id), parseInt(dStop.id), allLines);
+          routes.forEach(r => routesFound.push({ ...r, originStop: oStop, destStop: dStop, isNearby: (oStop.walkDist + dStop.walkDist) > 100, walkToDest: Math.round(dStop.walkDist) }));
         }
       }
 
-      const toFetch = [...directRoutes.slice(0,2), ...nearbyRoutes.slice(0,2)];
+      const toFetch = routesFound.slice(0, 4);
       this.fetchRealTime(toFetch);
     }
 
@@ -501,12 +503,14 @@ import Icon from './Icon.astro';
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition((pos) => {
             const { latitude, longitude } = pos.coords;
-            const closest = this.findClosestStop(latitude, longitude);
-            if (closest) {
-              const input = this.querySelector('#origin') as HTMLInputElement;
-              input.value = "Mi ubicación (" + closest.nombre + ")";
-              this.selectedOrigin = closest;
-            }
+            const input = this.querySelector('#origin') as HTMLInputElement;
+            input.value = "Mi ubicación";
+            this.selectedOrigin = {
+              type: 'place',
+              nombre: "Mi ubicación",
+              posy: latitude,
+              posx: longitude
+            };
           });
         }
       });
@@ -594,8 +598,8 @@ import Icon from './Icon.astro';
       const input = this.querySelector(`#${this.currentSelectionTarget}`) as HTMLInputElement;
       input.value = this.tempSelectedStop.nombre;
       
-      if (this.currentSelectionTarget === 'origin') this.selectedOrigin = this.tempSelectedStop;
-      else this.selectedDestination = this.tempSelectedStop;
+      if (this.currentSelectionTarget === 'origin') this.selectedOrigin = { type: 'stop', ...this.tempSelectedStop };
+      else this.selectedDestination = { type: 'stop', ...this.tempSelectedStop };
       
       this.closeMap();
     }
@@ -682,14 +686,19 @@ import Icon from './Icon.astro';
                 if (type === 'stop') {
                   const id = item.getAttribute('data-id');
                   const stop = currentCatalog?.paradas[id!];
-                  if (inputId === 'origin') this.selectedOrigin = stop;
-                  else this.selectedDestination = stop;
+                  if (inputId === 'origin') this.selectedOrigin = { type: 'stop', ...stop };
+                  else this.selectedDestination = { type: 'stop', ...stop };
                 } else {
                   const lat = parseFloat(item.getAttribute('data-lat') || '0');
                   const lon = parseFloat(item.getAttribute('data-lon') || '0');
-                  const closestStop = this.findClosestStop(lat, lon);
-                  if (inputId === 'origin') this.selectedOrigin = closestStop;
-                  else this.selectedDestination = closestStop;
+                  const place = {
+                    type: 'place',
+                    nombre: name,
+                    posy: lat,
+                    posx: lon
+                  };
+                  if (inputId === 'origin') this.selectedOrigin = place;
+                  else this.selectedDestination = place;
                 }
               });
             });
@@ -716,7 +725,7 @@ import Icon from './Icon.astro';
       let minDist = Infinity;
       
       stops.forEach((s: any) => {
-        const d = Math.sqrt(Math.pow(s.posy - lat, 2) + Math.pow(s.posx - lon, 2));
+        const d = this.getDistance(lat, lon, s.posy, s.posx);
         if (d < minDist) {
           minDist = d;
           closest = s;
@@ -732,50 +741,116 @@ import Icon from './Icon.astro';
         return;
       }
 
+      console.log('Calculating route:', { origin: this.selectedOrigin, dest: this.selectedDestination });
+
       if (resultsDiv) resultsDiv.innerHTML = '<div class="loading">Buscando la mejor combinación...</div>';
 
       this.catalog = storage.getCatalog();
       if (!this.catalog || !this.catalog.actualizacion || !this.catalog.actualizacion.lineas) {
+        console.error('Catalog not loaded or invalid structure', this.catalog);
         if (resultsDiv) resultsDiv.innerHTML = '<div class="error">Error: El catálogo de líneas no está disponible.</div>';
         return;
       }
 
-      const originId = parseInt(this.selectedOrigin.id);
-      const destId = parseInt(this.selectedDestination.id);
       const allLines = this.catalog.actualizacion.lineas;
       const allStops = this.catalog.actualizacion.paradas;
 
-      let directRoutes = this.findDirectRoutes(originId, destId, allLines);
+      // Prepare origin and destination stops
+      let originStops = [];
+      if (this.selectedOrigin.type === 'stop') {
+        originStops.push({ ...this.selectedOrigin, walkDist: 0 });
+      } else {
+        // Find stops near place
+        originStops = this.findNearbyStops(this.selectedOrigin.posy, this.selectedOrigin.posx, 800)
+          .map(s => ({ ...s, walkDist: s.dist }));
+      }
 
+      let destStops = [];
+      if (this.selectedDestination.type === 'stop') {
+        destStops.push({ ...this.selectedDestination, walkDist: 0 });
+      } else {
+        // Find stops near place
+        destStops = this.findNearbyStops(this.selectedDestination.posy, this.selectedDestination.posx, 1000)
+          .map(s => ({ ...s, walkDist: s.dist }));
+      }
+
+      console.log(`Found ${originStops.length} origin stops and ${destStops.length} destination stops`);
+
+      let directRoutes: any[] = [];
       let nearbyRoutes: any[] = [];
-      if (directRoutes.length === 0) {
-        const nearbyDestinations = this.findNearbyStops(this.selectedDestination.posy, this.selectedDestination.posx, 400)
-          .filter(s => s.id !== destId);
+      
+      for (const oStop of originStops) {
+        for (const dStop of destStops) {
+          const routes = this.findDirectRoutes(parseInt(oStop.id), parseInt(dStop.id), allLines);
+          routes.forEach(r => {
+            const totalWalk = oStop.walkDist + dStop.walkDist;
+            const routeObj = {
+              ...r,
+              originStop: oStop,
+              destStop: dStop,
+              walkDist: totalWalk,
+              walkToOrigin: Math.round(oStop.walkDist),
+              walkToDest: Math.round(dStop.walkDist),
+              isNearby: totalWalk > 100 
+            };
 
-        for (const nearbyStop of nearbyDestinations) {
-          const routes = this.findDirectRoutes(originId, nearbyStop.id, allLines);
-          routes.forEach(r => nearbyRoutes.push({ ...r, isNearby: true, walkToDest: Math.round(nearbyStop.dist) }));
+            if (totalWalk < 150) {
+              if (!directRoutes.find(dr => dr.lineId === r.lineId)) {
+                directRoutes.push(routeObj);
+              }
+            } else {
+              if (totalWalk < 1500) {
+                nearbyRoutes.push(routeObj);
+              }
+            }
+          });
         }
       }
 
+      console.log(`Found ${directRoutes.length} direct routes and ${nearbyRoutes.length} nearby routes`);
+
       let transferRoutes: any[] = [];
-      if (directRoutes.length < 2) {
-        transferRoutes = this.findTransferRoutes(originId, destId, allLines, allStops);
+      if (directRoutes.length === 0 && nearbyRoutes.length < 2) {
+        // Try transfers between the 3 closest stops
+        const topO = originStops.slice(0, 3);
+        const topD = destStops.slice(0, 3);
+        
+        for (const oStop of topO) {
+          for (const dStop of topD) {
+            const routes = this.findTransferRoutes(parseInt(oStop.id), parseInt(dStop.id), allLines, allStops);
+            routes.forEach(r => {
+              if (!transferRoutes.find(tr => tr.l1.id === r.l1.id && tr.l2.id === r.l2.id)) {
+                transferRoutes.push(r);
+              }
+            });
+          }
+        }
       }
+      
+      console.log(`Found ${transferRoutes.length} transfer routes`);
 
       if (directRoutes.length === 0 && nearbyRoutes.length === 0 && transferRoutes.length === 0) {
         if (resultsDiv) resultsDiv.innerHTML = `
           <div class="empty-state">
-            <p>No se encontró una ruta entre estas paradas.</p>
-            <small>Intenta seleccionar paradas principales o puntos de interés cercanos.</small>
+            <p>No se encontró una ruta entre estas ubicaciones.</p>
+            <small>Intenta seleccionar otros puntos de interés o paradas cercanas.</small>
           </div>
         `;
         return;
       }
 
       directRoutes.sort((a, b) => a.stopsCount - b.stopsCount);
-      nearbyRoutes.sort((a, b) => (a.stopsCount + a.walkToDest/50) - (b.stopsCount + b.walkToDest/50));
-      transferRoutes.sort((a, b) => (a.totalStops) - (b.totalStops));
+      nearbyRoutes.sort((a, b) => (a.stopsCount * 2 + a.walkDist/50) - (b.stopsCount * 2 + b.walkDist/50));
+      
+      const uniqueNearby: any[] = [];
+      nearbyRoutes.forEach(nr => {
+        const existing = uniqueNearby.find(u => u.lineId === nr.lineId);
+        if (!existing) uniqueNearby.push(nr);
+        else if (nr.walkDist < existing.walkDist) {
+          uniqueNearby[uniqueNearby.indexOf(existing)] = nr;
+        }
+      });
+      nearbyRoutes = uniqueNearby;
 
       this.lastResults = [
         ...directRoutes.map(r => ({ ...r, type: 'direct' })),
@@ -792,11 +867,12 @@ import Icon from './Icon.astro';
              🚕 Pues va a haber que coger un taxi...
           </div>
           <div class="results-list">
-            ${directRoutes.slice(0, 2).map((l, i) => this.renderDirectRouteCard(l, i)).join('')}
-            ${nearbyRoutes.slice(0, 2).map((l, i) => this.renderNearbyRouteCard(l, i + directRoutes.length)).join('')}
+            ${directRoutes.slice(0, 3).map((l, i) => this.renderDirectRouteCard(l, i)).join('')}
+            ${nearbyRoutes.slice(0, 3).map((l, i) => this.renderNearbyRouteCard(l, i + directRoutes.length)).join('')}
             ${transferRoutes.slice(0, 2).map((l, i) => this.renderTransferRouteCard(l, i + directRoutes.length + nearbyRoutes.length)).join('')}
           </div>
         `;
+
         
         // Add click listeners to result cards (for map)
         resultsDiv.querySelectorAll('.result-card').forEach(card => {
@@ -921,13 +997,20 @@ import Icon from './Icon.astro';
 
           this.fetchBusPath(route.originStop, route.destStop, route.color);
 
-          if (route.type === 'nearby') {
+          if (this.selectedOrigin.type === 'place' && route.walkToOrigin > 30) {
+             // @ts-ignore
+             const m0 = L.marker([this.selectedOrigin.posy, this.selectedOrigin.posx], { icon: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/25/25694.png', iconSize: [25, 25] }) }).addTo(this.routeMap).bindPopup("Tu origen");
+             this.routeMarkers.push(m0);
+             bounds.extend([this.selectedOrigin.posy, this.selectedOrigin.posx]);
+             this.drawWalkingPath(this.selectedOrigin.posy, this.selectedOrigin.posx, route.originStop.posy, route.originStop.posx, 'origin');
+          }
+
+          if (this.selectedDestination.type === 'place' && route.walkToDest > 30) {
              // @ts-ignore
              const m3 = L.marker([this.selectedDestination.posy, this.selectedDestination.posx], { icon: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/25/25694.png', iconSize: [25, 25] }) }).addTo(this.routeMap).bindPopup("Tu destino");
              this.routeMarkers.push(m3);
              bounds.extend([this.selectedDestination.posy, this.selectedDestination.posx]);
-             
-             this.drawWalkingPath(route.destStop.posy, route.destStop.posx, this.selectedDestination.posy, this.selectedDestination.posx);
+             this.drawWalkingPath(route.destStop.posy, route.destStop.posx, this.selectedDestination.posy, this.selectedDestination.posx, 'destination');
           }
 
           detailInfo.innerHTML = `
@@ -936,10 +1019,11 @@ import Icon from './Icon.astro';
               <div>
                 <p><strong>${route.originStop.nombre}</strong> &rarr; <strong>${route.destStop.nombre}</strong></p>
                 <p><small>${route.stopsCount} paradas (~${route.estimatedTravelMins} min)</small></p>
-                ${route.isNearby ? `<p><small id="walking-time-info">Calculando camino a pie...</small></p>` : ''}
+                <p><small id="walking-time-info"></small></p>
               </div>
             </div>
           `;
+
         } else if (route.type === 'transfer') {
           // @ts-ignore
           const m1 = L.marker([this.selectedOrigin.posy, this.selectedOrigin.posx]).addTo(this.routeMap).bindPopup(`Sube aquí: ${this.selectedOrigin.nombre}`);
@@ -979,7 +1063,7 @@ import Icon from './Icon.astro';
        } catch (e) {}
     }
 
-    async drawWalkingPath(lat1: number, lon1: number, lat2: number, lon2: number) {
+    async drawWalkingPath(lat1: number, lon1: number, lat2: number, lon2: number, tag: 'origin' | 'destination') {
       try {
         const response = await fetch(`https://router.project-osrm.org/route/v1/walking/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`);
         const data = await response.json();
@@ -993,7 +1077,8 @@ import Icon from './Icon.astro';
           if (timeInfo) {
             const mins = Math.round(route.duration / 60);
             const dist = Math.round(route.distance);
-            timeInfo.innerHTML = `Luego camina ${dist}m (${mins} min) hasta tu destino.`;
+            const prefix = tag === 'origin' ? "Camina hasta la parada: " : "Desde la parada camina: ";
+            timeInfo.innerHTML += `<div>${prefix} ${dist}m (${mins} min)</div>`;
           }
         }
       } catch (err) {
@@ -1003,11 +1088,15 @@ import Icon from './Icon.astro';
 
     findDirectRoutes(originId: number, destId: number, lines: any[]) {
       const results: any[] = [];
+      const sOriginId = originId.toString();
+      const sDestId = destId.toString();
+
       lines.forEach((line: any) => {
         if (!line.rutas) return;
         line.rutas.forEach((route: any) => {
-          const originIdx = route.paradas.indexOf(originId);
-          const destIdx = route.paradas.indexOf(destId);
+          const originIdx = route.paradas.findIndex((p: any) => p.toString() === sOriginId);
+          const destIdx = route.paradas.findIndex((p: any) => p.toString() === sDestId);
+          
           if (originIdx !== -1 && destIdx !== -1 && originIdx < destIdx) {
             const stopsCount = destIdx - originIdx;
             if (!results.find(r => r.lineId === line.id)) {
@@ -1017,8 +1106,8 @@ import Icon from './Icon.astro';
                 color: line.color,
                 stopsCount,
                 estimatedTravelMins: stopsCount * 2,
-                originStop: this.catalog.actualizacion.paradas.find((s: any) => s.id === originId),
-                destStop: this.catalog.actualizacion.paradas.find((s: any) => s.id === destId)
+                originStop: this.catalog.actualizacion.paradas.find((s: any) => s.id.toString() === sOriginId),
+                destStop: this.catalog.actualizacion.paradas.find((s: any) => s.id.toString() === sDestId)
               });
             }
           }
@@ -1029,40 +1118,43 @@ import Icon from './Icon.astro';
 
     findTransferRoutes(originId: number, destId: number, lines: any[], stops: any[]) {
       const results: any[] = [];
-      const originStop = stops.find(s => s.id === originId);
-      const destStop = stops.find(s => s.id === destId);
+      const sOriginId = originId.toString();
+      const sDestId = destId.toString();
+      
+      const originStop = stops.find(s => s.id.toString() === sOriginId);
+      const destStop = stops.find(s => s.id.toString() === sDestId);
       if (!originStop || !destStop) return [];
 
       const linesAtOrigin = originStop.enlaces;
       const linesAtDest = destStop.enlaces;
 
       linesAtOrigin.forEach((l1Id: any) => {
-        const line1 = lines.find(l => l.id === l1Id);
+        const line1 = lines.find(l => l.id.toString() === l1Id.toString());
         if (!line1) return;
 
         line1.rutas.forEach((r1: any) => {
-          const oIdx = r1.paradas.indexOf(originId);
+          const oIdx = r1.paradas.findIndex((p: any) => p.toString() === sOriginId);
           if (oIdx === -1) return;
 
           for (let i = oIdx + 1; i < r1.paradas.length; i++) {
             const transferStopId = r1.paradas[i];
-            const transferStop = stops.find(s => s.id === transferStopId);
+            const transferStop = stops.find(s => s.id.toString() === transferStopId.toString());
             if (!transferStop) continue;
 
             const linesAtTransfer = transferStop.enlaces;
-            const commonLines = linesAtTransfer.filter((lId: any) => linesAtDest.includes(lId));
+            const commonLines = linesAtTransfer.filter((lId: any) => linesAtDest.map((d: any) => d.toString()).includes(lId.toString()));
 
             commonLines.forEach((l2Id: any) => {
-              if (l2Id === l1Id) return;
-              const line2 = lines.find(l => l.id === l2Id);
+              if (l2Id.toString() === l1Id.toString()) return;
+              const line2 = lines.find(l => l.id.toString() === l2Id.toString());
               if (!line2) return;
 
               line2.rutas.forEach((r2: any) => {
-                const tIdx = r2.paradas.indexOf(transferStopId);
-                const dIdx = r2.paradas.indexOf(destId);
+                const tIdx = r2.paradas.findIndex((p: any) => p.toString() === transferStopId.toString());
+                const dIdx = r2.paradas.findIndex((p: any) => p.toString() === sDestId);
 
                 if (tIdx !== -1 && dIdx !== -1 && tIdx < dIdx) {
-                  if (!results.find(r => r.l1.id === l1Id && r.l2.id === l2Id)) {
+                  if (!results.find(r => r.l1.id === line1.id && r.l2.id === line2.id)) {
                     results.push({
                       l1: line1,
                       l2: line2,
@@ -1140,13 +1232,18 @@ import Icon from './Icon.astro';
       const routeId = `${l.originStop.id}-${l.destStop.id}-${l.lineId}`;
       const isFav = favRoutes.some((f: any) => f.routeId === routeId);
 
+      let walkInfo = "";
+      if (l.walkToOrigin > 30) walkInfo += `Camina ${l.walkToOrigin}m hasta <strong>${l.originStop.nombre}</strong>. `;
+      walkInfo += `Toma el bus y bájate en <strong>${l.destStop.nombre}</strong>. `;
+      if (l.walkToDest > 30) walkInfo += `Luego camina ${l.walkToDest}m (${Math.round(l.walkToDest/70)} min) hasta tu destino.`;
+
       return `
         <div class="card result-card nearby" data-idx="${idx}" style="border-left: 5px solid #${l.color}">
           <div class="result-header">
             <span class="line-badge" style="background-color: #${l.color}">${l.lineComer}</span>
             <div class="travel-summary">
               <strong>Hacia parada cercana (~${l.estimatedTravelMins} min)</strong>
-              <small>Bájate en <strong>${l.destStop.nombre}</strong> y camina ${l.walkToDest}m (${Math.round(l.walkToDest/60)} min)</small>
+              <small>${walkInfo}</small>
             </div>
             <div class="route-actions-row">
               <button class="btn-track-route" data-line="${l.lineId}" data-origin="${l.originStop.id}" data-dest="${l.destStop.id}" title="Seguir este bus">
@@ -1166,6 +1263,7 @@ import Icon from './Icon.astro';
         </div>
       `;
     }
+
 
     renderTransferRouteCard(r: any, idx: number) {
       return `
