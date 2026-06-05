@@ -13,11 +13,12 @@ import {
   ChevronLeft,
   LocateFixed,
   ShieldCheck,
-  Ban
+  Ban,
+  Menu
 } from '@lucide/astro';
 
 interface Props {
-  name: 'refresh' | 'edit' | 'search' | 'stop' | 'bus' | 'star' | 'heart' | 'map' | 'x' | 'chevron-right' | 'chevron-left' | 'location' | 'star-outline' | 'heart-outline' | 'shield' | 'ban';
+  name: 'refresh' | 'edit' | 'search' | 'stop' | 'bus' | 'star' | 'heart' | 'map' | 'x' | 'chevron-right' | 'chevron-left' | 'location' | 'star-outline' | 'heart-outline' | 'shield' | 'ban' | 'menu';
   class?: string;
   size?: number;
 }
@@ -40,7 +41,8 @@ const iconMap = {
   'star-outline': Star,
   'heart-outline': Heart,
   shield: ShieldCheck,
-  ban: Ban
+  ban: Ban,
+  menu: Menu
 };
 
 const SelectedIcon = iconMap[name];

@@ -7,6 +7,8 @@ import CatalogLoader from "../components/CatalogLoader.astro";
 import Icon from "../components/Icon.astro";
 import InstallPopup from "../components/InstallPopup.astro";
 import Landing from "../components/Landing.astro";
+import ProjectMenu from "../components/ProjectMenu.astro";
+import ProjectDrawer from "../components/ProjectDrawer.astro";
 
 const { title } = Astro.props;
 ---
@@ -98,6 +100,7 @@ const { title } = Astro.props;
                     >
                         <Icon name="refresh" size={18} />
                     </button>
+                    <ProjectMenu />
                 </div>
             </div>
         </header>
@@ -192,6 +195,7 @@ const { title } = Astro.props;
                 <span class="label">Favoritos</span>
             </a>
         </nav>
+        <ProjectDrawer />
     </body>
 </html>
 <style is:global>

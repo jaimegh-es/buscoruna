@@ -1,0 +1,33 @@
+---
+import Icon from "./Icon.astro";
+---
+
+<button id="project-menu-btn" class="menu-btn" title="Nuestros Proyectos">
+    <Icon name="menu" size={18} />
+</button>
+
+<style>
+    .menu-btn {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+    }
+
+    .menu-btn:active {
+        background: rgba(255, 255, 255, 0.4);
+    }
+</style>
+
+<script>
+    const menuBtn = document.getElementById('project-menu-btn');
+    menuBtn?.addEventListener('click', () => {
+        // Dispatch a global event to open the drawer
+        window.dispatchEvent(new CustomEvent('open-project-menu'));
+    });
+</script>
