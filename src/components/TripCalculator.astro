@@ -268,9 +268,22 @@ import Icon from './Icon.astro';
   }
 
   .result-card {
-    padding: 1rem;
+    padding: 1.25rem;
     cursor: pointer;
     transition: transform 0.1s;
+    position: relative;
+    border-left: none !important;
+    overflow: hidden;
+  }
+
+  .result-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    background-color: var(--line-color, var(--primary));
   }
 
   .result-card:active {
@@ -279,9 +292,16 @@ import Icon from './Icon.astro';
 
   .result-header {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 1rem;
     margin-bottom: 1rem;
+  }
+
+  @media (min-width: 400px) {
+    .result-header {
+      flex-direction: row;
+      align-items: flex-start;
+    }
   }
 
   .line-badge {
@@ -290,6 +310,7 @@ import Icon from './Icon.astro';
     padding: 0.5rem 0.75rem;
     border-radius: 6px;
     min-width: 45px;
+    height: fit-content;
     text-align: center;
     display: inline-block;
   }
@@ -298,12 +319,24 @@ import Icon from './Icon.astro';
     display: flex;
     flex-direction: column;
     flex-grow: 1;
+    min-width: 0;
   }
 
   .route-actions-row {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    margin-left: auto;
+  }
+
+  @media (max-width: 400px) {
+    .route-actions-row {
+      margin-left: 0;
+      width: 100%;
+      justify-content: flex-end;
+      border-top: 1px solid #f0f0f0;
+      padding-top: 0.75rem;
+    }
   }
 
   .btn-view-stop {
@@ -357,15 +390,15 @@ import Icon from './Icon.astro';
     transform: scale(1.2);
   }
 
-  .travel-summary strong { font-size: 1.1rem; }
-  .travel-summary small { color: var(--text-muted); }
+  .travel-summary strong { font-size: 1rem; line-height: 1.2; margin-bottom: 4px; }
+  .travel-summary small { color: var(--text-muted); line-height: 1.4; }
 
   .bus-status {
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 0.75rem;
-    border-radius: 8px;
+    padding: 1rem;
+    border-radius: 12px;
     background: #f8fafc;
   }
 
@@ -377,13 +410,17 @@ import Icon from './Icon.astro';
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-width: 50px;
+    justify-content: center;
+    min-width: 65px;
+    background: rgba(255, 255, 255, 0.5);
+    padding: 0.5rem;
+    border-radius: 8px;
   }
 
-  .bus-status .eta .time { font-size: 1.5rem; font-weight: 800; line-height: 1; }
-  .bus-status .eta .unit { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+  .bus-status .eta .time { font-size: 1.6rem; font-weight: 800; line-height: 1; }
+  .bus-status .eta .unit { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; margin-top: -2px; }
 
-  .bus-status .details p { margin: 0; font-size: 0.85rem; }
+  .bus-status .details p { margin: 2px 0; font-size: 0.85rem; }
   
   .result-card.nearby {
     background: #f0f9ff;
@@ -1323,7 +1360,7 @@ import Icon from './Icon.astro';
       const isFav = favRoutes.some((f: any) => f.routeId === routeId);
 
       return `
-        <div class="card result-card direct" data-idx="${idx}" style="border-left: 5px solid #${l.color}">
+        <div class="card result-card direct" data-idx="${idx}" style="--line-color: #${l.color}">
           <div class="result-header">
             <span class="line-badge" style="background-color: #${l.color}">${l.lineComer}</span>
             <div class="travel-summary">
@@ -1360,7 +1397,7 @@ import Icon from './Icon.astro';
       if (l.walkToDest > 30) walkInfo += `Luego camina ${l.walkToDest}m (${Math.round(l.walkToDest/70)} min) hasta tu destino.`;
 
       return `
-        <div class="card result-card nearby" data-idx="${idx}" style="border-left: 5px solid #${l.color}">
+        <div class="card result-card nearby" data-idx="${idx}" style="--line-color: #${l.color}">
           <div class="result-header">
             <span class="line-badge" style="background-color: #${l.color}">${l.lineComer}</span>
             <div class="travel-summary">
@@ -1389,7 +1426,7 @@ import Icon from './Icon.astro';
 
     renderTransferRouteCard(r: any, idx: number) {
       return `
-        <div class="card result-card transfer" data-idx="${idx}" style="border-left: 5px solid #${r.l1.color}">
+        <div class="card result-card transfer" data-idx="${idx}" style="--line-color: #${r.l1.color}">
           <div class="result-header">
             <div class="transfer-badges">
               <span class="line-badge" style="background-color: #${r.l1.color}">${r.l1.lin_comer}</span>

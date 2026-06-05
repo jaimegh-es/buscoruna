@@ -1,6 +1,37 @@
 import type { APIRoute } from 'astro';
 
 export const GET: APIRoute = async ({ request }) => {
+  const origin = request.headers.get('origin');
+  const referer = request.headers.get('referer');
+  
+  const allowedDomains = [
+    'buscoruna.inled.es',
+    'xn--coruabus-o3a.inled.es',
+    'coruñabus.inled.es',
+    'localhost'
+  ];
+
+  const isAllowed = (val: string | null) => {
+    if (!val) return false;
+    try {
+      const url = new URL(val);
+      const hostname = url.hostname;
+      return allowedDomains.includes(hostname) || hostname === 'localhost';
+    } catch {
+      return false;
+    }
+  };
+
+  const isAllowedOrigin = isAllowed(origin);
+  const isAllowedReferer = isAllowed(referer);
+
+  if (!isAllowedOrigin && !isAllowedReferer) {
+    return new Response(JSON.stringify({ error: 'Unauthorized: Access restricted to authorized domains' }), { 
+      status: 403,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
   const url = new URL(request.url);
   const type = url.searchParams.get('type') || 'itranvias';
   
@@ -47,7 +78,7 @@ export const GET: APIRoute = async ({ request }) => {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': origin || (referer ? new URL(referer).origin : '*'),
       }
     });
   } catch (error) {

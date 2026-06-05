@@ -48,7 +48,7 @@ import Icon from '../components/Icon.astro';
       const list = document.getElementById('lines-list');
       if (list && data.resultado === 'OK') {
         list.innerHTML = data.lineas.map((l: any) => `
-          <div class="card line-card clickable" data-id="${l.id}" style="border-left: 8px solid #${l.color_linea}">
+          <div class="card line-card clickable" data-id="${l.id}" style="--line-color: #${l.color_linea}">
             <div class="line-num" style="background-color: #${l.color_linea}">${l.nom_comer}</div>
             <div class="line-desc">
               <strong>${l.orig_linea}</strong>
@@ -331,7 +331,20 @@ import Icon from '../components/Icon.astro';
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 0.75rem;
+    padding: 0.75rem 1rem;
+    position: relative;
+    border-left: none !important;
+    overflow: hidden;
+  }
+
+  .line-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 8px;
+    background-color: var(--line-color, var(--primary));
   }
 
   .line-num {
