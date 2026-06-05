@@ -209,6 +209,30 @@ import Icon from './Icon.astro';
     overflow-y: auto;
   }
 
+  .autocomplete-loading {
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+
+  .spinner-small {
+    width: 18px;
+    height: 18px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #e11d48; /* fallback for var(--primary) if not defined */
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
   .autocomplete-item {
     padding: 0.75rem 1rem;
     cursor: pointer;
@@ -501,16 +525,62 @@ import Icon from './Icon.astro';
     setupGeoButtons() {
       this.querySelector('#get-location-origin')?.addEventListener('click', () => {
         if (navigator.geolocation) {
+          const resultsDiv = this.querySelector('#origin-results') as HTMLDivElement;
+          resultsDiv.innerHTML = '<div class="autocomplete-item"><small>Localizando...</small></div>';
+          resultsDiv.style.display = 'block';
+
           navigator.geolocation.getCurrentPosition((pos) => {
             const { latitude, longitude } = pos.coords;
-            const input = this.querySelector('#origin') as HTMLInputElement;
-            input.value = "Mi ubicación";
-            this.selectedOrigin = {
-              type: 'place',
-              nombre: "Mi ubicación",
-              posy: latitude,
-              posx: longitude
-            };
+            const nearby = this.findNearbyStops(latitude, longitude, 1000).slice(0, 5);
+            
+            if (nearby.length > 0) {
+              resultsDiv.innerHTML = `
+                <div class="autocomplete-item current-pos" data-lat="${latitude}" data-lon="${longitude}">
+                  <span class="icon"><i data-lucide="navigation" style="width: 18px; height: 18px;"></i></span>
+                  <div class="info">
+                    <strong>Mi ubicación exacta</strong>
+                    <small>Usar coordenadas GPS</small>
+                  </div>
+                </div>
+                <div style="padding: 0.5rem 1rem; background: #f3f4f6; font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">Paradas cercanas</div>
+                ${nearby.map((s: any) => `
+                  <div class="autocomplete-item stop" data-type="stop" data-id="${s.id}" data-name="${s.nombre}">
+                    <span class="icon"><i data-lucide="map-pin" style="width: 18px; height: 18px;"></i></span>
+                    <div class="info">
+                      <strong>${s.nombre}</strong>
+                      <small>Parada ${s.id} (${Math.round(s.dist)}m)</small>
+                    </div>
+                  </div>
+                `).join('')}
+              `;
+              this.renderIcons();
+
+              resultsDiv.querySelectorAll('.autocomplete-item').forEach(item => {
+                item.addEventListener('click', () => {
+                  const input = this.querySelector('#origin') as HTMLInputElement;
+                  if (item.classList.contains('current-pos')) {
+                    input.value = "Mi ubicación";
+                    this.selectedOrigin = {
+                      type: 'place',
+                      nombre: "Mi ubicación",
+                      posy: latitude,
+                      posx: longitude
+                    };
+                  } else {
+                    const id = item.getAttribute('data-id');
+                    const name = item.getAttribute('data-name');
+                    input.value = name || '';
+                    const stop = this.catalog.paradas[id!];
+                    this.selectedOrigin = { type: 'stop', ...stop };
+                  }
+                  resultsDiv.style.display = 'none';
+                });
+              });
+            } else {
+              resultsDiv.innerHTML = '<div class="autocomplete-item"><small>No se encontraron paradas cercanas.</small></div>';
+            }
+          }, (err) => {
+            resultsDiv.innerHTML = '<div class="autocomplete-item"><small>Error al obtener ubicación.</small></div>';
           });
         }
       });
@@ -629,6 +699,15 @@ import Icon from './Icon.astro';
           resultsDiv.style.display = 'none';
           return;
         }
+
+        // Show loading state immediately
+        resultsDiv.innerHTML = `
+          <div class="autocomplete-loading">
+            <div class="spinner-small"></div>
+            <span>Buscando...</span>
+          </div>
+        `;
+        resultsDiv.style.display = 'block';
 
         timeout = setTimeout(async () => {
           this.catalog = storage.getCatalog();
@@ -810,8 +889,8 @@ import Icon from './Icon.astro';
       console.log(`Found ${directRoutes.length} direct routes and ${nearbyRoutes.length} nearby routes`);
 
       let transferRoutes: any[] = [];
-      if (directRoutes.length === 0 && nearbyRoutes.length < 2) {
-        // Try transfers between the 3 closest stops
+      if (directRoutes.length < 2) {
+        // Try transfers between the top origin and destination stops
         const topO = originStops.slice(0, 3);
         const topD = destStops.slice(0, 3);
         
@@ -819,14 +898,25 @@ import Icon from './Icon.astro';
           for (const dStop of topD) {
             const routes = this.findTransferRoutes(parseInt(oStop.id), parseInt(dStop.id), allLines, allStops);
             routes.forEach(r => {
-              if (!transferRoutes.find(tr => tr.l1.id === r.l1.id && tr.l2.id === r.l2.id)) {
-                transferRoutes.push(r);
+              const totalWalk = oStop.walkDist + dStop.walkDist;
+              const routeObj = {
+                 ...r,
+                 type: 'transfer',
+                 walkDist: totalWalk,
+                 walkToOrigin: Math.round(oStop.walkDist),
+                 walkToDest: Math.round(dStop.walkDist)
+              };
+              // Deduplicate by line combination and transfer stop
+              const key = `${r.l1.id}-${r.l2.id}-${r.transferStop.id}`;
+              if (!transferRoutes.find(tr => `${tr.l1.id}-${tr.l2.id}-${tr.transferStop.id}` === key)) {
+                transferRoutes.push(routeObj);
               }
             });
           }
         }
       }
       
+      transferRoutes.sort((a, b) => (a.totalStops * 2 + a.walkDist/50) - (b.totalStops * 2 + b.walkDist/50));
       console.log(`Found ${transferRoutes.length} transfer routes`);
 
       if (directRoutes.length === 0 && nearbyRoutes.length === 0 && transferRoutes.length === 0) {
@@ -1136,13 +1226,17 @@ import Icon from './Icon.astro';
           const oIdx = r1.paradas.findIndex((p: any) => p.toString() === sOriginId);
           if (oIdx === -1) return;
 
+          // Look for potential transfer stops (major stops or any stop with connections)
           for (let i = oIdx + 1; i < r1.paradas.length; i++) {
             const transferStopId = r1.paradas[i];
             const transferStop = stops.find(s => s.id.toString() === transferStopId.toString());
-            if (!transferStop) continue;
+            if (!transferStop || transferStopId.toString() === sDestId) continue;
 
             const linesAtTransfer = transferStop.enlaces;
-            const commonLines = linesAtTransfer.filter((lId: any) => linesAtDest.map((d: any) => d.toString()).includes(lId.toString()));
+            // Lines that are at the transfer stop AND at the destination stop
+            const commonLines = linesAtTransfer.filter((lId: any) => 
+              linesAtDest.some((d: any) => d.toString() === lId.toString())
+            );
 
             commonLines.forEach((l2Id: any) => {
               if (l2Id.toString() === l1Id.toString()) return;
@@ -1154,14 +1248,18 @@ import Icon from './Icon.astro';
                 const dIdx = r2.paradas.findIndex((p: any) => p.toString() === sDestId);
 
                 if (tIdx !== -1 && dIdx !== -1 && tIdx < dIdx) {
-                  if (!results.find(r => r.l1.id === line1.id && r.l2.id === line2.id)) {
+                  // Found a connection!
+                  const transferKey = `${line1.id}-${line2.id}-${transferStopId}`;
+                  if (!results.find(r => `${r.l1.id}-${r.l2.id}-${r.transferStop.id}` === transferKey)) {
                     results.push({
                       l1: line1,
                       l2: line2,
                       transferStop: transferStop,
                       stops1: i - oIdx,
                       stops2: dIdx - tIdx,
-                      totalStops: (i - oIdx) + (dIdx - tIdx)
+                      totalStops: (i - oIdx) + (dIdx - tIdx),
+                      originStop: originStop,
+                      destStop: destStop
                     });
                   }
                 }
@@ -1170,7 +1268,9 @@ import Icon from './Icon.astro';
           }
         });
       });
-      return results.slice(0, 3);
+
+      // Sort by total stops and take the best few
+      return results.sort((a, b) => a.totalStops - b.totalStops).slice(0, 4);
     }
 
     findNearbyStops(lat: number, lon: number, radiusMeters: number) {

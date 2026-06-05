@@ -1,12 +1,12 @@
-# 🚌 Coruña Bus PWA
+# Coruña Bus
 
-![Coruña Bus Banner](https://raw.githubusercontent.com/AstroJS/astro/main/assets/astro-logo-light.svg)
+![Coruña Bus Banner](https://coruñabus.inled.es/logo.png)
 
-> **Tu asistente inteligente para el transporte público en A Coruña.** 
+> **La web que te ayuda a moverte inteligentemente con los buses de coruña.** 
 
 Coruña Bus es una Progressive Web App (PWA) moderna diseñada para ofrecer la mejor experiencia de usuario al consultar tiempos de llegada, planear rutas y realizar el seguimiento de autobuses en tiempo real.
 
-## ✨ Características Principales
+## Características Principales
 
 - 📍 **Tiempos en Tiempo Real**: Consulta cuánto falta para que llegue tu bus con datos actualizados directamente de iTranvías.
 - 🗺️ **Planificador de Rutas Inteligente**: Encuentra la mejor forma de ir de A a B, incluyendo caminatas a paradas cercanas y transbordos.
@@ -16,6 +16,9 @@ Coruña Bus es una Progressive Web App (PWA) moderna diseñada para ofrecer la m
 - 📡 **Modo Offline**: Gracias al cacheo inteligente del catálogo, la búsqueda de paradas y líneas funciona incluso sin conexión.
 - 🛡️ **Privacidad Total**: Sin anuncios, sin rastreadores y sin necesidad de crear una cuenta.
 
+## Especificaciones y análisis de API  
+Para poder desarrollar esta aplicación hemos analizado exhaustivamente el API abierta de iTranvias.  
+Toda la información acerca del api se puede encontrar en [/research](/research).
 ## 🚀 Tecnologías Utilizadas
 
 - **[Astro](https://astro.build/)**: Framework web para una velocidad máxima.

@@ -118,8 +118,7 @@ const { title } = Astro.props;
                         <strong>Aviso Legal:</strong> Coruña Bus es una aplicación
                         independiente de carácter informativo. No tiene relación oficial
                         con la Compañía de Tranvías de La Coruña ni con el Ayuntamiento
-                        de A Coruña. Los datos mostrados se ofrecen "tal cual" para
-                        facilitar la movilidad urbana.
+                        de A Coruña. Los datos se obtienen de fuentes abiertas.
                     </p>
                 </div>
             </footer>
@@ -162,7 +161,8 @@ const { title } = Astro.props;
                 <h3>¿A qué parada vas?</h3>
                 <p class="text-muted small">
                     Selecciona tu destino en la línea <strong
-                        id="modal-line-name">...</strong>
+                        id="modal-line-name">...</strong
+                    >
                 </p>
                 <div id="global-stops-list-modal" class="modal-list"></div>
                 <button id="close-global-modal" class="btn-secondary mt-1"
