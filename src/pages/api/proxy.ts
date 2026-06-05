@@ -6,7 +6,7 @@ export const GET: APIRoute = async ({ request }) => {
   
   const allowedDomains = [
     'buscoruna.inled.es',
-    'xn--coruabus-o3a.inled.es',
+    'xn--coruabus-g3a.inled.es',
     'coruñabus.inled.es',
     'localhost'
   ];
@@ -25,8 +25,19 @@ export const GET: APIRoute = async ({ request }) => {
   const isAllowedOrigin = isAllowed(origin);
   const isAllowedReferer = isAllowed(referer);
 
+  // If we are in the same domain, sometimes headers might be missing depending on the browser/navigation.
+  // But for an API proxy, we expect at least one to be present if it's from a web app.
   if (!isAllowedOrigin && !isAllowedReferer) {
-    return new Response(JSON.stringify({ error: 'Unauthorized: Access restricted to authorized domains' }), { 
+    // Basic check for direct access if no headers at all (can happen in some server-side or CLI tools, 
+    // but here we want to protect it. However, if it's a GET, we might want to be careful).
+    // Let's keep it strict but ensure we didn't miss anything.
+    return new Response(JSON.stringify({ 
+      error: 'Unauthorized', 
+      debug: { 
+        origin: origin || 'null', 
+        referer: referer ? new URL(referer).hostname : 'null' 
+      } 
+    }), { 
       status: 403,
       headers: { 'Content-Type': 'application/json' }
     });
