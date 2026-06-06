@@ -29,8 +29,23 @@ const { title } = Astro.props;
             name="viewport"
             content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"
         />
-        <link rel="icon" type="image/svg+xml" href="/logo.png" />
+        <link rel="icon" type="image/png" href="/logo.png" />
+        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <meta name="theme-color" content="#f44336" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Coruña Bus" />
         <meta name="generator" content={Astro.generator} />
+
+        <script>
+            // Register Service Worker for PWA
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/sw.js');
+                });
+            }
+        </script>
 
         <!-- SEO & Social Media -->
         <meta
