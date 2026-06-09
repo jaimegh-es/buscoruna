@@ -1,51 +1,452 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import TripCalculator from "../components/TripCalculator.astro";
+import Icon from "../components/Icon.astro";
 ---
 
-<Layout title="Coruña Bus | La webapp definitiva todo en uno">
-    <section class="welcome">
-        <h2>¿A dónde quieres ir?</h2>
-        <p>Calcula la mejor combinación de buses en tiempo real.</p>
-    </section>
+<Layout title="Coruña Bus | Inicio">
+    <div class="home-dashboard">
+        <section class="welcome-section">
+            <div class="welcome-header">
+                <div class="welcome-text">
+                    <h2>¡Hola! 👋</h2>
+                    <p>¿Qué quieres hacer hoy?</p>
+                </div>
+                <div id="weather-widget" class="weather-widget loading">
+                    <!-- Weather will be injected here -->
+                </div>
+            </div>
+        </section>
 
-    <TripCalculator />
+        <section class="quick-actions">
+            <a href="/planner" class="action-card">
+                <div class="action-icon search"><Icon name="search" /></div>
+                <span>Planear ruta</span>
+            </a>
+            <a href="/stops" class="action-card">
+                <div class="action-icon location"><Icon name="location" /></div>
+                <span>Paradas cerca</span>
+            </a>
+            <a href="/lines" class="action-card">
+                <div class="action-icon bus"><Icon name="bus" /></div>
+                <span>Ver líneas</span>
+            </a>
+        </section>
 
-    <section class="quick-links">
-        <div class="card">
-            <h3>Paradas cercanas</h3>
-            <p>Encuentra las paradas a tu alrededor.</p>
-            <a href="/stops" class="btn-secondary">Ver paradas</a>
-        </div>
-    </section>
+        <section class="favorites-section">
+            <div class="section-header">
+                <h3>Mis favoritos</h3>
+                <a href="/favorites" class="view-all">Ver todos</a>
+            </div>
+            <div id="favorites-summary" class="favorites-summary">
+                <div class="loading-simple">Cargando favoritos...</div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        import { storage } from '../utils/storage';
+        import { tracking } from '../utils/tracking';
+        import { createIcons, ChevronRight, Cloud, Sun, CloudRain, CloudLightning, Thermometer } from 'lucide';
+
+        async function fetchWeather() {
+            const widget = document.getElementById('weather-widget');
+            if (!widget) return;
+
+            try {
+                // Default to Coruña coordinates
+                const lat = 43.3623;
+                const lon = -8.4115;
+                
+                const resp = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code&timezone=auto`);
+                const data = await resp.json();
+                
+                if (data && data.current) {
+                    const temp = Math.round(data.current.temperature_2m);
+                    const code = data.current.weather_code;
+                    
+                    let iconName = 'sun';
+                    let description = 'Despejado';
+                    
+                    if (code >= 1 && code <= 3) { iconName = 'cloud'; description = 'Nublado'; }
+                    else if (code >= 45 && code <= 48) { iconName = 'cloud'; description = 'Niebla'; }
+                    else if (code >= 51 && code <= 67) { iconName = 'cloud-rain'; description = 'Lluvia'; }
+                    else if (code >= 71 && code <= 77) { iconName = 'cloud'; description = 'Nieve'; }
+                    else if (code >= 80 && code <= 82) { iconName = 'cloud-rain'; description = 'Chubascos'; }
+                    else if (code >= 95) { iconName = 'cloud-lightning'; description = 'Tormenta'; }
+
+                    widget.className = 'weather-widget ready';
+                    widget.innerHTML = `
+                        <div class="weather-main">
+                            <span class="weather-temp">${temp}°</span>
+                            <span class="weather-icon"><i data-lucide="${iconName}"></i></span>
+                        </div>
+                        <span class="weather-desc">${description}</span>
+                    `;
+                    createIcons({ icons: { Sun, Cloud, CloudRain, CloudLightning, Thermometer } });
+                }
+            } catch (err) {
+                console.error('Weather fetch failed', err);
+                widget.style.display = 'none';
+            }
+        }
+
+        async function renderFavorites() {
+            const container = document.getElementById('favorites-summary');
+            if (!container) return;
+
+            const favIds = storage.getFavorites();
+            const favRoutes = storage.getFavoriteRoutes();
+            const catalog = storage.getCatalog();
+
+            if (favIds.length === 0 && favRoutes.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-favorites">
+                        <p>No tienes favoritos guardados.</p>
+                        <p><small>Tus paradas y rutas frecuentes aparecerán aquí.</small></p>
+                    </div>
+                `;
+                return;
+            }
+
+            if (!catalog) {
+                container.innerHTML = '<div class="loading-simple">Cargando datos del sistema...</div>';
+                return;
+            }
+
+            const lines = catalog.actualizacion.lineas || [];
+            const lineMap = lines.reduce((acc: any, line: any) => {
+                acc[line.id] = { name: line.lin_comer, color: line.color };
+                return acc;
+            }, {});
+
+            let html = '';
+
+            // Show top 3 favorite stops
+            if (favIds.length > 0) {
+                html += `
+                    <div class="summary-list">
+                        ${favIds.slice(0, 3).map(id => {
+                            const s = catalog.paradas[id];
+                            if (!s) return '';
+                            return `
+                                <a href="/stop/${s.id}" class="card fav-item">
+                                    <div class="fav-info">
+                                        <strong>${s.nombre}</strong>
+                                        <div class="fav-lines">
+                                            ${s.enlaces.slice(0, 4).map((lId: any) => {
+                                                const info = lineMap[lId];
+                                                if (!info) return '';
+                                                return `<span class="line-dot" style="background-color: #${info.color}" title="${info.name}"></span>`;
+                                            }).join('')}
+                                            ${s.enlaces.length > 4 ? '<span class="more-dots">...</span>' : ''}
+                                        </div>
+                                    </div>
+                                    <div class="fav-arrow"><i data-lucide="chevron-right"></i></div>
+                                </a>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            }
+
+            // Show top 2 favorite routes
+            if (favRoutes.length > 0) {
+                html += `
+                    <div class="summary-list mt-1">
+                        ${favRoutes.slice(0, 2).map(r => {
+                            const origin = catalog.paradas[r.originId];
+                            const dest = catalog.paradas[r.destId];
+                            const line = lines.find((l: any) => l.id === r.lineId);
+                            const color = line ? `#${line.color}` : 'var(--primary)';
+                            
+                            return `
+                                <a href="/stop/${r.originId}" class="card fav-item route-fav" style="--line-color: ${color}" data-dest="${r.destId}">
+                                    <div class="route-info">
+                                        <span class="route-line-badge" style="background-color: ${color}">${r.lineName}</span>
+                                        <div class="route-text">
+                                            <strong>${dest?.nombre || 'Destino'}</strong>
+                                            <small>Desde ${origin?.nombre || 'Origen'}</small>
+                                        </div>
+                                    </div>
+                                    <div class="fav-arrow"><i data-lucide="chevron-right"></i></div>
+                                </a>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            }
+
+            container.innerHTML = html;
+            createIcons({ icons: { ChevronRight } });
+
+            // Listeners for routes
+            container.querySelectorAll('.route-fav').forEach(link => {
+                link.addEventListener('click', () => {
+                    const destId = link.getAttribute('data-dest');
+                    if (destId) tracking.setTargetDestination(parseInt(destId));
+                });
+            });
+        }
+
+        renderFavorites();
+        fetchWeather();
+        window.addEventListener('catalog-loaded', renderFavorites);
+    </script>
 </Layout>
 
-<style>
-    .welcome {
-        margin-bottom: 2rem;
+<style is:global>
+    .home-dashboard {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+        padding-top: 1rem;
     }
 
-    .welcome h2 {
-        font-size: 1.75rem;
-        margin-bottom: 0.5rem;
+    .welcome-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
     }
 
-    .welcome p {
+    .weather-widget {
+        background: white;
+        padding: 0.75rem 1rem;
+        border-radius: 16px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 90px;
+        border: 1px solid #f0f0f0;
+    }
+
+    .weather-widget.loading {
+        opacity: 0.5;
+        height: 60px;
+    }
+
+    .weather-main {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .weather-temp {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--text);
+    }
+
+    .weather-icon {
+        color: var(--primary);
+    }
+
+    .weather-desc {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        letter-spacing: 0.05em;
+    }
+
+    .welcome-section h2 {
+        font-size: 2rem;
+        font-weight: 800;
+        margin-bottom: 0.25rem;
+    }
+
+    .welcome-section p {
+        color: var(--text-muted);
+        font-size: 1.1rem;
+    }
+
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+    }
+
+    .action-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.75rem;
+        text-decoration: none;
+        color: var(--text);
+        text-align: center;
+    }
+
+    .action-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        transition: transform 0.2s;
+    }
+
+    .action-card:active .action-icon {
+        transform: scale(0.9);
+    }
+
+    .action-icon.search { background: linear-gradient(135deg, #f44336, #ff7043); }
+    .action-icon.location { background: linear-gradient(135deg, #2196f3, #4fc3f2); }
+    .action-icon.bus { background: linear-gradient(135deg, #4caf50, #81c784); }
+
+    .action-card span {
+        font-size: 0.85rem;
+        font-weight: 700;
+    }
+
+    .favorites-section {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .section-header h3 {
+        font-size: 1.2rem;
+        font-weight: 800;
+    }
+
+    .view-all {
+        font-size: 0.85rem;
+        color: var(--primary);
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .summary-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .fav-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        margin-bottom: 0;
+        text-decoration: none;
+        color: inherit;
+        border: 1px solid transparent;
+        transition: all 0.2s;
+    }
+
+    .fav-item:active {
+        background-color: #f9f9f9;
+        border-color: #eee;
+        transform: translateY(-2px);
+    }
+
+    .fav-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .fav-info strong {
+        font-size: 1rem;
+    }
+
+    .fav-lines {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+    }
+
+    .line-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
+
+    .more-dots {
+        font-size: 0.7rem;
         color: var(--text-muted);
     }
 
-    .quick-links h3 {
-        margin-bottom: 0.5rem;
+    .fav-arrow {
+        color: #ccc;
     }
 
-    .btn-secondary {
-        display: inline-block;
-        margin-top: 1rem;
-        padding: 0.5rem 1rem;
-        background: #eee;
-        color: var(--text);
-        text-decoration: none;
-        border-radius: 6px;
-        font-weight: 600;
+    .route-fav {
+        position: relative;
+        padding-left: 1.25rem;
     }
+
+    .route-fav::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background-color: var(--line-color);
+        border-radius: 12px 0 0 12px;
+    }
+
+    .route-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        min-width: 0;
+    }
+
+    .route-line-badge {
+        color: white;
+        font-weight: 800;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        min-width: 30px;
+        text-align: center;
+    }
+
+    .route-text {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .route-text strong {
+        font-size: 0.95rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .route-text small {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    .empty-favorites {
+        text-align: center;
+        padding: 2rem 1rem;
+        background: white;
+        border-radius: 12px;
+        border: 2px dashed #eee;
+        color: var(--text-muted);
+    }
+
+    .loading-simple {
+        text-align: center;
+        padding: 2rem;
+        color: var(--text-muted);
+        font-style: italic;
+    }
+
+    .mt-1 { margin-top: 0.5rem; }
 </style>

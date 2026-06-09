@@ -18,7 +18,17 @@ import Icon from '../../components/Icon.astro';
       <p id="display-stop-address" class="text-muted"></p>
     </div>
 
-    <div id="stop-map" style="height: 200px; margin-bottom: 1.5rem; border-radius: 12px; z-index: 1;"></div>
+    <div id="stop-map-container" class="map-container">
+      <div id="stop-map" style="height: 250px; border-radius: 12px; z-index: 1;"></div>
+      <div class="map-actions">
+        <button id="toggle-satellite" class="map-btn" title="Vista Satélite">
+          <Icon name="map" size={20} />
+        </button>
+        <button id="locate-me" class="map-btn" title="Mi ubicación">
+          <Icon name="location" size={20} />
+        </button>
+      </div>
+    </div>
 
     <div id="eta-container">
       <h3>Próximos buses</h3>
@@ -47,7 +57,7 @@ import Icon from '../../components/Icon.astro';
     import { storage } from '../../utils/storage';
     import { API } from '../../services/api';
     import { tracking } from '../../utils/tracking';
-    import { createIcons, Star, Navigation } from 'lucide';
+    import { createIcons, Star, Navigation, Map, LocateFixed } from 'lucide';
 
     // Get ID from URL
     const pathParts = window.location.pathname.split('/');
@@ -56,12 +66,19 @@ import Icon from '../../components/Icon.astro';
     let map: any = null;
     let stopData: any = null;
     let pendingTracking: { busId: string, lineId: number } | null = null;
+    let satelliteLayer: any = null;
+    let isSatellite = false;
+    let userMarker: any = null;
+    let watchId: any = null;
+    let guidanceLine: any = null;
 
     function renderIcons() {
       createIcons({
         icons: {
           Star,
-          Navigation
+          Navigation,
+          Map,
+          LocateFixed
         }
       });
     }
@@ -128,7 +145,85 @@ import Icon from '../../components/Icon.astro';
         }).addTo(map);
         // @ts-ignore
         L.marker([stopData.posy, stopData.posx]).addTo(map);
+        
+        setupMapActions();
       }
+    }
+
+    function setupMapActions() {
+      const satBtn = document.getElementById('toggle-satellite');
+      const locateBtn = document.getElementById('locate-me');
+
+      satBtn?.addEventListener('click', () => {
+        isSatellite = !isSatellite;
+        if (isSatellite) {
+          if (!satelliteLayer) {
+            // @ts-ignore
+            satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+              attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EBP, and the GIS User Community'
+            });
+          }
+          satelliteLayer.addTo(map);
+          satBtn.classList.add('active');
+        } else {
+          if (satelliteLayer) satelliteLayer.remove();
+          satBtn.classList.remove('active');
+        }
+      });
+
+      locateBtn?.addEventListener('click', () => {
+        if (navigator.geolocation) {
+          if (watchId) {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+            if (userMarker) userMarker.remove();
+            if (guidanceLine) guidanceLine.remove();
+            locateBtn.classList.remove('active');
+            return;
+          }
+
+          locateBtn.classList.add('active');
+          watchId = navigator.geolocation.watchPosition((pos) => {
+            const { latitude, longitude, heading } = pos.coords;
+            const latlng = [latitude, longitude];
+
+            if (!userMarker) {
+              // @ts-ignore
+              const userIcon = L.divIcon({
+                className: 'user-location-marker',
+                html: `<div class="marker-container"><div class="marker-dot"></div><div class="marker-arrow" style="transform: rotate(${heading || 0}deg)"></div></div>`,
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+              });
+              // @ts-ignore
+              userMarker = L.marker(latlng, { icon: userIcon }).addTo(map);
+            } else {
+              userMarker.setLatLng(latlng);
+              const arrow = document.querySelector('.marker-arrow') as HTMLElement;
+              if (arrow && heading !== null) arrow.style.transform = `rotate(${heading}deg)`;
+            }
+
+            updateGuidanceLine(latitude, longitude);
+            // @ts-ignore
+            map.panTo(latlng);
+          }, (err) => {
+            console.error(err);
+            locateBtn.classList.remove('active');
+          }, { enableHighAccuracy: true });
+        }
+      });
+    }
+
+    function updateGuidanceLine(uLat: number, uLon: number) {
+      if (!stopData || !map) return;
+      if (guidanceLine) guidanceLine.remove();
+      // @ts-ignore
+      guidanceLine = L.polyline([[uLat, uLon], [stopData.posy, stopData.posx]], {
+        color: 'var(--primary)',
+        dashArray: '5, 10',
+        weight: 3,
+        opacity: 0.6
+      }).addTo(map);
     }
 
     async function fetchETAs() {
@@ -219,7 +314,20 @@ import Icon from '../../components/Icon.astro';
               
               const currentTargetId = tracking.getTargetDestination();
               
+              let isValidTarget = false;
               if (currentTargetId) {
+                 const line = catalog.actualizacion.lineas.find(l => l.id === lineId);
+                 if (line) {
+                    const route = line.rutas.find(r => r.paradas.includes(stopId) && r.paradas.includes(currentTargetId));
+                    if (route) {
+                       const cIdx = route.paradas.indexOf(stopId);
+                       const tIdx = route.paradas.indexOf(currentTargetId);
+                       if (tIdx > cIdx) isValidTarget = true;
+                    }
+                 }
+              }
+
+              if (isValidTarget && currentTargetId) {
                 pendingTracking = { busId, lineId };
                 startTracking(currentTargetId);
                 tracking.clearTargetDestination();
@@ -319,6 +427,77 @@ import Icon from '../../components/Icon.astro';
 <style is:global>
   .stop-detail-page {
     animation: fadeIn 0.3s ease-out;
+  }
+
+  .map-container {
+    position: relative;
+    margin-bottom: 1.5rem;
+  }
+
+  .map-actions {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 1000;
+  }
+
+  .map-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: white;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border: 1px solid #eee;
+    transition: all 0.2s;
+  }
+
+  .map-btn:active, .map-btn.active {
+    background: var(--primary);
+    color: white;
+    transform: scale(0.95);
+  }
+
+  .user-location-marker {
+    background: none !important;
+    border: none !important;
+  }
+
+  .marker-container {
+    position: relative;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .marker-dot {
+    width: 12px;
+    height: 12px;
+    background: #3b82f6;
+    border: 2px solid white;
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+    z-index: 2;
+  }
+
+  .marker-arrow {
+    position: absolute;
+    top: -5px;
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 12px solid #3b82f6;
+    z-index: 1;
+    transform-origin: center 20px;
   }
 
   .header-main {
@@ -516,7 +695,6 @@ import Icon from '../../components/Icon.astro';
     display: block;
   }
 
-  /* Restoring essential styles */
   .eta-extra-buses {
     width: 100%;
     padding: 0.5rem 1rem 1rem 1rem;
@@ -542,7 +720,6 @@ import Icon from '../../components/Icon.astro';
   .extra-bus-main { display: flex; flex-direction: column; }
   .extra-bus-id { font-size: 0.7rem; color: #888; }
 
-  /* Modal Styles */
   .modal-overlay {
     position: fixed;
     top: 0;

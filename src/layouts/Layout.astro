@@ -97,7 +97,7 @@ const { title } = Astro.props;
 
         <header class="main-header">
             <div class="header-content">
-                <div class="logo-container">
+                <a href="/" class="logo-container" style="text-decoration: none; color: inherit;">
                     <img
                         src="/logo.png"
                         alt="Coruña Bus Logo"
@@ -105,7 +105,7 @@ const { title } = Astro.props;
                         id="header-logo"
                     />
                     <h1>Coruña<span>Bus</span></h1>
-                </div>
+                </a>
                 <div class="header-actions">
                     <div id="last-update" class="last-update">...</div>
                     <button
@@ -194,6 +194,10 @@ const { title } = Astro.props;
         </div>
         <nav class="bottom-nav">
             <a href="/" class="nav-item">
+                <span class="icon"><Icon name="home" /></span>
+                <span class="label">Inicio</span>
+            </a>
+            <a href="/planner" class="nav-item">
                 <span class="icon"><Icon name="search" /></span>
                 <span class="label">Planear</span>
             </a>

@@ -16,11 +16,12 @@ import {
   Ban,
   Menu,
   Share,
-  Plus
+  Plus,
+  Home
 } from '@lucide/astro';
 
 interface Props {
-  name: 'refresh' | 'edit' | 'search' | 'stop' | 'bus' | 'star' | 'heart' | 'map' | 'x' | 'chevron-right' | 'chevron-left' | 'location' | 'star-outline' | 'heart-outline' | 'shield' | 'ban' | 'menu' | 'share' | 'plus';
+  name: 'refresh' | 'edit' | 'search' | 'stop' | 'bus' | 'star' | 'heart' | 'map' | 'x' | 'chevron-right' | 'chevron-left' | 'location' | 'star-outline' | 'heart-outline' | 'shield' | 'ban' | 'menu' | 'share' | 'plus' | 'home';
   class?: string;
   size?: number;
 }
@@ -46,7 +47,8 @@ const iconMap = {
   ban: Ban,
   menu: Menu,
   share: Share,
-  plus: Plus
+  plus: Plus,
+  home: Home
 };
 
 const SelectedIcon = iconMap[name];
