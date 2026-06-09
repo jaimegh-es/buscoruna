@@ -1,0 +1,90 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Icon from "../components/Icon.astro";
+
+const posts = [
+  {
+    title: "La mejor aplicación de buses en Coruña: ¿Por qué elegir Coruña Bus?",
+    slug: "mejor-aplicacion-buses-coruna",
+    description: "Descubre por qué Coruña Bus es la herramienta definitiva para moverte por la ciudad. Tiempos reales, rutas optimizadas y privacidad total.",
+    date: "2026-06-09"
+  },
+  {
+    title: "Cómo ahorrar tiempo en tus trayectos de bus por A Coruña",
+    slug: "ahorrar-tiempo-bus-coruna",
+    description: "Trucos y consejos para usar el transporte público de Coruña como un experto. Evita esperas innecesarias con nuestra calculadora.",
+    date: "2026-06-08"
+  }
+];
+---
+
+<Layout title="Blog - Coruña Bus | Noticias y Guías de Transporte">
+  <div class="blog-container">
+    <header class="blog-header">
+      <h1>Blog Coruña<span>Bus</span></h1>
+      <p>Consejos, noticias y guías para moverte por la ciudad.</p>
+    </header>
+
+    <div class="posts-grid">
+      {posts.map(post => (
+        <article class="card post-card">
+          <h2>{post.title}</h2>
+          <p class="post-desc">{post.description}</p>
+          <div class="post-meta">
+            <time>{post.date}</time>
+            <a href={`/blog/${post.slug}`} class="read-more">Leer más</a>
+          </div>
+        </article>
+      ))}
+    </div>
+  </div>
+</Layout>
+
+<style is:global>
+  .blog-container {
+    padding: 1rem 0;
+  }
+  .blog-header {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+  .blog-header h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+  }
+  .blog-header h1 span {
+    font-weight: 300;
+    color: var(--primary);
+  }
+  .posts-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  .post-card {
+    padding: 2rem;
+  }
+  .post-card h2 {
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+  }
+  .post-desc {
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+  }
+  .post-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .post-meta time {
+    font-size: 0.85rem;
+    color: #888;
+  }
+  .read-more {
+    color: var(--primary);
+    font-weight: 700;
+    text-decoration: none;
+  }
+</style>

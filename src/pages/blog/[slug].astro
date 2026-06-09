@@ -1,0 +1,96 @@
+---
+import Layout from "../layouts/Layout.astro";
+
+const { slug } = Astro.params;
+
+// In a real app, this would be a markdown file or a DB call
+const posts: Record<string, any> = {
+  "mejor-aplicacion-buses-coruna": {
+    title: "La mejor aplicación de buses en Coruña: ¿Por qué elegir Coruña Bus?",
+    content: `
+      <p>Moverse por A Coruña no siempre es fácil, especialmente cuando dependes de los horarios de los buses urbanos. Aunque existen aplicaciones oficiales, muchos usuarios buscan una experiencia más fluida, rápida y privada. Aquí es donde entra <strong>Coruña Bus</strong>.</p>
+      
+      <h2>Tiempos reales y precisos</h2>
+      <p>A diferencia de otras apps que solo muestran horarios teóricos, nuestra plataforma se conecta directamente con los datos de tiempo real. Si el bus de la línea 1A va con retraso, lo sabrás al segundo.</p>
+      
+      <h2>Calculadora de rutas inteligente</h2>
+      <p>Nuestra calculadora no solo te dice qué bus coger, sino cuánto tardarás caminando a la parada y cuál es la combinación más eficiente según el tráfico actual.</p>
+      
+      <h2>Privacidad ante todo</h2>
+      <p>No rastreamos tus datos, no pedimos registros y no vendemos tu ubicación. Es una herramienta hecha por y para los coruñeses.</p>
+    `,
+    date: "2026-06-09"
+  },
+  "ahorrar-tiempo-bus-coruna": {
+    title: "Cómo ahorrar tiempo en tus trayectos de bus por A Coruña",
+    content: `
+      <p>El tiempo es oro, y más cuando vas justo para entrar a trabajar o para una cita. Aquí te damos 3 consejos clave para optimizar tus viajes.</p>
+      
+      <h2>1. Usa el seguimiento en tiempo real</h2>
+      <p>No salgas de casa hasta que veas que el bus está a menos de 5 minutos. Con Coruña Bus, puedes ver exactamente dónde está tu bus.</p>
+      
+      <h2>2. Conoce tus alternativas</h2>
+      <p>A veces, una parada que está 2 minutos más lejos tiene una línea que te deja más cerca de tu destino. Usa nuestro mapa de paradas cercanas para explorar.</p>
+      
+      <h2>3. Guarda tus favoritos</h2>
+      <p>No pierdas tiempo buscando. Guarda tu parada de casa y del trabajo en favoritos para consultarlas con un solo toque desde el Dashboard.</p>
+    `,
+    date: "2026-06-08"
+  }
+};
+
+const post = posts[slug || ""];
+
+if (!post) {
+  return Astro.redirect("/404");
+}
+---
+
+<Layout title={`${post.title} - Coruña Bus`}>
+  <article class="post-detail card">
+    <header>
+      <h1>{post.title}</h1>
+      <time>{post.date}</time>
+    </header>
+    <div class="post-content" set:html={post.content}></div>
+    <footer>
+      <a href="/blog" class="back-link">&larr; Volver al blog</a>
+    </footer>
+  </article>
+</Layout>
+
+<style is:global>
+  .post-detail {
+    padding: 2.5rem;
+    margin-top: 1rem;
+  }
+  .post-detail h1 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    line-height: 1.2;
+  }
+  .post-detail time {
+    display: block;
+    font-size: 0.9rem;
+    color: #888;
+    margin-bottom: 2rem;
+  }
+  .post-content {
+    line-height: 1.8;
+    color: var(--text);
+  }
+  .post-content h2 {
+    margin: 2rem 0 1rem;
+    font-size: 1.4rem;
+  }
+  .post-content p {
+    margin-bottom: 1.5rem;
+  }
+  .back-link {
+    display: inline-block;
+    margin-top: 3rem;
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 700;
+  }
+</style>
