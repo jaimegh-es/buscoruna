@@ -4,6 +4,8 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 import node from '@astrojs/node';
 
+import cloudflare from '@astrojs/cloudflare';
+
 // https://astro.build/config
 export default defineConfig({
   output: 'server',
@@ -34,7 +36,5 @@ export default defineConfig({
     ]
   },
 
-  adapter: node({
-    mode: 'standalone'
-  })
+  adapter: cloudflare()
 });
