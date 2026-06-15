@@ -60,8 +60,23 @@ import Icon from './Icon.astro';
       </div>
 
       <div class="input-group">
-        <label for="time">Hora de llegada deseada</label>
-        <input type="time" id="arrival-time" />
+        <label>Modo de planificación</label>
+        <div class="planner-mode-toggle">
+          <button type="button" class="mode-btn active" data-mode="now">
+            <Icon name="navigation" size={18} />
+            <span>Salir ahora</span>
+          </button>
+          <button type="button" class="mode-btn" data-mode="arrive">
+            <Icon name="map" size={18} />
+            <span>Llegar a las...</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="input-group" id="target-time-group" style="display: none;">
+        <label for="target-time">¿A qué hora quieres llegar?</label>
+        <input type="time" id="target-time" />
+        <small class="input-hint">Calcularemos la mejor opción con un margen de seguridad de 5-10 min.</small>
       </div>
 
       <button type="submit" class="btn-primary">Calcular Ruta</button>
@@ -77,6 +92,44 @@ import Icon from './Icon.astro';
   trip-calculator {
     display: block;
     width: 100%;
+  }
+
+  .planner-mode-toggle {
+    display: flex;
+    background: #f1f5f9;
+    padding: 0.25rem;
+    border-radius: 12px;
+    gap: 0.25rem;
+  }
+
+  .mode-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.6rem;
+    border: none;
+    background: transparent;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .mode-btn.active {
+    background: white;
+    color: var(--primary);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  }
+
+  .input-hint {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
   }
 
   .main-calculator-card {
@@ -405,6 +458,120 @@ import Icon from './Icon.astro';
   .bus-status.success { background: #f0fdf4; color: #166534; }
   .bus-status.warning { background: #fffbeb; color: #92400e; }
   .bus-status.error { background: #fef2f2; color: #991b1b; }
+  
+  .bus-status.recommended {
+    border: 2px solid #10b981;
+    background: #ecfdf5;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .bus-status.recommended::after {
+    content: 'RECOMENDADO';
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: #10b981;
+    color: white;
+    font-size: 0.6rem;
+    font-weight: 900;
+    padding: 0.2rem 0.5rem;
+    border-bottom-left-radius: 8px;
+  }
+
+  .bus-status.secondary {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+  }
+
+  .buses-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .hidden-bus {
+    display: none;
+  }
+
+  .buses-timeline.expanded .hidden-bus {
+    display: flex;
+    animation: slideDown 0.3s ease-out;
+  }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .btn-toggle-buses {
+    background: none;
+    border: 1px dashed #cbd5e1;
+    color: #64748b;
+    padding: 0.5rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-toggle-buses:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+  }
+
+  .buses-timeline .text-hide { display: none; }
+  .buses-timeline.expanded .text-show { display: none; }
+  .buses-timeline.expanded .text-hide { display: inline; }
+
+  .time-step {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .dot.origin { background: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+  .dot.bus { background: #10b981; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1); }
+
+  .bus-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(0,0,0,0.05);
+  }
+
+  .btn-track-this-bus {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: white;
+    border: 1px solid #e2e8f0;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-track-this-bus:hover {
+    background: #f0f7ff;
+    border-color: #3b82f6;
+    color: #3b82f6;
+  }
 
   .bus-status .eta {
     display: flex;
@@ -477,6 +644,7 @@ import Icon from './Icon.astro';
     private currentSelectionTarget: 'origin' | 'destination' | null = null;
     private tempSelectedStop: any = null;
     private lastResults: any[] = [];
+    private plannerMode: 'now' | 'arrive' = 'now';
 
     constructor() {
       super();
@@ -485,6 +653,7 @@ import Icon from './Icon.astro';
     connectedCallback() {
       this.catalog = storage.getCatalog();
       this.setupForm();
+      this.setupModeToggle();
       this.setupAutocomplete('origin');
       this.setupAutocomplete('destination');
       this.setupGeoButtons();
@@ -502,6 +671,32 @@ import Icon from './Icon.astro';
       });
       
       this.renderIcons();
+    }
+
+    setupModeToggle() {
+      const buttons = this.querySelectorAll('.mode-btn');
+      const timeGroup = this.querySelector('#target-time-group') as HTMLElement;
+      
+      buttons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          buttons.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          this.plannerMode = btn.getAttribute('data-mode') as 'now' | 'arrive';
+          
+          if (this.plannerMode === 'arrive') {
+            timeGroup.style.display = 'block';
+            // Set default time to +30 mins
+            const now = new Date();
+            now.setMinutes(now.getMinutes() + 30);
+            const targetInput = this.querySelector('#target-time') as HTMLInputElement;
+            if (!targetInput.value) {
+              targetInput.value = now.toTimeString().slice(0, 5);
+            }
+          } else {
+            timeGroup.style.display = 'none';
+          }
+        });
+      });
     }
 
     renderIcons() {
@@ -1447,9 +1642,12 @@ import Icon from './Icon.astro';
     }
 
     async fetchRealTime(lines: any[]) {
-      const arrivalTimeInput = this.querySelector('#arrival-time') as HTMLInputElement;
-      const desiredTime = arrivalTimeInput?.value;
+      const targetTimeInput = this.querySelector('#target-time') as HTMLInputElement;
+      const desiredTime = targetTimeInput?.value;
       let earliestArrival: Date | null = null;
+      
+      // Safety buffer in minutes
+      const SAFE_BUFFER = 7; 
 
       for (const l of lines) {
         try {
@@ -1462,28 +1660,193 @@ import Icon from './Icon.astro';
             const lineInfo = data.buses.lineas.find((bl: any) => bl.linea.toString() === l.lineId.toString());
             
             if (lineInfo && lineInfo.buses && lineInfo.buses.length > 0) {
-              const bus = lineInfo.buses[0];
-              const arrivalAtDest = new Date();
-              const busTime = typeof bus.tiempo === 'number' ? bus.tiempo : parseInt(bus.tiempo) || 0;
-              arrivalAtDest.setMinutes(arrivalAtDest.getMinutes() + busTime + l.estimatedTravelMins + (l.isNearby ? Math.round(l.walkToDest/60) : 0));
-              
-              if (!earliestArrival || arrivalAtDest < earliestArrival) {
-                earliestArrival = arrivalAtDest;
-              }
+              let selectedBus = lineInfo.buses[0];
+              let selectedArrivalAtDest = new Date();
+              let isRecommended = false;
 
-              infoDiv.innerHTML = `
-                <div class="bus-status success">
-                  <div class="eta">
-                    <span class="time">${busTime}</span>
-                    <span class="unit">min</span>
+              if (this.plannerMode === 'arrive' && desiredTime) {
+                // Arrive By Mode: Calculate the best bus to reach destination on time
+                // Modo Llegar a las...: Calcular el mejor bus para llegar al destino a tiempo
+                const [h, m] = desiredTime.split(':').map(Number);
+                const targetDate = new Date();
+                targetDate.setHours(h, m, 0, 0);
+                if (targetDate < new Date()) targetDate.setDate(targetDate.getDate() + 1);
+
+                // Find all buses and their arrival times
+                // Buscar todos los buses y sus tiempos de llegada
+                const possibleBuses = lineInfo.buses.map((b: any) => {
+                  const bTime = typeof b.tiempo === 'number' ? b.tiempo : parseInt(b.tiempo) || 0;
+                  const arr = new Date();
+                  arr.setMinutes(arr.getMinutes() + bTime + l.estimatedTravelMins + (l.isNearby ? Math.round(l.walkToDest/60) : 0));
+                  const diffMins = Math.round((targetDate.getTime() - arr.getTime()) / 60000);
+                  return { bus: b, arrival: arr, waitTime: bTime, diffMins, isLate: diffMins < 0 };
+                });
+
+                const safeBuses = possibleBuses.filter(pb => !pb.isLate);
+
+                // Get recommended bus (latest safe one)
+                // Obtener bus recomendado (el último de los seguros)
+                const recommended = safeBuses.length > 0 
+                  ? [...safeBuses].sort((a: any, b: any) => b.arrival.getTime() - a.arrival.getTime())[0]
+                  : possibleBuses[0];
+
+                // Get second option (one before recommended in safe list, or first one after)
+                // Obtener segunda opción (el anterior al recomendado en la lista segura)
+                const sortedSafe = [...safeBuses].sort((a: any, b: any) => a.arrival.getTime() - b.arrival.getTime());
+                const recIdx = sortedSafe.findIndex(s => s.bus.bus === recommended.bus.bus);
+                const secondOption = recIdx > 0 ? sortedSafe[recIdx - 1] : sortedSafe[recIdx + 1];
+
+                if (!earliestArrival || recommended.arrival < earliestArrival) {
+                  earliestArrival = recommended.arrival;
+                }
+
+                // Render all buses with the recommended one highlighted
+                // Renderizar todos los buses destacando el recomendado
+                const walkTimeToOrigin = Math.round((l.walkToOrigin || 0) / 70); // ~70m/min walking speed
+                const shownBusesIds = [recommended.bus.bus, secondOption?.bus.bus].filter(Boolean);
+                const hiddenCount = possibleBuses.filter(pb => !shownBusesIds.includes(pb.bus.bus)).length;
+
+                infoDiv.innerHTML = `
+                  <div class="buses-timeline">
+                    ${possibleBuses.map((pb: any, idx: number) => {
+                      const isRec = pb.bus.bus === recommended.bus.bus;
+                      const isSecond = pb.bus.bus === secondOption?.bus.bus;
+                      const isShown = isRec || isSecond;
+                      
+                      const arrivalAtOrigin = new Date(Date.now() + pb.waitTime * 60000);
+
+                      return `
+                        <div class="bus-status ${isRec ? 'success recommended' : (pb.isLate ? 'error' : 'secondary')} ${!isShown ? 'hidden-bus' : ''}" data-bus-idx="${idx}">
+                          <div class="eta">
+                            <span class="time">${pb.waitTime}</span>
+                            <span class="unit">min</span>
+                          </div>
+                          <div class="details">
+                            ${isRec ? '<p><strong style="color: #059669;">✨ Recomendado</strong></p>' : ''}
+                            ${isSecond ? '<p><strong style="color: #475569;">🥈 Segunda opción</strong></p>' : ''}
+                            ${pb.isLate ? `<p><strong style="color: #dc2626;">⚠️ Llega tarde (${Math.abs(pb.diffMins)} min tarde)</strong></p>` : ''}
+                            
+                            <div class="time-step">
+                               <span class="dot origin"></span>
+                               <p>Pasa por parada: <strong>${this.formatTime(arrivalAtOrigin)}</strong></p>
+                            </div>
+                            <div class="time-step">
+                               <span class="dot bus"></span>
+                               <p>Llegada destino: <strong>${this.formatTime(pb.arrival)}</strong> 
+                                  <small>(${pb.isLate ? '' : 'llega '}${Math.abs(pb.diffMins)} min ${pb.isLate ? 'después' : 'antes'})</small>
+                               </p>
+                            </div>
+                            
+                            <div class="bus-actions">
+                              <small>Vehículo nº: <strong>${pb.bus.bus || '---'}</strong></small>
+                              <button class="btn-track-this-bus" 
+                                      data-bus="${pb.bus.bus}" 
+                                      data-line="${l.lineId}" 
+                                      data-origin="${l.originStop.id}" 
+                                      data-dest="${l.destStop.id}"
+                                      title="Seguir este bus específico">
+                                <i data-lucide="navigation" style="width: 14px; height: 14px;"></i> Seguir
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      `;
+                    }).join('')}
+                    ${hiddenCount > 0 ? `
+                      <button class="btn-toggle-buses" type="button">
+                        <span class="text-show">Mostrar ${hiddenCount} más (incluyendo buses tarde)</span>
+                        <span class="text-hide">Ocultar alternativas</span>
+                      </button>
+                    ` : ''}
                   </div>
-                  <div class="details">
-                    <p>Pasa por origen a las <strong>${this.formatTime(new Date(Date.now() + busTime * 60000))}</strong></p>
-                    <p>Llegada estimada: <strong>${this.formatTime(arrivalAtDest)}</strong></p>
-                    ${bus.bus ? `<p><small>Vehículo nº: <strong>${bus.bus}</strong></small></p>` : ''}
+                `;
+
+                // Add toggle listener
+                infoDiv.querySelector('.btn-toggle-buses')?.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  const container = (e.currentTarget as HTMLElement).closest('.buses-timeline');
+                  container?.classList.toggle('expanded');
+                });
+
+                // Add tracking listeners to specific buses
+                infoDiv.querySelectorAll('.btn-track-this-bus').forEach(btn => {
+                  btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const busId = btn.getAttribute('data-bus');
+                    if (!busId) return;
+
+                    import('../utils/tracking').then(({ tracking }) => {
+                      tracking.set({
+                        busId: busId,
+                        lineId: parseInt(btn.getAttribute('data-line')!),
+                        originStopId: parseInt(btn.getAttribute('data-origin')!),
+                        destinationStopId: parseInt(btn.getAttribute('data-dest')!),
+                        lastEta: null,
+                        arrivalTime: null
+                      });
+                      alert(`¡Seguimiento iniciado para el bus ${busId}!`);
+                    });
+                  });
+                });
+                
+                this.renderIcons();
+
+              } else {
+                // Default mode: next bus available
+                // Modo por defecto: siguiente bus disponible
+                const selectedBus = lineInfo.buses[0];
+                const busTime = typeof selectedBus.tiempo === 'number' ? selectedBus.tiempo : parseInt(selectedBus.tiempo) || 0;
+                const arrivalAtDest = new Date();
+                arrivalAtDest.setMinutes(arrivalAtDest.getMinutes() + busTime + l.estimatedTravelMins + (l.isNearby ? Math.round(l.walkToDest/60) : 0));
+                
+                if (!earliestArrival || arrivalAtDest < earliestArrival) {
+                  earliestArrival = arrivalAtDest;
+                }
+
+                const arrivalAtOrigin = new Date(Date.now() + (busTime * 60000));
+
+                infoDiv.innerHTML = `
+                  <div class="bus-status success">
+                    <div class="eta">
+                      <span class="time">${busTime}</span>
+                      <span class="unit">min</span>
+                    </div>
+                    <div class="details">
+                      <p>Pasa por parada: <strong>${this.formatTime(arrivalAtOrigin)}</strong></p>
+                      <p>Llegada estimada: <strong>${this.formatTime(arrivalAtDest)}</strong></p>
+                      <div class="bus-actions">
+                        <small>Vehículo nº: <strong>${selectedBus.bus || '---'}</strong></small>
+                        <button class="btn-track-this-bus" 
+                                data-bus="${selectedBus.bus}" 
+                                data-line="${l.lineId}" 
+                                data-origin="${l.originStop.id}" 
+                                data-dest="${l.destStop.id}">
+                          <i data-lucide="navigation" style="width: 14px; height: 14px;"></i> Seguir
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              `;
+                `;
+
+                infoDiv.querySelector('.btn-track-this-bus')?.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  const busId = (e.currentTarget as HTMLElement).getAttribute('data-bus');
+                  if (!busId) return;
+                  import('../utils/tracking').then(({ tracking }) => {
+                    tracking.set({
+                      busId: busId,
+                      lineId: l.lineId,
+                      originStopId: l.originStop.id,
+                      destinationStopId: l.destStop.id,
+                      lastEta: null,
+                      arrivalTime: null
+                    });
+                    alert(`¡Seguimiento iniciado para el bus ${busId}!`);
+                  });
+                });
+
+                this.renderIcons();
+              }
             } else {
               infoDiv.innerHTML = `<div class="bus-status warning">Sin buses próximos en tiempo real.</div>`;
             }
@@ -1495,8 +1858,8 @@ import Icon from './Icon.astro';
         }
       }
 
-      // Check against desired arrival time
-      if (desiredTime && earliestArrival) {
+      // Check against desired arrival time for global warning
+      if (this.plannerMode === 'arrive' && desiredTime && earliestArrival) {
         const [h, m] = desiredTime.split(':').map(Number);
         const desiredDate = new Date();
         desiredDate.setHours(h, m, 0, 0);
@@ -1507,7 +1870,10 @@ import Icon from './Icon.astro';
 
         const warning = this.querySelector('#taxi-warning') as HTMLElement;
         if (earliestArrival > desiredDate) {
-          if (warning) warning.style.display = 'block';
+          if (warning) {
+            warning.style.display = 'block';
+            warning.innerHTML = '🚕 Ningún bus parece llegar a tiempo... ¡va a haber que coger un taxi!';
+          }
         } else {
           if (warning) warning.style.display = 'none';
         }
