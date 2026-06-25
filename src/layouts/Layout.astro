@@ -267,7 +267,10 @@ const { title } = Astro.props;
                         </div>
                     </div>
                 </div>
-                <button type="button" id="btn-save-settings" class="btn-primary">Guardar Ajustes</button>
+                <div class="settings-actions">
+                    <button type="button" id="btn-test-notification" class="btn-secondary">Probar Notificación</button>
+                    <button type="button" id="btn-save-settings" class="btn-primary">Guardar Ajustes</button>
+                </div>
             </div>
         </div>
 
@@ -313,10 +316,6 @@ const { title } = Astro.props;
                 <span class="icon"><Icon name="star" /></span>
                 <span class="label">Favoritos</span>
             </a>
-            <button id="nav-settings-btn" class="nav-item" type="button" title="Ajustes de alertas">
-                <span class="icon"><Icon name="settings" /></span>
-                <span class="label">Ajustes</span>
-            </button>
         </nav>
         <ProjectDrawer />
     </body>
@@ -801,12 +800,15 @@ const { title } = Astro.props;
         color: #0f172a;
     }
 
-    button.nav-item {
-        background: none;
-        border: none;
-        cursor: pointer;
-        padding: 0;
-        font-family: inherit;
+    .settings-actions {
+        display: flex;
+        gap: 0.75rem;
+        width: 100%;
+        margin-top: 1rem;
+    }
+
+    .settings-actions button {
+        flex: 1;
     }
 
     .settings-modal-content {
@@ -1056,6 +1058,60 @@ const { title } = Astro.props;
     import { API, isApiLoading } from "../services/api";
     import { storage } from "../utils/storage";
 
+    // Helper function to send notifications on both desktop and mobile (Android/Chrome ready)
+    // Función auxiliar para enviar notificaciones en escritorio y móvil (lista para Android/Chrome)
+    function sendNotification(title: string, options: NotificationOptions = {}) {
+        if (Notification.permission !== "granted") return;
+        
+        // Use Service Worker notification if controller is active (production / mobile Chrome PWA)
+        // Usar la notificación del Service Worker si el controlador está activo (producción / PWA Chrome en móvil)
+        if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.ready.then((registration) => {
+                registration.showNotification(title, options);
+            }).catch((err) => {
+                console.warn("Service Worker notification failed, falling back to window Notification", err);
+                try {
+                    new Notification(title, options);
+                } catch (e) {
+                    console.error("Fallback Notification constructor failed", e);
+                }
+            });
+        } else {
+            // Fallback for dev mode or browsers without active service workers (like desktop Brave in dev mode)
+            // Alternativa para modo desarrollo o navegadores sin service worker activo
+            try {
+                new Notification(title, options);
+            } catch (e) {
+                console.error("Notification constructor failed", e);
+            }
+        }
+    }
+
+    // Show persistent background tracking notification
+    // Mostrar la notificación persistente de seguimiento en segundo plano
+    function showBackgroundNotification() {
+        sendNotification("Coruña Bus - Seguimiento activo", {
+            body: "La app se mantendrá activa en segundo plano para avisarte de tus paradas.",
+            tag: "tracking-bg",
+            silent: true,
+            icon: "/logo.png",
+            badge: "/logo.png",
+            requireInteraction: true
+        });
+    }
+
+    // Close persistent background tracking notification
+    // Cerrar la notificación de seguimiento en segundo plano
+    function closeBackgroundNotification() {
+        if ("serviceWorker" in navigator && Notification.permission === "granted") {
+            navigator.serviceWorker.ready.then((registration) => {
+                registration.getNotifications({ tag: "tracking-bg" }).then((notifications) => {
+                    notifications.forEach(notification => notification.close());
+                });
+            });
+        }
+    }
+
     const globalLoader = document.getElementById("global-api-loader");
 
     function checkInitialLoading() {
@@ -1165,13 +1221,14 @@ const { title } = Astro.props;
                                         // Disparar aviso de llegada
                                         localStorage.setItem('buscoruna_eta_alert_triggered', 'true');
                                         
-                                        // Send system notification
-                                        if (Notification.permission === "granted") {
-                                            new Notification("🚌 ¡Tu autobús está llegando!", {
-                                                body: `El bus ${info.busId} llegará a tu parada de origen en ${waitTime} min. ¡Sube al bus!`,
-                                                requireInteraction: true
-                                            });
-                                        }
+                                        // Send system notification (compatible with Android/Chrome)
+                                        // Enviar notificación del sistema (compatible con Android/Chrome)
+                                        sendNotification("🚌 ¡Tu autobús está llegando!", {
+                                            body: `El bus ${info.busId} llegará a tu parada de origen en ${waitTime} min. ¡Sube al bus!`,
+                                            requireInteraction: true,
+                                            icon: "/logo.png",
+                                            badge: "/logo.png"
+                                        });
 
                                         // Play sound and vibration
                                         if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
@@ -1623,18 +1680,14 @@ const { title } = Astro.props;
                     console.warn("Could not play warning sound", soundErr);
                 }
 
-                // Send background push/system notification if permission granted
-                // Enviar notificación del sistema si los permisos han sido concedidos
-                if (Notification.permission === "granted") {
-                    try {
-                        new Notification("⚠️ ¡PULSA EL BOTÓN DE PARADA!", {
-                            body: `Te aproximas a tu destino: ${destStop.nombre}. ¡Avisa al conductor!`,
-                            requireInteraction: true
-                        });
-                    } catch (notifyErr) {
-                        console.error("System notification failed", notifyErr);
-                    }
-                }
+                // Send background push/system notification if permission granted (compatible with Android/Chrome)
+                // Enviar notificación del sistema si los permisos han sido concedidos (compatible con Android/Chrome)
+                sendNotification("⚠️ ¡PULSA EL BOTÓN DE PARADA!", {
+                    body: `Te aproximas a tu destino: ${destStop.nombre}. ¡Avisa al conductor!`,
+                    requireInteraction: true,
+                    icon: "/logo.png",
+                    badge: "/logo.png"
+                });
             }
         }, (geoErr) => {
             console.warn("[GPS Alert] Geolocation failed", geoErr);
@@ -1664,16 +1717,9 @@ const { title } = Astro.props;
             source.start();
             console.log("[Background] Silence loop started successfully.");
             
-            // Show background notification if permission granted
-            // Mostrar notificación de segundo plano si se ha concedido el permiso
-            if (Notification.permission === "granted") {
-                try {
-                    new Notification("Coruña Bus - Seguimiento activo", {
-                        body: "La app se mantendrá activa en segundo plano para avisarte de tus paradas.",
-                        silent: true
-                    });
-                } catch (e) {}
-            }
+            // Show persistent background tracking notification (compatible with Android/Chrome)
+            // Mostrar notificación de seguimiento en segundo plano (compatible con Android/Chrome)
+            showBackgroundNotification();
         } catch (err) {
             console.warn("Failed to initiate silence background loop", err);
         }
@@ -1689,6 +1735,9 @@ const { title } = Astro.props;
             audioContext = null;
             silenceNode = null;
         }
+        // Close persistent background tracking notification
+        // Cerrar la notificación persistente de segundo plano
+        closeBackgroundNotification();
     }
 
     function startGPSMonitor() {
@@ -1730,8 +1779,8 @@ const { title } = Astro.props;
     // Eventos de la Interfaz del Modal de Ajustes
     const settingsModal = document.getElementById("settings-modal");
     
-    // Open settings button in header or bottom navigation
-    // Abrir modal de ajustes al pulsar el botón del header o la pestaña del menú inferior
+    // Open settings button in header
+    // Abrir modal de ajustes al pulsar el botón del header
     const openSettings = () => {
         const gpsAlertInput = document.getElementById("settings-enable-gps-alert") as HTMLInputElement;
         const etaAlertInput = document.getElementById("settings-enable-eta-alert") as HTMLInputElement;
@@ -1745,23 +1794,44 @@ const { title } = Astro.props;
         
         if (settingsModal) {
             settingsModal.style.display = "flex";
-            document.getElementById("nav-settings-btn")?.classList.add("active");
         }
     };
 
     const closeSettings = () => {
         if (settingsModal) {
             settingsModal.style.display = "none";
-            document.getElementById("nav-settings-btn")?.classList.remove("active");
         }
     };
 
     document.getElementById("open-settings-btn")?.addEventListener("click", openSettings);
-    document.getElementById("nav-settings-btn")?.addEventListener("click", openSettings);
 
     // Close settings button
     // Cerrar modal de ajustes al pulsar X
     document.getElementById("close-settings")?.addEventListener("click", closeSettings);
+
+    // Test notification button
+    // Botón de prueba de notificaciones
+    document.getElementById("btn-test-notification")?.addEventListener("click", () => {
+        if (Notification.permission !== "granted") {
+            Notification.requestPermission().then((perm) => {
+                if (perm === "granted") {
+                    sendNotification("🚌 Prueba de Coruña Bus", {
+                        body: "¡Funciona! Las notificaciones están bien configuradas en tu dispositivo.",
+                        icon: "/logo.png",
+                        badge: "/logo.png"
+                    });
+                } else {
+                    alert("⚠️ Permiso de notificaciones denegado. Actívalo en los ajustes de tu navegador.");
+                }
+            });
+        } else {
+            sendNotification("🚌 Prueba de Coruña Bus", {
+                body: "¡Funciona! Las notificaciones están bien configuradas en tu dispositivo.",
+                icon: "/logo.png",
+                badge: "/logo.png"
+            });
+        }
+    });
 
     // Save settings button
     // Guardar ajustes seleccionados por el usuario
