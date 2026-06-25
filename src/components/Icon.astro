@@ -17,11 +17,12 @@ import {
   Menu,
   Share,
   Plus,
-  Home
+  Home,
+  Settings
 } from '@lucide/astro';
 
 interface Props {
-  name: 'refresh' | 'edit' | 'search' | 'stop' | 'bus' | 'star' | 'heart' | 'map' | 'x' | 'chevron-right' | 'chevron-left' | 'location' | 'star-outline' | 'heart-outline' | 'shield' | 'ban' | 'menu' | 'share' | 'plus' | 'home';
+  name: 'refresh' | 'edit' | 'settings' | 'search' | 'stop' | 'bus' | 'star' | 'heart' | 'map' | 'x' | 'chevron-right' | 'chevron-left' | 'location' | 'star-outline' | 'heart-outline' | 'shield' | 'ban' | 'menu' | 'share' | 'plus' | 'home';
   class?: string;
   size?: number;
 }
@@ -31,6 +32,7 @@ const { name, class: className, size = 24 } = Astro.props;
 const iconMap = {
   refresh: RefreshCw,
   edit: Pencil,
+  settings: Settings,
   search: Search,
   stop: MapPin,
   bus: Bus,

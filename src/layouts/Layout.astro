@@ -122,6 +122,13 @@ const { title } = Astro.props;
                     >
                         <Icon name="refresh" size={18} />
                     </button>
+                    <button
+                        id="open-settings-btn"
+                        class="refresh-btn"
+                        title="Ajustes de alertas"
+                    >
+                        <Icon name="settings" size={18} />
+                    </button>
                     <ProjectMenu />
                 </div>
             </div>
@@ -169,12 +176,9 @@ const { title } = Astro.props;
         <div id="tracking-bar" class="tracking-bar" style="display: none;">
             <div class="tracking-content">
                 <div class="tracking-main">
-                    <span class="tracking-bus-badge" id="track-bus-id">...</span
-                    >
+                    <span class="tracking-bus-badge" id="track-bus-id">...</span>
                     <div class="tracking-text">
-                        <strong
-                            >Hacia <span id="track-dest-name">...</span></strong
-                        >
+                        <strong>Hacia <span id="track-dest-name">...</span></strong>
                         <small id="track-status">Calculando llegada...</small>
                     </div>
                     <button
@@ -191,6 +195,83 @@ const { title } = Astro.props;
                 </button>
             </div>
         </div>
+
+        <!-- GPS Notification Overlay Popup -->
+        <!-- Ventana Emergente de Aviso de Parada -->
+        <div id="gps-alert-popup" class="gps-alert-popup" style="display: none;">
+            <div class="gps-alert-card">
+                <div class="gps-alert-header">
+                    <Icon name="bus" size={24} />
+                    <h3>¡Próxima Parada!</h3>
+                </div>
+                <div class="gps-alert-body">
+                    <p>Estás llegando a tu parada final: <strong id="gps-alert-dest-name">...</strong></p>
+                    <p class="gps-alert-cta">🔔 ¡Pulsa el botón de solicitar parada en el autobús!</p>
+                </div>
+                <button type="button" id="btn-close-gps-alert" class="btn-primary">Entendido</button>
+            </div>
+        </div>
+
+        <!-- Settings Modal overlay (Ajustes de Alertas) -->
+        <div id="settings-modal" class="modal-overlay" style="display: none;">
+            <div class="modal-content settings-modal-content">
+                <div class="modal-header">
+                    <h3>Ajustes de Alertas</h3>
+                    <button type="button" id="close-settings" class="close-btn">
+                        <Icon name="x" size={24} />
+                    </button>
+                </div>
+                <div class="modal-body settings-modal-body">
+                    <!-- Setting 1: GPS Destination Stop Prompt -->
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <label class="setting-title" for="settings-enable-gps-alert">
+                                <span>Aviso de bajada por GPS</span>
+                                <input type="checkbox" id="settings-enable-gps-alert" />
+                            </label>
+                            <p class="setting-desc">Te avisa al llegar o pasar por la parada anterior a tu destino para que pulses el botón de solicitud del autobús.</p>
+                            <p class="setting-warn">⚠️ Nota: Requiere GPS continuo en segundo plano. Puede fallar o gastar más batería.</p>
+                        </div>
+                    </div>
+
+                    <!-- Setting 2: Boarding Bus Stop ETA Prompt -->
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <label class="setting-title" for="settings-enable-eta-alert">
+                                <span>Aviso de llegada del bus</span>
+                                <input type="checkbox" id="settings-enable-eta-alert" />
+                            </label>
+                            <p class="setting-desc">Te avisa cuando el autobús que estás esperando se aproxime a tu parada de origen.</p>
+                            
+                            <div class="setting-sub-option" id="eta-alert-threshold-group">
+                                <label for="settings-eta-threshold">Avisar cuando queden:</label>
+                                <select id="settings-eta-threshold">
+                                    <option value="0">0 minutos (Llegando)</option>
+                                    <option value="1">1 minuto</option>
+                                    <option value="2">2 minutos</option>
+                                    <option value="3">3 minutos</option>
+                                    <option value="5">5 minutos</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Setting 3: Persistent Background Notification -->
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <label class="setting-title" for="settings-enable-bg-keep-awake">
+                                <span>Mantener activo en segundo plano</span>
+                                <input type="checkbox" id="settings-enable-bg-keep-awake" />
+                            </label>
+                            <p class="setting-desc">Intenta mantener la app activa en segundo plano mediante un bucle de audio silencioso y notificaciones.</p>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" id="btn-save-settings" class="btn-primary">Guardar Ajustes</button>
+            </div>
+        </div>
+
+
 
         <!-- Global Destination Modal (Fallback) -->
         <div
@@ -232,6 +313,10 @@ const { title } = Astro.props;
                 <span class="icon"><Icon name="star" /></span>
                 <span class="label">Favoritos</span>
             </a>
+            <button id="nav-settings-btn" class="nav-item" type="button" title="Ajustes de alertas">
+                <span class="icon"><Icon name="settings" /></span>
+                <span class="label">Ajustes</span>
+            </button>
         </nav>
         <ProjectDrawer />
     </body>
@@ -585,6 +670,251 @@ const { title } = Astro.props;
         margin-left: 0.5rem;
     }
 
+    .tracking-alert-settings {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0.5rem 0 0.5rem;
+        margin-top: 0.5rem;
+        border-top: 1px dashed rgba(255, 255, 255, 0.15);
+        font-size: 0.75rem;
+    }
+
+    .alert-toggle-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 600;
+        color: #f1f5f9;
+        cursor: pointer;
+    }
+
+    .alert-toggle-label input {
+        width: 14px;
+        height: 14px;
+        cursor: pointer;
+        margin: 0;
+        accent-color: var(--primary);
+    }
+
+    .alert-warning-hint {
+        color: #94a3b8;
+        font-size: 0.65rem;
+    }
+
+    /* GPS Stop Warning Modal Alert Styles */
+    /* Estilos del Modal de Aviso de Parada por GPS */
+    .gps-alert-popup {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        backdrop-filter: blur(4px);
+    }
+
+    .gps-alert-card {
+        background: white;
+        color: #0f172a;
+        width: 100%;
+        max-width: 400px;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        text-align: center;
+        animation: bounceIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes bounceIn {
+        from { transform: scale(0.8); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+
+    .gps-alert-header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        color: #e11d48;
+    }
+
+    .gps-alert-header h3 {
+        font-size: 1.25rem;
+        font-weight: 800;
+        margin: 0;
+        color: #e11d48;
+    }
+
+    .gps-alert-body {
+        margin-bottom: 1.25rem;
+    }
+
+    .gps-alert-body p {
+        margin: 0.5rem 0;
+        font-size: 0.95rem;
+        color: #475569;
+    }
+
+    .gps-alert-cta {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: #1e293b;
+        background: #fef2f2;
+        border: 1px dashed #fca5a5;
+        padding: 0.75rem;
+        border-radius: 8px;
+        margin-top: 1rem !important;
+    }
+
+    /* Settings Modal Card Styles */
+    /* Estilos de la Tarjeta del Modal de Ajustes */
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+
+    .close-btn {
+        background: none;
+        border: none;
+        color: #64748b;
+        cursor: pointer;
+        padding: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: background-color 0.2s, color 0.2s;
+    }
+
+    .close-btn:hover {
+        background-color: #f1f5f9;
+        color: #0f172a;
+    }
+
+    button.nav-item {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0;
+        font-family: inherit;
+    }
+
+    .settings-modal-content {
+        background: white;
+        color: #0f172a;
+        width: 100%;
+        max-width: 450px;
+        border-radius: 16px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding: 1.5rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        animation: scaleUp 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.15);
+    }
+
+    @keyframes scaleUp {
+        from { transform: scale(0.9); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+
+    .settings-modal-body {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        margin: 1.25rem 0;
+        overflow-y: auto;
+        max-height: 55vh;
+        text-align: left;
+    }
+
+    .setting-item {
+        border-bottom: 1px solid #f1f5f9;
+        padding-bottom: 1rem;
+    }
+
+    .setting-item:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .setting-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .setting-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 700;
+        font-size: 0.95rem;
+        cursor: pointer;
+        color: #1e293b;
+        user-select: none;
+    }
+
+    .setting-title input {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        accent-color: var(--primary);
+        margin: 0;
+    }
+
+    .setting-desc {
+        font-size: 0.75rem;
+        color: #64748b;
+        margin: 0;
+        line-height: 1.4;
+    }
+
+    .setting-warn {
+        font-size: 0.7rem;
+        color: #b45309;
+        background: #fffbeb;
+        border: 1px solid #fef3c7;
+        padding: 6px;
+        border-radius: 6px;
+        margin: 6px 0 0 0;
+        font-weight: 500;
+    }
+
+    .setting-sub-option {
+        margin-top: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.8rem;
+        color: #475569;
+    }
+
+    .setting-sub-option select {
+        padding: 4px 8px;
+        border-radius: 6px;
+        border: 1px solid #cbd5e1;
+        font-size: 0.8rem;
+        background: white;
+        color: #1e293b;
+        outline: none;
+        cursor: pointer;
+    }
+
+    .setting-sub-option select:focus {
+        border-color: var(--primary);
+    }
+
     /* Modal Overlay (Reuse) */
     .modal-overlay {
         position: fixed;
@@ -790,10 +1120,80 @@ const { title } = Astro.props;
             const destStop = catalog.paradas[info.destinationStopId];
             destStopName = destStop?.nombre || destStopName;
         }
-        document.getElementById("track-dest-name")!.textContent = destStopName;
+        
+        // Dynamically update label depending on whether we are waiting or travelling
+        // Actualizar dinámicamente el texto según si estamos esperando en la parada o de viaje
+        const trackTitleEl = document.querySelector("#tracking-bar .tracking-text strong");
+        if (trackTitleEl) {
+            if (info.destinationStopId.toString() === info.originStopId.toString()) {
+                trackTitleEl.innerHTML = `Esperando en <span id="track-dest-name">${destStopName}</span>`;
+            } else {
+                trackTitleEl.innerHTML = `Hacia <span id="track-dest-name">${destStopName}</span>`;
+            }
+        } else {
+            const destSpan = document.getElementById("track-dest-name");
+            if (destSpan) destSpan.textContent = destStopName;
+        }
 
         // Recalculate ETA
         try {
+            // Check ETA alert for the boarding/origin stop if enabled and not already triggered
+            // Comprobar la alerta de ETA para la parada de origen si está activa y aún no se ha disparado
+            const etaAlertEnabled = localStorage.getItem('buscoruna_eta_alert_enabled') === 'true';
+            const etaAlertTriggered = localStorage.getItem('buscoruna_eta_alert_triggered') === 'true';
+
+            if (etaAlertEnabled && !etaAlertTriggered && info.originStopId) {
+                try {
+                    const originData = await API.getStopArrivals(info.originStopId);
+                    if (originData && originData.resultado === "OK" && originData.buses && Array.isArray(originData.buses.lineas)) {
+                        const lineInfo = originData.buses.lineas.find(
+                            (bl: any) => bl.linea.toString() === info.lineId.toString()
+                        );
+                        if (lineInfo && Array.isArray(lineInfo.buses)) {
+                            const b = lineInfo.buses.find(
+                                (bus: any) => bus.bus && bus.bus.toString() === info.busId.toString()
+                            );
+                            if (b) {
+                                let waitTime = typeof b.tiempo === "number" ? b.tiempo : parseInt(b.tiempo);
+                                if (!isNaN(waitTime)) {
+                                    const threshold = parseInt(localStorage.getItem('buscoruna_eta_alert_threshold') || '0');
+                                    if (waitTime <= threshold) {
+                                        // Trigger arrival alert!
+                                        // Disparar aviso de llegada
+                                        localStorage.setItem('buscoruna_eta_alert_triggered', 'true');
+                                        
+                                        // Send system notification
+                                        if (Notification.permission === "granted") {
+                                            new Notification("🚌 ¡Tu autobús está llegando!", {
+                                                body: `El bus ${info.busId} llegará a tu parada de origen en ${waitTime} min. ¡Sube al bus!`,
+                                                requireInteraction: true
+                                            });
+                                        }
+
+                                        // Play sound and vibration
+                                        if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+                                        try {
+                                            const context = new (window.AudioContext || (window as any).webkitAudioContext)();
+                                            const osc = context.createOscillator();
+                                            osc.type = "sine";
+                                            osc.frequency.setValueAtTime(523.25, context.currentTime); // C5 note
+                                            osc.connect(context.destination);
+                                            osc.start();
+                                            osc.stop(context.currentTime + 0.6);
+                                        } catch (e) {}
+
+                                        // Show custom in-app banner alert if user is looking at screen
+                                        alert(`🔔 ¡Aviso de llegada! Tu autobús (Bus ${info.busId}) llegará en ${waitTime} min.`);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (etaErr) {
+                    console.warn("Failed to check boarding ETA alert", etaErr);
+                }
+            }
+
             // Step 1: Try getting arrivals at the destination stop
             const data = await API.getStopArrivals(info.destinationStopId);
             let busFoundAtStop = false;
@@ -842,9 +1242,15 @@ const { title } = Astro.props;
 
                 document.getElementById("track-status")!.textContent =
                     `Llegada: ${timeStr}`;
-                if (time === 0)
-                    document.getElementById("track-status")!.textContent =
-                        "¡Llegando a destino!";
+                if (time === 0) {
+                    if (info.destinationStopId.toString() === info.originStopId.toString()) {
+                        document.getElementById("track-status")!.textContent =
+                            "¡Llegando a tu parada!";
+                    } else {
+                        document.getElementById("track-status")!.textContent =
+                            "¡Llegando a destino!";
+                    }
+                }
             } else {
                 // Step 2: Fallback - Check full line info (func=2)
                 const lineData = await API.getLineInfo(info.lineId);
@@ -1101,4 +1507,319 @@ const { title } = Astro.props;
                 );
             }
         });
+
+    // GPS Alert Stop Warning & Background Keep-Awake features (bilingual comments)
+    // Funcionalidad de aviso de parada por GPS, aviso de llegada de bus y ejecución en segundo plano
+    let gpsInterval: any = null;
+    let audioContext: AudioContext | null = null;
+    let silenceNode: GainNode | null = null;
+
+    function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+        const R = 6371000; // meters
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    // Resolve the stop immediately before the destination stop in the route
+    // Obtener la parada inmediatamente anterior a la parada de destino en la ruta
+    function getPreviousStop(lineId: number, originId: number, destId: number, catalog: any) {
+        const line = catalog.actualizacion.lineas.find(
+            (l: any) => l.id.toString() === lineId.toString()
+        );
+        if (!line || !Array.isArray(line.rutas)) return null;
+        
+        const sOriginId = originId.toString();
+        const sDestId = destId.toString();
+        
+        for (const route of line.rutas) {
+            if (!Array.isArray(route.paradas)) continue;
+            const oIdx = route.paradas.findIndex((p: any) => p.toString() === sOriginId);
+            const dIdx = route.paradas.findIndex((p: any) => p.toString() === sDestId);
+            
+            if (oIdx !== -1 && dIdx !== -1 && oIdx < dIdx) {
+                const prevStopId = route.paradas[dIdx - 1];
+                if (prevStopId) {
+                    return catalog.paradas[prevStopId];
+                }
+            }
+        }
+        return null;
+    }
+
+    // Main interval check function to check GPS location against route stops
+    // Función de verificación periódica del GPS contra las paradas de la ruta
+    function checkGPSAlert() {
+        const info = tracking.get();
+        if (!info) {
+            stopGPSMonitor();
+            return;
+        }
+
+        if (localStorage.getItem('buscoruna_gps_alert_triggered') === 'true') {
+            return; // Already notified for this journey
+        }
+
+        const catalog = storage.getCatalog();
+        if (!catalog) return;
+
+        const destStop = catalog.paradas[info.destinationStopId];
+        const originStop = catalog.paradas[info.originStopId];
+        if (!destStop || !originStop) return;
+
+        const prevStop = getPreviousStop(info.lineId, info.originStopId, info.destinationStopId, catalog);
+        if (!prevStop) return;
+
+        navigator.geolocation.getCurrentPosition((position) => {
+            const userLat = position.coords.latitude;
+            const userLon = position.coords.longitude;
+
+            const distToPrev = getDistance(userLat, userLon, prevStop.posy, prevStop.posx);
+            const distToDest = getDistance(userLat, userLon, destStop.posy, destStop.posx);
+            const distPrevToDest = getDistance(prevStop.posy, prevStop.posx, destStop.posy, destStop.posx);
+
+            console.log(`[GPS Alert] distToPrev: ${distToPrev.toFixed(1)}m, distToDest: ${distToDest.toFixed(1)}m, distPrevToDest: ${distPrevToDest.toFixed(1)}m`);
+
+            // Check if we are at the previous stop (< 100m) or already closer to destination than previous stop (passed it)
+            // Comprobar si estamos en la parada anterior (< 100m) o si ya estamos más cerca del destino que la parada anterior (la hemos pasado)
+            const atPreviousStop = distToPrev < 100;
+            const passedPreviousStop = distToDest < Math.min(300, distPrevToDest * 0.85);
+
+            if (atPreviousStop || passedPreviousStop) {
+                // Trigger warning!
+                // Activar aviso
+                localStorage.setItem('buscoruna_gps_alert_triggered', 'true');
+                
+                // Show modal overlay alert
+                // Mostrar alerta emergente en pantalla
+                const alertPopup = document.getElementById("gps-alert-popup");
+                const alertDestName = document.getElementById("gps-alert-dest-name");
+                if (alertDestName) alertDestName.textContent = destStop.nombre;
+                if (alertPopup) alertPopup.style.display = "flex";
+
+                // Vibrate device if supported
+                // Vibrar el dispositivo si está soportado
+                if (navigator.vibrate) {
+                    navigator.vibrate([300, 100, 300, 100, 300]);
+                }
+                
+                // Play oscillator beep sound
+                // Emitir un pitido de advertencia por el altavoz
+                try {
+                    const context = new (window.AudioContext || (window as any).webkitAudioContext)();
+                    const osc = context.createOscillator();
+                    osc.type = "sine";
+                    osc.frequency.setValueAtTime(880, context.currentTime);
+                    osc.connect(context.destination);
+                    osc.start();
+                    osc.stop(context.currentTime + 0.5);
+                } catch (soundErr) {
+                    console.warn("Could not play warning sound", soundErr);
+                }
+
+                // Send background push/system notification if permission granted
+                // Enviar notificación del sistema si los permisos han sido concedidos
+                if (Notification.permission === "granted") {
+                    try {
+                        new Notification("⚠️ ¡PULSA EL BOTÓN DE PARADA!", {
+                            body: `Te aproximas a tu destino: ${destStop.nombre}. ¡Avisa al conductor!`,
+                            requireInteraction: true
+                        });
+                    } catch (notifyErr) {
+                        console.error("System notification failed", notifyErr);
+                    }
+                }
+            }
+        }, (geoErr) => {
+            console.warn("[GPS Alert] Geolocation failed", geoErr);
+        }, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        });
+    }
+
+    // Play silent loop programmatically using AudioContext to prevent system suspension in background
+    // Reproducir un bucle de silencio para evitar la suspensión en segundo plano por el navegador
+    function startSilencePlayback() {
+        if (audioContext) return;
+        try {
+            audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const buffer = audioContext.createBuffer(1, audioContext.sampleRate * 2, audioContext.sampleRate);
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.loop = true;
+            
+            silenceNode = audioContext.createGain();
+            silenceNode.gain.setValueAtTime(0, audioContext.currentTime); // 0 volume
+            
+            source.connect(silenceNode);
+            silenceNode.connect(audioContext.destination);
+            source.start();
+            console.log("[Background] Silence loop started successfully.");
+            
+            // Show background notification if permission granted
+            // Mostrar notificación de segundo plano si se ha concedido el permiso
+            if (Notification.permission === "granted") {
+                try {
+                    new Notification("Coruña Bus - Seguimiento activo", {
+                        body: "La app se mantendrá activa en segundo plano para avisarte de tus paradas.",
+                        silent: true
+                    });
+                } catch (e) {}
+            }
+        } catch (err) {
+            console.warn("Failed to initiate silence background loop", err);
+        }
+    }
+
+    // Stop background silent audio loop
+    // Detener la reproducción de silencio de segundo plano
+    function stopSilencePlayback() {
+        if (audioContext) {
+            try {
+                audioContext.close();
+            } catch (e) {}
+            audioContext = null;
+            silenceNode = null;
+        }
+    }
+
+    function startGPSMonitor() {
+        if (gpsInterval) clearInterval(gpsInterval);
+        gpsInterval = setInterval(checkGPSAlert, 15000); // Check location every 15s
+        checkGPSAlert();
+    }
+
+    function stopGPSMonitor() {
+        if (gpsInterval) {
+            clearInterval(gpsInterval);
+            gpsInterval = null;
+        }
+    }
+
+    // Apply alert configurations (starts/stops monitors and background loops)
+    // Aplicar las configuraciones de alertas (iniciar/detener monitores y bucles)
+    function applySettings() {
+        const info = tracking.get();
+        
+        // GPS alert warning
+        const gpsEnabled = localStorage.getItem('buscoruna_gps_alert_enabled') === 'true';
+        if (gpsEnabled && info) {
+            startGPSMonitor();
+        } else {
+            stopGPSMonitor();
+        }
+
+        // Background keep-awake
+        const keepAwakeEnabled = localStorage.getItem('buscoruna_bg_keep_awake') === 'true';
+        if (keepAwakeEnabled && info) {
+            startSilencePlayback();
+        } else {
+            stopSilencePlayback();
+        }
+    }
+
+    // Settings Modal UI Events
+    // Eventos de la Interfaz del Modal de Ajustes
+    const settingsModal = document.getElementById("settings-modal");
+    
+    // Open settings button in header or bottom navigation
+    // Abrir modal de ajustes al pulsar el botón del header o la pestaña del menú inferior
+    const openSettings = () => {
+        const gpsAlertInput = document.getElementById("settings-enable-gps-alert") as HTMLInputElement;
+        const etaAlertInput = document.getElementById("settings-enable-eta-alert") as HTMLInputElement;
+        const etaThresholdSelect = document.getElementById("settings-eta-threshold") as HTMLSelectElement;
+        const keepAwakeInput = document.getElementById("settings-enable-bg-keep-awake") as HTMLInputElement;
+        
+        if (gpsAlertInput) gpsAlertInput.checked = localStorage.getItem('buscoruna_gps_alert_enabled') === 'true';
+        if (etaAlertInput) etaAlertInput.checked = localStorage.getItem('buscoruna_eta_alert_enabled') === 'true';
+        if (etaThresholdSelect) etaThresholdSelect.value = localStorage.getItem('buscoruna_eta_alert_threshold') || '0';
+        if (keepAwakeInput) keepAwakeInput.checked = localStorage.getItem('buscoruna_bg_keep_awake') === 'true';
+        
+        if (settingsModal) {
+            settingsModal.style.display = "flex";
+            document.getElementById("nav-settings-btn")?.classList.add("active");
+        }
+    };
+
+    const closeSettings = () => {
+        if (settingsModal) {
+            settingsModal.style.display = "none";
+            document.getElementById("nav-settings-btn")?.classList.remove("active");
+        }
+    };
+
+    document.getElementById("open-settings-btn")?.addEventListener("click", openSettings);
+    document.getElementById("nav-settings-btn")?.addEventListener("click", openSettings);
+
+    // Close settings button
+    // Cerrar modal de ajustes al pulsar X
+    document.getElementById("close-settings")?.addEventListener("click", closeSettings);
+
+    // Save settings button
+    // Guardar ajustes seleccionados por el usuario
+    document.getElementById("btn-save-settings")?.addEventListener("click", () => {
+        const gpsAlertInput = document.getElementById("settings-enable-gps-alert") as HTMLInputElement;
+        const etaAlertInput = document.getElementById("settings-enable-eta-alert") as HTMLInputElement;
+        const etaThresholdSelect = document.getElementById("settings-eta-threshold") as HTMLSelectElement;
+        const keepAwakeInput = document.getElementById("settings-enable-bg-keep-awake") as HTMLInputElement;
+
+        const gpsEnabled = gpsAlertInput?.checked ? 'true' : 'false';
+        const etaEnabled = etaAlertInput?.checked ? 'true' : 'false';
+        const etaThreshold = etaThresholdSelect?.value || '0';
+        const keepAwakeEnabled = keepAwakeInput?.checked ? 'true' : 'false';
+
+        localStorage.setItem('buscoruna_gps_alert_enabled', gpsEnabled);
+        localStorage.setItem('buscoruna_eta_alert_enabled', etaEnabled);
+        localStorage.setItem('buscoruna_eta_alert_threshold', etaThreshold);
+        localStorage.setItem('buscoruna_bg_keep_awake', keepAwakeEnabled);
+
+        // Ask for browser notification permissions if any alert checked
+        if (gpsAlertInput?.checked || etaAlertInput?.checked || keepAwakeInput?.checked) {
+            if (Notification.permission === "default") {
+                Notification.requestPermission();
+            }
+        }
+
+        applySettings();
+        closeSettings();
+    });
+
+    // Close settings if clicked outside of the content container
+    // Cerrar ajustes si se pulsa fuera de la tarjeta modal
+    settingsModal?.addEventListener("click", (e) => {
+        if (e.target === settingsModal) {
+            closeSettings();
+        }
+    });
+
+    // Bind popup close button click listener
+    document.getElementById("btn-close-gps-alert")?.addEventListener("click", () => {
+        const popup = document.getElementById("gps-alert-popup");
+        if (popup) popup.style.display = "none";
+    });
+
+    // Reset alert trigger flags on new tracking/journey configuration
+    // Reiniciar los avisos cuando cambia o finaliza el seguimiento
+    window.addEventListener("tracking-updated", (e: any) => {
+        localStorage.removeItem('buscoruna_gps_alert_triggered');
+        localStorage.removeItem('buscoruna_eta_alert_triggered');
+        
+        if (e.detail) {
+            applySettings();
+        } else {
+            stopGPSMonitor();
+            stopSilencePlayback();
+        }
+    });
+
+    // Initial load setup
+    const initialInfo = tracking.get();
+    if (initialInfo) {
+        applySettings();
+    }
 </script>

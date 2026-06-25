@@ -57,7 +57,9 @@ import Icon from '../../components/Icon.astro';
     import { storage } from '../../utils/storage';
     import { API } from '../../services/api';
     import { tracking } from '../../utils/tracking';
-    import { createIcons, Star, Navigation, Map, LocateFixed } from 'lucide';
+    // Import Bell icon for the ETA alerts feature
+    // Importar el icono Bell (Campana) para la funcionalidad de alertas de llegada (ETA)
+    import { createIcons, Star, Navigation, Map, LocateFixed, Bell } from 'lucide';
 
     // Get ID from URL
     const pathParts = window.location.pathname.split('/');
@@ -72,13 +74,16 @@ import Icon from '../../components/Icon.astro';
     let watchId: any = null;
     let guidanceLine: any = null;
 
+    // Render Lucide icons on dynamic elements, including Bell
+    // Renderizar iconos de Lucide en elementos dinámicos, incluyendo Bell
     function renderIcons() {
       createIcons({
         icons: {
           Star,
           Navigation,
           Map,
-          LocateFixed
+          LocateFixed,
+          Bell
         }
       });
     }
@@ -258,8 +263,11 @@ import Icon from '../../components/Icon.astro';
                       <span class="time-unit">min</span>
                     </div>
                     ${l.buses[0]?.bus ? `
-                      <button class="btn-track-subtle" data-bus="${l.buses[0].bus}" data-line="${l.linea}" title="Subir a este bus">
+                      <button class="btn-track-subtle" data-bus="${l.buses[0].bus}" data-line="${l.linea}" title="Subir a este bus (GPS)">
                         <i data-lucide="navigation" style="width: 18px; height: 18px;"></i>
+                      </button>
+                      <button class="btn-bell-subtle" data-bus="${l.buses[0].bus}" data-line="${l.linea}" title="Aviso de llegada (Campana)">
+                        <i data-lucide="bell" style="width: 18px; height: 18px;"></i>
                       </button>
                     ` : ''}
                   </div>
@@ -275,9 +283,14 @@ import Icon from '../../components/Icon.astro';
                         </div>
                         <div class="extra-bus-right">
                           <span class="extra-time"><strong>${b.tiempo}</strong> min</span>
-                          ${b.bus ? `<button class="btn-track-subtle-small" data-bus="${b.bus}" data-line="${l.linea}">
-                            <i data-lucide="navigation" style="width: 14px; height: 14px;"></i>
-                          </button>` : ''}
+                          ${b.bus ? `
+                            <button class="btn-track-subtle-small" data-bus="${b.bus}" data-line="${l.linea}" title="Seguimiento GPS">
+                              <i data-lucide="navigation" style="width: 14px; height: 14px;"></i>
+                            </button>
+                            <button class="btn-bell-subtle-small" data-bus="${b.bus}" data-line="${l.linea}" title="Aviso de llegada">
+                              <i data-lucide="bell" style="width: 14px; height: 14px;"></i>
+                            </button>
+                          ` : ''}
                         </div>
                       </div>
                     `).join('')}
@@ -305,7 +318,8 @@ import Icon from '../../components/Icon.astro';
             });
           });
 
-          // Add track button listeners
+          // Add track button listeners (GPS route following)
+          // Agregar oyentes de eventos a los botones de seguimiento (ruta GPS)
           container.querySelectorAll('.btn-track-subtle, .btn-track-subtle-small').forEach(btn => {
             btn.addEventListener('click', (e) => {
               e.stopPropagation();
@@ -334,6 +348,42 @@ import Icon from '../../components/Icon.astro';
               } else {
                 openDestinationSelector(busId, lineId);
               }
+            });
+          });
+
+          // Add bell button listeners (ETA arrival warning at current stop)
+          // Agregar oyentes de eventos a los botones de campana (aviso de llegada en la parada actual)
+          container.querySelectorAll('.btn-bell-subtle, .btn-bell-subtle-small').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const busId = btn.getAttribute('data-bus')!;
+              const lineId = parseInt(btn.getAttribute('data-line')!);
+              
+              // Enable ETA alerts in localStorage
+              // Activar la alerta de ETA en el almacenamiento local
+              localStorage.setItem('buscoruna_eta_alert_enabled', 'true');
+              
+              // Set tracking info: target current stop as destination
+              // Configurar la información de seguimiento: parada actual como origen y destino
+              tracking.set({
+                busId: busId,
+                lineId: lineId,
+                destinationStopId: stopId,
+                originStopId: stopId,
+                lastEta: null,
+                arrivalTime: null
+              });
+              
+              const threshold = parseInt(localStorage.getItem('buscoruna_eta_alert_threshold') || '0');
+              const thresholdText = threshold === 0 ? 'está llegando' : `queden ${threshold} min o menos`;
+              
+              // Ask for browser notification permissions if not set
+              // Solicitar permisos de notificación si no están concedidos
+              if (Notification.permission === 'default') {
+                Notification.requestPermission();
+              }
+              
+              alert(`🔔 ¡Aviso de llegada activado! Te avisaremos cuando el autobús ${busId} esté a ${thresholdText} de esta parada.`);
             });
           });
 
@@ -674,6 +724,27 @@ import Icon from '../../components/Icon.astro';
     transform: scale(1.05);
   }
 
+  .btn-bell-subtle {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #94a3b8;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+
+  .btn-bell-subtle:hover, .btn-bell-subtle:active {
+    color: #eab308;
+    border-color: #eab308;
+    background: #fef3c7;
+    transform: scale(1.05);
+  }
+
   .btn-track-subtle-small {
     background: #f8fafc;
     border: 1px solid #e2e8f0;
@@ -685,6 +756,41 @@ import Icon from '../../components/Icon.astro';
     align-items: center;
     justify-content: center;
     font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+
+  .btn-track-subtle-small:hover, .btn-track-subtle-small:active {
+    color: #3b82f6;
+    border-color: #3b82f6;
+    background: #f0f7ff;
+    transform: scale(1.05);
+  }
+
+  .btn-bell-subtle-small {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #94a3b8;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+
+  .btn-bell-subtle-small:hover, .btn-bell-subtle-small:active {
+    color: #eab308;
+    border-color: #eab308;
+    background: #fef3c7;
+    transform: scale(1.05);
+  }
+
+  .extra-bus-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .next-label {
