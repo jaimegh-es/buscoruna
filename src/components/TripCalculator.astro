@@ -59,6 +59,28 @@ import Icon from './Icon.astro';
         </div>
       </div>
 
+      <!-- Save Arrival Time Modal (Confirmation Bottom Sheet) -->
+      <!-- Modal de Confirmación de Hora de Llegada -->
+      <div id="save-time-modal" class="modal">
+        <div class="modal-content confirmation-modal-content">
+          <div class="modal-header">
+            <h3>Guardar Trayecto</h3>
+            <button type="button" id="close-save-time" class="close-btn">
+              <Icon name="x" size={24} />
+            </button>
+          </div>
+          <div class="modal-body confirmation-modal-body">
+            <p>¿Deseas guardar también la hora de llegada planificada (<strong id="save-time-modal-display"></strong>)?</p>
+            <p class="modal-hint">Si la guardas, al hacer click en el favorito se calculará para llegar a esa hora.</p>
+          </div>
+          <div class="modal-footer confirmation-modal-footer">
+            <button type="button" id="btn-save-with-time" class="btn-primary">Sí, con hora</button>
+            <button type="button" id="btn-save-without-time" class="btn-secondary">Sólo el trayecto</button>
+          </div>
+        </div>
+      </div>
+
+
       <div class="input-group">
         <label>Modo de planificación</label>
         <div class="planner-mode-toggle">
@@ -309,10 +331,109 @@ import Icon from './Icon.astro';
   }
 
   .route-summary-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 1rem;
     padding-bottom: 0.5rem;
     border-bottom: 2px solid #eee;
+    gap: 1rem;
   }
+
+  .confirmation-modal-content {
+    height: auto;
+    max-height: 90vh;
+    margin: 25vh auto;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  }
+
+  .confirmation-modal-body {
+    padding: 1.5rem;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--text, #1e293b);
+  }
+
+  .modal-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted, #64748b);
+    margin-top: 0.5rem;
+  }
+
+  .confirmation-modal-footer {
+    display: flex;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem 1.5rem;
+    border-top: none;
+  }
+
+  .confirmation-modal-footer button {
+    flex: 1;
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  .confirmation-modal-footer .btn-secondary {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+  }
+
+  .confirmation-modal-footer .btn-secondary:hover {
+    background: #e2e8f0;
+  }
+
+  /* Responsive bottom sheet design for mobile confirmation */
+  /* Diseño responsivo de Bottom Sheet para confirmación en móvil */
+  @media (max-width: 480px) {
+    .confirmation-modal-content {
+      margin: auto 0 0 0;
+      width: 100%;
+      border-radius: 20px 20px 0 0;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      animation: slideUpModal 0.3s ease-out;
+    }
+    
+    .modal {
+      padding: 0;
+    }
+  }
+
+  @keyframes slideUpModal {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+
+  .fav-planner-route-btn {
+    background: none;
+    border: none;
+    padding: 0.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: var(--text-muted, #64748b);
+    transition: all 0.2s ease;
+  }
+
+  .fav-planner-route-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text, #0f172a);
+  }
+
+  .fav-planner-route-btn:active {
+    transform: scale(1.15);
+  }
+
 
   .results-list {
     display: flex;
@@ -671,7 +792,111 @@ import Icon from './Icon.astro';
       });
       
       this.renderIcons();
+      this.autoPopulateFromUrl();
     }
+
+    // Auto-populate origin and destination from URL query parameters if present
+    // Auto-completar el origen y destino a partir de los parámetros de la URL si están presentes
+    autoPopulateFromUrl() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const originType = urlParams.get('originType');
+      const destType = urlParams.get('destType');
+      
+      if (!originType || !destType) return;
+
+      if (!this.catalog) {
+        // If the catalog isn't loaded yet, retry when the catalog-loaded event is fired
+        // Si el catálogo aún no se ha cargado, reintentar cuando se dispare el evento catalog-loaded
+        window.addEventListener('catalog-loaded', () => {
+          this.autoPopulateFromUrl();
+        }, { once: true });
+        return;
+      }
+
+      const originInput = this.querySelector('#origin') as HTMLInputElement;
+      const destInput = this.querySelector('#destination') as HTMLInputElement;
+
+      // Populate Origin
+      // Rellenar Origen
+      if (originType === 'stop') {
+        const id = urlParams.get('originId');
+        const stop = this.catalog.paradas[id!];
+        if (stop) {
+          this.selectedOrigin = { type: 'stop', ...stop };
+          if (originInput) originInput.value = stop.nombre;
+        }
+      } else if (originType === 'place') {
+        const name = urlParams.get('originName') || 'Mi ubicación';
+        const lat = parseFloat(urlParams.get('originLat') || '0');
+        const lon = parseFloat(urlParams.get('originLon') || '0');
+        this.selectedOrigin = { type: 'place', nombre: name, posy: lat, posx: lon };
+        if (originInput) originInput.value = name;
+      }
+
+      // Populate Destination
+      // Rellenar Destino
+      if (destType === 'stop') {
+        const id = urlParams.get('destId');
+        const stop = this.catalog.paradas[id!];
+        if (stop) {
+          this.selectedDestination = { type: 'stop', ...stop };
+          if (destInput) destInput.value = stop.nombre;
+        }
+      } else if (destType === 'place') {
+        const name = urlParams.get('destName') || 'Destino';
+        const lat = parseFloat(urlParams.get('destLat') || '0');
+        const lon = parseFloat(urlParams.get('destLon') || '0');
+        this.selectedDestination = { type: 'place', nombre: name, posy: lat, posx: lon };
+        if (destInput) destInput.value = name;
+      }
+
+      // Populate planner mode and target arrival time if specified
+      // Rellenar el modo de planificación y la hora de llegada si están especificados
+      const plannerMode = urlParams.get('plannerMode') || 'now';
+      const targetTime = urlParams.get('targetTime');
+
+      if (plannerMode === 'arrive' && targetTime) {
+        this.plannerMode = 'arrive';
+        
+        // Update UI toggles
+        // Actualizar botones en la interfaz
+        const buttons = this.querySelectorAll('.mode-btn');
+        buttons.forEach(btn => {
+          if (btn.getAttribute('data-mode') === 'arrive') {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+        
+        // Show time input and set value
+        // Mostrar campo de hora y establecer valor
+        const timeGroup = this.querySelector('#target-time-group') as HTMLElement;
+        if (timeGroup) timeGroup.style.display = 'block';
+        
+        const targetInput = this.querySelector('#target-time') as HTMLInputElement;
+        if (targetInput) targetInput.value = targetTime;
+      } else {
+        this.plannerMode = 'now';
+        const buttons = this.querySelectorAll('.mode-btn');
+        buttons.forEach(btn => {
+          if (btn.getAttribute('data-mode') === 'now') {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+        const timeGroup = this.querySelector('#target-time-group') as HTMLElement;
+        if (timeGroup) timeGroup.style.display = 'none';
+      }
+
+      // Calculate route automatically if both inputs have been populated
+      // Calcular la ruta automáticamente si se han rellenado ambos campos
+      if (this.selectedOrigin && this.selectedDestination) {
+        this.calculate();
+      }
+    }
+
 
     setupModeToggle() {
       const buttons = this.querySelectorAll('.mode-btn');
@@ -1185,9 +1410,16 @@ import Icon from './Icon.astro';
       ];
 
       if (resultsDiv) {
+        const isFav = storage.isFavoritePlannerRoute(this.selectedOrigin, this.selectedDestination);
         resultsDiv.innerHTML = `
           <div class="route-summary-header">
             <h3>Rutas de <strong>${this.selectedOrigin.nombre}</strong> a <strong>${this.selectedDestination.nombre}</strong></h3>
+            <button type="button" id="toggle-fav-planner-route-btn" class="fav-planner-route-btn" title="Guardar ruta en favoritos">
+              ${isFav 
+                ? `<i data-lucide="star" style="fill: currentColor; color: #facc15; width: 22px; height: 22px;"></i>` 
+                : `<i data-lucide="star" style="width: 22px; height: 22px;"></i>`
+              }
+            </button>
           </div>
           <div id="taxi-warning" style="display: none; padding: 1rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; margin-bottom: 1.5rem; color: #92400e; font-style: italic; text-align: center;">
              🚕 Pues va a haber que coger un taxi...
@@ -1198,6 +1430,7 @@ import Icon from './Icon.astro';
             ${transferRoutes.slice(0, 2).map((l, i) => this.renderTransferRouteCard(l, i + directRoutes.length + nearbyRoutes.length)).join('')}
           </div>
         `;
+
 
         
         // Add click listeners to result cards (for map)
@@ -1277,16 +1510,105 @@ import Icon from './Icon.astro';
             
             storage.toggleFavoriteRoute(origin, dest, line, lineName);
             
-            // Toggle icon fill
-            const icon = btn.querySelector('svg');
-            if (icon) {
-              const isFilled = icon.getAttribute('fill') !== 'none';
-              icon.setAttribute('fill', isFilled ? 'none' : 'currentColor');
-            }
+            // Check if it is now a favorite
+            // Comprobar si ahora es favorita
+            const favRoutes = storage.getFavoriteRoutes();
+            const routeId = `${origin}-${dest}-${line}`;
+            const isNowFav = favRoutes.some((f: any) => f.routeId === routeId);
+
+            // Re-render and re-hydrate the icon
+            // Volver a renderizar e hidratar el icono
+            btn.innerHTML = `<i data-lucide="heart" style="width: 20px; height: 20px; fill: ${isNowFav ? 'currentColor' : 'none'}"></i>`;
+            this.renderIcons();
           });
         });
 
         this.renderIcons();
+
+        // Toggle planner route in favorites listener
+        // Manejador para alternar la ruta planificada en favoritos
+        const favBtn = resultsDiv.querySelector('#toggle-fav-planner-route-btn');
+        if (favBtn) {
+          favBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            const isNowFav = storage.isFavoritePlannerRoute(this.selectedOrigin, this.selectedDestination);
+            
+            if (isNowFav) {
+              // Already a favorite, toggle it off directly
+              // Ya es favorito, quitar de favoritos directamente
+              storage.toggleFavoritePlannerRoute(this.selectedOrigin, this.selectedDestination);
+              favBtn.innerHTML = '<i data-lucide="star" style="width: 22px; height: 22px;"></i>';
+              this.renderIcons();
+            } else {
+              // Not a favorite. Check if we have an arrival time set to ask the user.
+              // No es favorito. Comprobar si se ha establecido hora de llegada para preguntar al usuario.
+              const targetTimeInput = this.querySelector('#target-time') as HTMLInputElement;
+              const targetTime = targetTimeInput?.value;
+              
+              if (this.plannerMode === 'arrive' && targetTime) {
+                // Open confirmation dialog
+                // Abrir diálogo de confirmación
+                const modal = this.querySelector('#save-time-modal') as HTMLElement;
+                const timeDisplay = this.querySelector('#save-time-modal-display') as HTMLElement;
+                
+                if (timeDisplay) timeDisplay.textContent = targetTime;
+                if (modal) modal.style.display = 'block';
+                
+                // Configure modal buttons
+                // Configurar botones del modal
+                const saveWithTimeBtn = this.querySelector('#btn-save-with-time');
+                const saveWithoutTimeBtn = this.querySelector('#btn-save-without-time');
+                const closeSaveTimeBtn = this.querySelector('#close-save-time');
+                
+                const onSaveWithTime = () => {
+                  storage.toggleFavoritePlannerRoute(this.selectedOrigin, this.selectedDestination, 'arrive', targetTime);
+                  favBtn.innerHTML = '<i data-lucide="star" style="fill: currentColor; color: #facc15; width: 22px; height: 22px;"></i>';
+                  this.renderIcons();
+                  cleanup();
+                };
+                
+                const onSaveWithoutTime = () => {
+                  storage.toggleFavoritePlannerRoute(this.selectedOrigin, this.selectedDestination, 'now', null);
+                  favBtn.innerHTML = '<i data-lucide="star" style="fill: currentColor; color: #facc15; width: 22px; height: 22px;"></i>';
+                  this.renderIcons();
+                  cleanup();
+                };
+                
+                const onCancel = () => {
+                  cleanup();
+                };
+                
+                const cleanup = () => {
+                  if (modal) modal.style.display = 'none';
+                  saveWithTimeBtn?.removeEventListener('click', onSaveWithTime);
+                  saveWithoutTimeBtn?.removeEventListener('click', onSaveWithoutTime);
+                  closeSaveTimeBtn?.removeEventListener('click', onCancel);
+                  modal?.removeEventListener('click', onModalClick);
+                };
+
+                const onModalClick = (event: MouseEvent) => {
+                  if (event.target === modal) {
+                    cleanup();
+                  }
+                };
+                
+                saveWithTimeBtn?.addEventListener('click', onSaveWithTime);
+                saveWithoutTimeBtn?.addEventListener('click', onSaveWithoutTime);
+                closeSaveTimeBtn?.addEventListener('click', onCancel);
+                modal?.addEventListener('click', onModalClick);
+                
+              } else {
+                // No target time or in "now" mode, save directly
+                // Sin hora de llegada o en modo "ahora", guardar directamente
+                storage.toggleFavoritePlannerRoute(this.selectedOrigin, this.selectedDestination, 'now', null);
+                favBtn.innerHTML = '<i data-lucide="star" style="fill: currentColor; color: #facc15; width: 22px; height: 22px;"></i>';
+                this.renderIcons();
+              }
+            }
+          });
+
+        }
       }
     }
 

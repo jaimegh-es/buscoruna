@@ -15,22 +15,27 @@ import Icon from '../components/Icon.astro';
     import { storage } from '../utils/storage';
     import { API } from '../services/api';
     import { tracking } from '../utils/tracking';
-    import { createIcons, Star, Heart, ChevronRight } from 'lucide';
+    import { createIcons, Star, Heart, ChevronRight, Map } from 'lucide';
 
+    // Load and render all favorites categories (stops, routes, planner trajectories)
+    // Cargar y renderizar todas las categorías de favoritos (paradas, rutas, trayectos del planificador)
     async function loadFavorites() {
       const container = document.getElementById('favorites-container');
       if (!container) return;
 
       const favIds = storage.getFavorites();
       const favRoutes = storage.getFavoriteRoutes();
+      const favPlannerRoutes = storage.getFavoritePlannerRoutes();
       const catalog = storage.getCatalog();
 
-      if (favIds.length === 0 && favRoutes.length === 0) {
+      // Check if there are no favorites at all
+      // Comprobar si no hay ningún favorito guardado
+      if (favIds.length === 0 && favRoutes.length === 0 && favPlannerRoutes.length === 0) {
         container.innerHTML = `
           <div class="empty-state">
             <span class="icon"><i data-lucide="star"></i></span>
             <p>Aún no tienes favoritos.</p>
-            <p><small>Pulsa la estrella en una parada o el corazón en una ruta para guardarla.</small></p>
+            <p><small>Pulsa la estrella en una parada, el corazón en una ruta o guarda un trayecto en el planificador.</small></p>
           </div>
         `;
         createIcons({ icons: { Star } });
@@ -50,6 +55,8 @@ import Icon from '../components/Icon.astro';
 
       let html = '';
 
+      // Render favorite stops
+      // Renderizar paradas favoritas
       if (favIds.length > 0) {
         html += `
           <h3 class="section-title">Paradas favoritas</h3>
@@ -69,18 +76,20 @@ import Icon from '../components/Icon.astro';
                         return `<span class="line-tag" style="background-color: #${info.color}">${info.name}</span>`;
                       }).join('')}
                     </div>
-                    </div>
-                    <div class="stop-arrow"><i data-lucide="chevron-right"></i></div>
-                    </a>
-                    `;
-                    }).join('')}
-                    </div>
-                    `;
-                    }
+                  </div>
+                  <div class="stop-arrow"><i data-lucide="chevron-right"></i></div>
+                </a>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
 
+      // Render favorite line routes (specific line connecting origin & dest stops)
+      // Renderizar rutas favoritas de líneas (línea específica que conecta origen y destino)
       if (favRoutes.length > 0) {
         html += `
-          <h3 class="section-title mt-2">Rutas favoritas</h3>
+          <h3 class="section-title mt-2">Rutas de líneas favoritas</h3>
           <div class="routes-list">
             ${favRoutes.map(r => {
               const origin = catalog.paradas[r.originId];
@@ -96,24 +105,86 @@ import Icon from '../components/Icon.astro';
                       <strong>${origin?.nombre || 'Origen'} &rarr; ${dest?.nombre || 'Destino'}</strong>
                       <small>Desde parada ${r.originId}</small>
                     </div>
+                  </div>
+                  <div class="stop-arrow"><i data-lucide="chevron-right"></i></div>
+                </a>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
+
+      // Render favorite planner trajectories (Origin -> Destination search queries)
+      // Renderizar trayectos favoritos del planificador (consultas de búsqueda Origen -> Destino)
+      if (favPlannerRoutes.length > 0) {
+        html += `
+          <h3 class="section-title mt-2">Trayectos planificados favoritos</h3>
+          <div class="routes-list">
+            ${favPlannerRoutes.map(r => {
+              const originName = r.origin.nombre;
+              const destName = r.destination.nombre;
+
+              // Build URLSearchParams from saved origin/destination stop or custom place
+              // Construir URLSearchParams desde el origen/destino guardado (parada o lugar personalizado)
+              const params = new URLSearchParams();
+              params.set('originType', r.origin.type);
+              if (r.origin.type === 'stop') {
+                params.set('originId', r.origin.id);
+              } else {
+                params.set('originName', r.origin.nombre);
+                params.set('originLat', r.origin.posy);
+                params.set('originLon', r.origin.posx);
+              }
+              
+              params.set('destType', r.destination.type);
+              if (r.destination.type === 'stop') {
+                params.set('destId', r.destination.id);
+              } else {
+                params.set('destName', r.destination.nombre);
+                params.set('destLat', r.destination.posy);
+                params.set('destLon', r.destination.posx);
+              }
+
+              if (r.plannerMode) {
+                params.set('plannerMode', r.plannerMode);
+              }
+              if (r.targetTime) {
+                params.set('targetTime', r.targetTime);
+              }
+
+              const href = `/planner?${params.toString()}`;
+
+              return `
+                <a href="${href}" class="card route-fav-card favorite-planner-link" style="--line-color: var(--primary)">
+                  <div class="route-fav-header">
+                    <span class="line-badge-small flex-center" style="background-color: var(--primary); display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0;">
+                      <i data-lucide="map" style="width: 16px; height: 16px; color: white;"></i>
+                    </span>
+                    <div class="route-fav-text">
+                      <strong>${originName} &rarr; ${destName}</strong>
+                      <small>
+                        ${r.origin.type === 'stop' ? 'Parada ' + r.origin.id : 'Mi ubicación'} &rarr; ${r.destination.type === 'stop' ? 'Parada ' + r.destination.id : 'Ubicación'}
+                        ${r.plannerMode === 'arrive' && r.targetTime ? ` • 🕒 Llegar a las ${r.targetTime}` : ''}
+                      </small>
                     </div>
-                    <div class="stop-arrow"><i data-lucide="chevron-right"></i></div>
-                    </a>
-                    `;
-                    }).join('')}
-                    </div>
-                    `;
-                    }
+                  </div>
+                  <div class="stop-arrow"><i data-lucide="chevron-right"></i></div>
+                </a>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
 
       container.innerHTML = html;
-      createIcons({ icons: { Star, Heart, ChevronRight } });
+      createIcons({ icons: { Star, Heart, ChevronRight, Map } });
 
       // Add listeners to favorite route links to set target destination
+      // Añadir oyentes a los enlaces de rutas favoritas para establecer la parada destino
       container.querySelectorAll('.favorite-route-link').forEach(link => {
         link.addEventListener('click', (e) => {
           const destId = link.getAttribute('data-dest');
           if (destId) {
-            // Force save to localStorage immediately
             tracking.setTargetDestination(parseInt(destId));
           }
         });
