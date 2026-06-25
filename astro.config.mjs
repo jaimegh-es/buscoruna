@@ -2,7 +2,9 @@
 import { defineConfig } from 'astro/config';
 import { VitePWA } from 'vite-plugin-pwa';
 
-import node from '@astrojs/node';
+// Import Cloudflare adapter for Cloudflare deployment
+// Importar el adaptador de Cloudflare para el despliegue en Cloudflare
+import cloudflare from '@astrojs/cloudflare';
 
 // https://astro.build/config
 export default defineConfig({
@@ -34,7 +36,7 @@ export default defineConfig({
     ]
   },
 
-  adapter: node({
-    mode: 'standalone'
-  })
+  // Use Cloudflare adapter for runtime
+  // Usar el adaptador de Cloudflare para la ejecución
+  adapter: cloudflare()
 });

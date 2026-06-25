@@ -852,6 +852,8 @@ const { title } = Astro.props;
         display: flex;
         flex-direction: column;
         gap: 4px;
+        padding-right: 12px; /* Prevent checkboxes from sticking directly to the right scrollbar edge */
+        /* Evitar que los checkboxes se peguen directamente al borde derecho del scroll */
     }
 
     .setting-title {
@@ -866,11 +868,12 @@ const { title } = Astro.props;
     }
 
     .setting-title input {
-        width: 18px;
-        height: 18px;
+        width: 22px; /* Increased size for better mobile accessibility */
+        height: 22px; /* Tamaño incrementado para mejor accesibilidad móvil */
         cursor: pointer;
         accent-color: var(--primary);
         margin: 0;
+        margin-left: 10px; /* Space between title text and checkbox */
     }
 
     .setting-desc {
