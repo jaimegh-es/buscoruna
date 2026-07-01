@@ -230,7 +230,7 @@ const { title } = Astro.props;
                                 <input type="checkbox" id="settings-enable-gps-alert" />
                             </label>
                             <p class="setting-desc">Te avisa al llegar o pasar por la parada anterior a tu destino para que pulses el botón de solicitud del autobús.</p>
-                            <p class="setting-warn">⚠️ Nota: Requiere GPS continuo en segundo plano. Puede fallar o gastar más batería.</p>
+                            <p class="setting-warn">⚠️ La app debe estar en primer plano con la pantalla encendida. Requiere GPS continuo. Puede fallar o gastar más batería.</p>
                         </div>
                     </div>
 
@@ -242,6 +242,7 @@ const { title } = Astro.props;
                                 <input type="checkbox" id="settings-enable-eta-alert" />
                             </label>
                             <p class="setting-desc">Te avisa cuando el autobús que estás esperando se aproxime a tu parada de origen.</p>
+                            <p class="setting-warn">⚠️ La app debe estar en primer plano con la pantalla encendida para recibir el aviso. Si minimizas o bloqueas el móvil, no llegará.</p>
                             
                             <div class="setting-sub-option" id="eta-alert-threshold-group">
                                 <label for="settings-eta-threshold">Avisar cuando queden:</label>
@@ -263,7 +264,7 @@ const { title } = Astro.props;
                                 <span>Mantener activo en segundo plano</span>
                                 <input type="checkbox" id="settings-enable-bg-keep-awake" />
                             </label>
-                            <p class="setting-desc">Intenta mantener la app activa en segundo plano mediante un bucle de audio silencioso y notificaciones.</p>
+                            <p class="setting-desc">Mantiene la pantalla encendida (Wake Lock) y reproduce audio silencioso, como hace YouTube. Ayuda a que la app no se suspenda, pero en Android el sistema puede matarla si lleva mucho tiempo en segundo plano.</p>
                         </div>
                     </div>
                 </div>
@@ -1699,11 +1700,59 @@ const { title } = Astro.props;
         });
     }
 
-    // Play silent loop programmatically using AudioContext to prevent system suspension in background
-    // Reproducir un bucle de silencio para evitar la suspensión en segundo plano por el navegador
+    // --- Wake Lock + Audio + Media Session (like YouTube) ---
+    // Mantener la pantalla encendida y priorizar el proceso en Android
+    let wakeLock: WakeLockSentinel | null = null;
+
+    async function acquireWakeLock() {
+        if ('wakeLock' in navigator) {
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+                wakeLock.addEventListener('release', () => {
+                    console.log("[WakeLock] Released");
+                });
+                console.log("[WakeLock] Acquired");
+            } catch (err) {
+                console.warn("[WakeLock] Failed to acquire", err);
+            }
+        }
+    }
+
+    function releaseWakeLock() {
+        if (wakeLock) {
+            wakeLock.release();
+            wakeLock = null;
+            console.log("[WakeLock] Released manually");
+        }
+    }
+
+    // Re-acquire wake lock if the page becomes visible again (user switches back)
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && wakeLock === null) {
+            // If keep-awake is enabled and we lost the lock, re-acquire
+            if (localStorage.getItem('buscoruna_bg_keep_awake') === 'true') {
+                acquireWakeLock();
+            }
+        }
+    });
+
     function startSilencePlayback() {
         if (audioContext) return;
         try {
+            // 1) Screen Wake Lock — keep screen on
+            acquireWakeLock();
+
+            // 2) Media Session API — show "playing" in notification shade (like YouTube)
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: 'Coruña Bus',
+                    artist: 'Seguimiento activo',
+                    artwork: [{ src: '/logo.png', sizes: '512x512', type: 'image/png' }],
+                });
+                navigator.mediaSession.playbackState = 'playing';
+            }
+
+            // 3) Silent audio loop — helps Chrome keep the tab alive
             audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
             const buffer = audioContext.createBuffer(1, audioContext.sampleRate * 2, audioContext.sampleRate);
             const source = audioContext.createBufferSource();
@@ -1718,17 +1767,23 @@ const { title } = Astro.props;
             source.start();
             console.log("[Background] Silence loop started successfully.");
             
-            // Show persistent background tracking notification (compatible with Android/Chrome)
-            // Mostrar notificación de seguimiento en segundo plano (compatible con Android/Chrome)
+            // Show persistent background tracking notification
             showBackgroundNotification();
         } catch (err) {
             console.warn("Failed to initiate silence background loop", err);
         }
     }
 
-    // Stop background silent audio loop
-    // Detener la reproducción de silencio de segundo plano
     function stopSilencePlayback() {
+        // Release Wake Lock
+        releaseWakeLock();
+
+        // Reset Media Session
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'none';
+        }
+
+        // Close audio context
         if (audioContext) {
             try {
                 audioContext.close();
@@ -1736,8 +1791,6 @@ const { title } = Astro.props;
             audioContext = null;
             silenceNode = null;
         }
-        // Close persistent background tracking notification
-        // Cerrar la notificación persistente de segundo plano
         closeBackgroundNotification();
     }
 

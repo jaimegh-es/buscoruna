@@ -24,16 +24,17 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return
+  if (!event.request.url.startsWith(self.location.origin)) return
+
+  // Network-first: always try to fetch fresh data (critical for real-time bus times)
   event.respondWith(
-    caches.match(event.request).then(cached =>
-      cached || fetch(event.request).then(response => {
-        if (response.ok && response.type === 'basic') {
-          const clone = response.clone()
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone))
-        }
-        return response
-      })
-    ).catch(() => caches.match('/'))
+    fetch(event.request).then(response => {
+      if (response.ok && response.type === 'basic') {
+        const clone = response.clone()
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone))
+      }
+      return response
+    }).catch(() => caches.match(event.request).then(cached => cached || caches.match('/')))
   )
 })
 
