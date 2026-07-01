@@ -13,6 +13,9 @@ export default defineConfig({
     plugins: [
       VitePWA({
         registerType: 'autoUpdate',
+        devOptions: {
+          enabled: true
+        },
         manifest: {
           name: 'Coruña Bus',
           short_name: 'Coruña Bus',
@@ -20,7 +23,20 @@ export default defineConfig({
           theme_color: '#f44336',
           background_color: '#f5f5f7',
           display: 'standalone',
+          lang: 'es',
+          scope: '/',
+          start_url: '/',
+          id: '/',
+          orientation: 'portrait-primary',
+          categories: ['transportation', 'navigation', 'travel'],
+          prefer_related_applications: false,
           icons: [
+            {
+              src: 'logo.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any maskable'
+            },
             {
               src: 'logo.png',
               sizes: '512x512',
