@@ -1,15 +1,19 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import Icon from "../components/Icon.astro";
+import { getTranslations } from "../utils/i18n";
+
+const lang = Astro.cookies.get('buscoruna_lang')?.value || 'es';
+const t = getTranslations(lang);
 ---
 
-<Layout title="Coruña Bus | Inicio">
+<Layout title={`${t.appName} | ${t.bottomNavHome}`}>
     <div class="home-dashboard">
         <section class="welcome-section">
             <div class="welcome-header">
                 <div class="welcome-text">
-                    <h2>¡Hola! 👋</h2>
-                    <p>¿Qué quieres hacer hoy?</p>
+                    <h2>{t.homeHello}</h2>
+                    <p>{t.homeWhatToDo}</p>
                 </div>
                 <div id="weather-widget" class="weather-widget loading">
                     <div class="spinner-small"></div>
@@ -20,27 +24,27 @@ import Icon from "../components/Icon.astro";
         <section class="quick-actions">
             <a href="/planner" class="action-card">
                 <div class="action-icon search"><Icon name="search" /></div>
-                <span>Planear ruta</span>
+                <span>{t.homeActionPlan}</span>
             </a>
             <a href="/stops" class="action-card">
                 <div class="action-icon location"><Icon name="location" /></div>
-                <span>Paradas cerca</span>
+                <span>{t.homeActionStops}</span>
             </a>
             <a href="/lines" class="action-card">
                 <div class="action-icon bus"><Icon name="bus" /></div>
-                <span>Ver líneas</span>
+                <span>{t.homeActionLines}</span>
             </a>
         </section>
 
         <section class="favorites-section">
             <div class="section-header">
-                <h3>Mis favoritos</h3>
-                <a href="/favorites" class="view-all">Ver todos</a>
+                <h3>{t.homeMyFavorites}</h3>
+                <a href="/favorites" class="view-all">{t.homeViewAll}</a>
             </div>
             <div id="favorites-summary" class="favorites-summary">
                 <div class="loading-simple">
                     <div class="spinner-small"></div>
-                    <span>Cargando favoritos...</span>
+                    <span>{t.homeLoadingFavorites}</span>
                 </div>
             </div>
         </section>
@@ -48,8 +52,8 @@ import Icon from "../components/Icon.astro";
         <section class="news-section">
             <div class="section-header">
                 <div class="header-main-title">
-                    <h3>Entretenimiento para el trayecto</h3>
-                    <span class="news-source">Noticias locales</span>
+                    <h3>{t.homeEntertainment}</h3>
+                    <span class="news-source">{t.homeLocalNews}</span>
                 </div>
                 <div class="news-config">
                     <button id="toggle-news-images" class="config-btn" title="Mostrar/Ocultar imágenes">
@@ -60,10 +64,10 @@ import Icon from "../components/Icon.astro";
             <div id="news-feed" class="news-feed card">
                 <div class="loading-simple">
                     <div class="spinner-small"></div>
-                    <span>Cargando noticias de La Voz de Galicia...</span>
+                    <span>{t.homeLoadingNews}</span>
                 </div>
             </div>
-            <button id="load-more-news" class="btn-load-more" style="display: none;">Cargar más noticias</button>
+            <button id="load-more-news" class="btn-load-more" style="display: none;">{t.homeLoadMore}</button>
         </section>
     </div>
 
@@ -90,13 +94,13 @@ import Icon from "../components/Icon.astro";
                     const temp = Math.round(data.current.temperature_2m);
                     const code = data.current.weather_code;
                     let iconName = 'sun';
-                    let description = 'Despejado';
-                    if (code >= 1 && code <= 3) { iconName = 'cloud'; description = 'Nublado'; }
-                    else if (code >= 45 && code <= 48) { iconName = 'cloud'; description = 'Niebla'; }
-                    else if (code >= 51 && code <= 67) { iconName = 'cloud-rain'; description = 'Lluvia'; }
-                    else if (code >= 71 && code <= 77) { iconName = 'cloud'; description = 'Nieve'; }
-                    else if (code >= 80 && code <= 82) { iconName = 'cloud-rain'; description = 'Chubascos'; }
-                    else if (code >= 95) { iconName = 'cloud-lightning'; description = 'Tormenta'; }
+                    let description = lang === 'en' ? 'Clear' : 'Despejado';
+                    if (code >= 1 && code <= 3) { iconName = 'cloud'; description = lang === 'en' ? 'Cloudy' : 'Nublado'; }
+                    else if (code >= 45 && code <= 48) { iconName = 'cloud'; description = lang === 'en' ? 'Foggy' : 'Niebla'; }
+                    else if (code >= 51 && code <= 67) { iconName = 'cloud-rain'; description = lang === 'en' ? 'Rain' : 'Lluvia'; }
+                    else if (code >= 71 && code <= 77) { iconName = 'cloud'; description = lang === 'en' ? 'Snow' : 'Nieve'; }
+                    else if (code >= 80 && code <= 82) { iconName = 'cloud-rain'; description = lang === 'en' ? 'Showers' : 'Chubascos'; }
+                    else if (code >= 95) { iconName = 'cloud-lightning'; description = lang === 'en' ? 'Storm' : 'Tormenta'; }
 
                     widget.className = 'weather-widget ready';
                     widget.innerHTML = `
@@ -148,7 +152,7 @@ import Icon from "../components/Icon.astro";
                 }
             } catch (err) {
                 console.error('News fetch failed', err);
-                feed.innerHTML = '<p class="loading-simple">No se pudieron cargar las noticias.</p>';
+                feed.innerHTML = `<p class="loading-simple">${lang === 'en' ? 'Could not load news.' : 'No se pudieron cargar las noticias.'}</p>`;
             }
         }
 
@@ -207,15 +211,15 @@ import Icon from "../components/Icon.astro";
             if (favIds.length === 0 && favRoutes.length === 0) {
                 container.innerHTML = `
                     <div class="empty-favorites">
-                        <p>No tienes favoritos guardados.</p>
-                        <p><small>Tus paradas y rutas frecuentes aparecerán aquí.</small></p>
+                        <p>${lang === 'en' ? 'You have no saved favorites.' : 'No tienes favoritos guardados.'}</p>
+                        <p><small>${lang === 'en' ? 'Your frequent stops and routes will appear here.' : 'Tus paradas y rutas frecuentes aparecerán aquí.'}</small></p>
                     </div>
                 `;
                 return;
             }
 
             if (!catalog) {
-                container.innerHTML = '<div class="loading-simple"><div class="spinner-small"></div><span>Cargando datos del sistema...</span></div>';
+                container.innerHTML = `<div class="loading-simple"><div class="spinner-small"></div><span>${lang === 'en' ? 'Loading system data...' : 'Cargando datos del sistema...'}</span></div>`;
                 return;
             }
 
@@ -261,13 +265,16 @@ import Icon from "../components/Icon.astro";
                             const dest = catalog.paradas[r.destId];
                             const line = lines.find((l: any) => l.id === r.lineId);
                             const color = line ? `#${line.color}` : 'var(--primary)';
+                            const destLabel = dest?.nombre || (lang === 'en' ? 'Destination' : 'Destino');
+                            const originLabel = origin?.nombre || (lang === 'en' ? 'Origin' : 'Origen');
+                            const fromLabel = lang === 'en' ? 'From' : 'Desde';
                             return `
                                 <a href="/stop/${r.originId}" class="card fav-item route-fav" style="--line-color: ${color}" data-dest="${r.destId}">
                                     <div class="route-info">
                                         <span class="route-line-badge" style="background-color: ${color}">${r.lineName}</span>
                                         <div class="route-text">
-                                            <strong>${dest?.nombre || 'Destino'}</strong>
-                                            <small>Desde ${origin?.nombre || 'Origen'}</small>
+                                            <strong>${destLabel}</strong>
+                                            <small>${fromLabel} ${originLabel}</small>
                                         </div>
                                     </div>
                                     <div class="fav-arrow"><i data-lucide="chevron-right"></i></div>
@@ -286,6 +293,10 @@ import Icon from "../components/Icon.astro";
                 });
             });
         }
+
+        const initialInfo = tracking.get();
+        // Read selected lang from html attribute
+        const lang = document.documentElement.getAttribute('data-lang') || 'es';
 
         renderFavorites();
         fetchWeather();

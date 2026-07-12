@@ -1,14 +1,18 @@
 ---
 import Icon from './Icon.astro';
+import { getTranslations } from '../utils/i18n';
+
+const lang = Astro.cookies.get('buscoruna_lang')?.value || 'es';
+const t = getTranslations(lang);
 ---
 <trip-calculator>
   <div class="card main-calculator-card">
     <form id="calc-form">
       <div class="input-group">
-        <label for="origin">Origen</label>
+        <label for="origin">{t.tripOriginLabel}</label>
         <div class="input-with-action">
-          <input type="text" id="origin" placeholder="Mi ubicación o parada..." autocomplete="off" />
-          <button type="button" id="get-location-origin" class="geo-btn" title="Usar GPS">
+          <input type="text" id="origin" placeholder={t.tripOriginPlaceholder} autocomplete="off" />
+          <button type="button" id="get-location-origin" class="geo-btn" title={t.tripOriginGpsTitle}>
             <Icon name="location" size={20} />
           </button>
         </div>
@@ -16,10 +20,10 @@ import Icon from './Icon.astro';
       </div>
 
       <div class="input-group">
-        <label for="destination">Destino</label>
+        <label for="destination">{t.tripDestLabel}</label>
         <div class="input-with-action">
-          <input type="text" id="destination" placeholder="¿A dónde vas?" autocomplete="off" />
-          <button type="button" id="get-location-dest" class="geo-btn" title="Seleccionar en mapa">
+          <input type="text" id="destination" placeholder={t.tripDestPlaceholder} autocomplete="off" />
+          <button type="button" id="get-location-dest" class="geo-btn" title={t.tripDestMapTitle}>
             <Icon name="map" size={20} />
           </button>
         </div>
@@ -30,15 +34,15 @@ import Icon from './Icon.astro';
       <div id="map-modal" class="modal">
         <div class="modal-content">
           <div class="modal-header">
-            <h3>Selecciona una parada</h3>
+            <h3>{t.tripMapModalTitle}</h3>
             <button type="button" id="close-map" class="close-btn">
               <Icon name="x" size={24} />
             </button>
           </div>
           <div id="selection-map"></div>
           <div class="modal-footer">
-            <p id="selected-stop-info">Toca una parada en el mapa</p>
-            <button type="button" id="confirm-selection" class="btn-primary" disabled>Confirmar</button>
+            <p id="selected-stop-info">{t.tripMapModalHint}</p>
+            <button type="button" id="confirm-selection" class="btn-primary" disabled>{t.tripConfirmBtn}</button>
           </div>
         </div>
       </div>
@@ -47,7 +51,7 @@ import Icon from './Icon.astro';
       <div id="route-detail-modal" class="modal">
         <div class="modal-content">
           <div class="modal-header">
-            <h3>Detalle de la ruta</h3>
+            <h3>{t.tripRouteDetailTitle}</h3>
             <button type="button" id="close-route-detail" class="close-btn">
               <Icon name="x" size={24} />
             </button>
@@ -64,44 +68,44 @@ import Icon from './Icon.astro';
       <div id="save-time-modal" class="modal">
         <div class="modal-content confirmation-modal-content">
           <div class="modal-header">
-            <h3>Guardar Trayecto</h3>
+            <h3>{t.tripSaveTripTitle}</h3>
             <button type="button" id="close-save-time" class="close-btn">
               <Icon name="x" size={24} />
             </button>
           </div>
           <div class="modal-body confirmation-modal-body">
-            <p>¿Deseas guardar también la hora de llegada planificada (<strong id="save-time-modal-display"></strong>)?</p>
-            <p class="modal-hint">Si la guardas, al hacer click en el favorito se calculará para llegar a esa hora.</p>
+            <p>{lang === 'en' ? 'Do you also want to save the planned arrival time (' : '¿Deseas guardar también la hora de llegada planificada ('}<strong id="save-time-modal-display"></strong>{lang === 'en' ? ')?' : ')?'}</p>
+            <p class="modal-hint">{t.tripSaveTripHint}</p>
           </div>
           <div class="modal-footer confirmation-modal-footer">
-            <button type="button" id="btn-save-with-time" class="btn-primary">Sí, con hora</button>
-            <button type="button" id="btn-save-without-time" class="btn-secondary">Sólo el trayecto</button>
+            <button type="button" id="btn-save-with-time" class="btn-primary">{t.tripSaveTripYes}</button>
+            <button type="button" id="btn-save-without-time" class="btn-secondary">{t.tripSaveTripNo}</button>
           </div>
         </div>
       </div>
 
 
       <div class="input-group">
-        <label>Modo de planificación</label>
+        <label>{t.tripModeLabel}</label>
         <div class="planner-mode-toggle">
           <button type="button" class="mode-btn active" data-mode="now">
             <Icon name="navigation" size={18} />
-            <span>Salir ahora</span>
+            <span>{t.tripModeNow}</span>
           </button>
           <button type="button" class="mode-btn" data-mode="arrive">
             <Icon name="map" size={18} />
-            <span>Llegar a las...</span>
+            <span>{t.tripModeArrive}</span>
           </button>
         </div>
       </div>
 
       <div class="input-group" id="target-time-group" style="display: none;">
-        <label for="target-time">¿A qué hora quieres llegar?</label>
+        <label for="target-time">{t.tripTimeLabel}</label>
         <input type="time" id="target-time" />
-        <small class="input-hint">Calcularemos la mejor opción con un margen de seguridad de 5-10 min.</small>
+        <small class="input-hint">{lang === 'en' ? 'We will calculate the best option with a 5-10 min safety margin.' : 'Calcularemos la mejor opción con un margen de seguridad de 5-10 min.'}</small>
       </div>
 
-      <button type="submit" class="btn-primary">Calcular Ruta</button>
+      <button type="submit" class="btn-primary">{t.tripCalcBtn}</button>
     </form>
   </div>
 
@@ -753,6 +757,10 @@ import Icon from './Icon.astro';
     Navigation,
     Map
   } from 'lucide';
+  import { getTranslations } from '../utils/i18n';
+
+  const lang = document.documentElement.getAttribute('data-lang') || 'es';
+  const t = getTranslations(lang);
 
   class TripCalculator extends HTMLElement {
     private selectedOrigin: any = null;
@@ -826,15 +834,13 @@ import Icon from './Icon.astro';
           if (originInput) originInput.value = stop.nombre;
         }
       } else if (originType === 'place') {
-        const name = urlParams.get('originName') || 'Mi ubicación';
+        const name = urlParams.get('originName') || (lang === 'en' ? 'My location' : 'Mi ubicación');
         const lat = parseFloat(urlParams.get('originLat') || '0');
         const lon = parseFloat(urlParams.get('originLon') || '0');
         this.selectedOrigin = { type: 'place', nombre: name, posy: lat, posx: lon };
         if (originInput) originInput.value = name;
       }
 
-      // Populate Destination
-      // Rellenar Destino
       if (destType === 'stop') {
         const id = urlParams.get('destId');
         const stop = this.catalog.paradas[id!];
@@ -843,23 +849,19 @@ import Icon from './Icon.astro';
           if (destInput) destInput.value = stop.nombre;
         }
       } else if (destType === 'place') {
-        const name = urlParams.get('destName') || 'Destino';
+        const name = urlParams.get('destName') || (lang === 'en' ? 'Destination' : 'Destino');
         const lat = parseFloat(urlParams.get('destLat') || '0');
         const lon = parseFloat(urlParams.get('destLon') || '0');
         this.selectedDestination = { type: 'place', nombre: name, posy: lat, posx: lon };
         if (destInput) destInput.value = name;
       }
 
-      // Populate planner mode and target arrival time if specified
-      // Rellenar el modo de planificación y la hora de llegada si están especificados
       const plannerMode = urlParams.get('plannerMode') || 'now';
       const targetTime = urlParams.get('targetTime');
 
       if (plannerMode === 'arrive' && targetTime) {
         this.plannerMode = 'arrive';
         
-        // Update UI toggles
-        // Actualizar botones en la interfaz
         const buttons = this.querySelectorAll('.mode-btn');
         buttons.forEach(btn => {
           if (btn.getAttribute('data-mode') === 'arrive') {
@@ -869,8 +871,6 @@ import Icon from './Icon.astro';
           }
         });
         
-        // Show time input and set value
-        // Mostrar campo de hora y establecer valor
         const timeGroup = this.querySelector('#target-time-group') as HTMLElement;
         if (timeGroup) timeGroup.style.display = 'block';
         
@@ -890,8 +890,6 @@ import Icon from './Icon.astro';
         if (timeGroup) timeGroup.style.display = 'none';
       }
 
-      // Calculate route automatically if both inputs have been populated
-      // Calcular la ruta automáticamente si se han rellenado ambos campos
       if (this.selectedOrigin && this.selectedDestination) {
         this.calculate();
       }
@@ -910,7 +908,6 @@ import Icon from './Icon.astro';
           
           if (this.plannerMode === 'arrive') {
             timeGroup.style.display = 'block';
-            // Set default time to +30 mins
             const now = new Date();
             now.setMinutes(now.getMinutes() + 30);
             const targetInput = this.querySelector('#target-time') as HTMLInputElement;
@@ -987,7 +984,7 @@ import Icon from './Icon.astro';
       this.querySelector('#get-location-origin')?.addEventListener('click', () => {
         if (navigator.geolocation) {
           const resultsDiv = this.querySelector('#origin-results') as HTMLDivElement;
-          resultsDiv.innerHTML = '<div class="autocomplete-item"><small>Localizando...</small></div>';
+          resultsDiv.innerHTML = `<div class="autocomplete-item"><small>${lang === 'en' ? 'Locating...' : 'Localizando...'}</small></div>`;
           resultsDiv.style.display = 'block';
 
           navigator.geolocation.getCurrentPosition((pos) => {
@@ -999,17 +996,17 @@ import Icon from './Icon.astro';
                 <div class="autocomplete-item current-pos" data-lat="${latitude}" data-lon="${longitude}">
                   <span class="icon"><i data-lucide="navigation" style="width: 18px; height: 18px;"></i></span>
                   <div class="info">
-                    <strong>Mi ubicación exacta</strong>
-                    <small>Usar coordenadas GPS</small>
+                    <strong>${lang === 'en' ? 'My exact location' : 'Mi ubicación exacta'}</strong>
+                    <small>${lang === 'en' ? 'Use GPS coordinates' : 'Usar coordenadas GPS'}</small>
                   </div>
                 </div>
-                <div style="padding: 0.5rem 1rem; background: #f3f4f6; font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">Paradas cercanas</div>
+                <div style="padding: 0.5rem 1rem; background: #f3f4f6; font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">${lang === 'en' ? 'Nearby stops' : 'Paradas cercanas'}</div>
                 ${nearby.map((s: any) => `
                   <div class="autocomplete-item stop" data-type="stop" data-id="${s.id}" data-name="${s.nombre}">
                     <span class="icon"><i data-lucide="map-pin" style="width: 18px; height: 18px;"></i></span>
                     <div class="info">
                       <strong>${s.nombre}</strong>
-                      <small>Parada ${s.id} (${Math.round(s.dist)}m)</small>
+                      <small>${lang === 'en' ? 'Stop' : 'Parada'} ${s.id} (${Math.round(s.dist)}m)</small>
                     </div>
                   </div>
                 `).join('')}
@@ -1020,10 +1017,11 @@ import Icon from './Icon.astro';
                 item.addEventListener('click', () => {
                   const input = this.querySelector('#origin') as HTMLInputElement;
                   if (item.classList.contains('current-pos')) {
-                    input.value = "Mi ubicación";
+                    const originInput = this.querySelector('#origin') as HTMLInputElement;
+                    if (originInput) originInput.value = lang === 'en' ? "My location" : "Mi ubicación";
                     this.selectedOrigin = {
                       type: 'place',
-                      nombre: "Mi ubicación",
+                      nombre: lang === 'en' ? "My location" : "Mi ubicación",
                       posy: latitude,
                       posx: longitude
                     };
@@ -1038,10 +1036,10 @@ import Icon from './Icon.astro';
                 });
               });
             } else {
-              resultsDiv.innerHTML = '<div class="autocomplete-item"><small>No se encontraron paradas cercanas.</small></div>';
+              resultsDiv.innerHTML = `<div class="autocomplete-item"><small>${t.tripNoStopsFound}</small></div>`;
             }
-          }, (err) => {
-            resultsDiv.innerHTML = '<div class="autocomplete-item"><small>Error al obtener ubicación.</small></div>';
+          }, () => {
+            resultsDiv.innerHTML = `<div class="autocomplete-item"><small>${lang === 'en' ? 'Error getting location.' : 'Error al obtener ubicación.'}</small></div>`;
           });
         }
       });
@@ -1110,11 +1108,11 @@ import Icon from './Icon.astro';
       nearby.forEach((s: any) => {
         // @ts-ignore
         const marker = L.marker([s.posy, s.posx]).addTo(this.map);
-        marker.bindPopup(`<strong>${s.nombre}</strong><br>Parada ${s.id}`);
+        marker.bindPopup(`<strong>${s.nombre}</strong><br>${lang === 'en' ? 'Stop' : 'Parada'} ${s.id}`);
         marker.on('click', () => {
           this.tempSelectedStop = s;
           const info = this.querySelector('#selected-stop-info');
-          if (info) info.innerHTML = `Seleccionada: <strong>${s.nombre}</strong>`;
+          if (info) info.innerHTML = lang === 'en' ? `Selected: <strong>${s.nombre}</strong>` : `Seleccionada: <strong>${s.nombre}</strong>`;
           const confirmBtn = this.querySelector('#confirm-selection') as HTMLButtonElement;
           if (confirmBtn) confirmBtn.disabled = false;
         });
@@ -1143,7 +1141,7 @@ import Icon from './Icon.astro';
       const confirmBtn = this.querySelector('#confirm-selection') as HTMLButtonElement;
       if (confirmBtn) confirmBtn.disabled = true;
       const info = this.querySelector('#selected-stop-info');
-      if (info) info.textContent = 'Toca una parada en el mapa';
+      if (info) info.textContent = lang === 'en' ? 'Tap a stop on the map' : 'Toca una parada en el mapa';
     }
 
 
@@ -1161,11 +1159,10 @@ import Icon from './Icon.astro';
           return;
         }
 
-        // Show loading state immediately
         resultsDiv.innerHTML = `
           <div class="autocomplete-loading">
             <div class="spinner-small"></div>
-            <span>Buscando...</span>
+            <span>${lang === 'en' ? 'Searching...' : 'Buscando...'}</span>
           </div>
         `;
         resultsDiv.style.display = 'block';
@@ -1198,7 +1195,7 @@ import Icon from './Icon.astro';
                   <span class="icon"><i data-lucide="map-pin" style="width: 18px; height: 18px;"></i></span>
                   <div class="info">
                     <strong>${s.nombre}</strong>
-                    <small>Parada ${s.id}</small>
+                    <small>${lang === 'en' ? 'Stop' : 'Parada'} ${s.id}</small>
                   </div>
                 </div>
               `).join('')}
@@ -1243,7 +1240,7 @@ import Icon from './Icon.astro';
               });
             });
           } else if (query.length >= 3) {
-            resultsDiv.innerHTML = `<div class="autocomplete-item"><small>No se encontraron resultados para "${query}"</small></div>`;
+            resultsDiv.innerHTML = `<div class="autocomplete-item"><small>${t.tripNoResultsQuery.replace('{query}', query)}</small></div>`;
             resultsDiv.style.display = 'block';
           } else {
             resultsDiv.style.display = 'none';
@@ -1275,15 +1272,13 @@ import Icon from './Icon.astro';
     }
 
     async calculate() {
-      const resultsDiv = this.querySelector('#results');
       if (!this.selectedOrigin || !this.selectedDestination) {
-        alert("Por favor, selecciona origen y destino de la lista.");
+        alert(t.tripSelectOriginDest);
         return;
       }
 
-      console.log('Calculating route:', { origin: this.selectedOrigin, dest: this.selectedDestination });
-
-      if (resultsDiv) resultsDiv.innerHTML = '<div class="loading">Buscando la mejor combinación...</div>';
+      const resultsDiv = this.querySelector('#results') as HTMLDivElement;
+      if (resultsDiv) resultsDiv.innerHTML = `<div class="loading">${lang === 'en' ? 'Calculating the best combination...' : 'Buscando la mejor combinación...'}</div>`;
 
       this.catalog = storage.getCatalog();
       if (!this.catalog || !this.catalog.actualizacion || !this.catalog.actualizacion.lineas) {
@@ -1383,8 +1378,8 @@ import Icon from './Icon.astro';
       if (directRoutes.length === 0 && nearbyRoutes.length === 0 && transferRoutes.length === 0) {
         if (resultsDiv) resultsDiv.innerHTML = `
           <div class="empty-state">
-            <p>No se encontró una ruta entre estas ubicaciones.</p>
-            <small>Intenta seleccionar otros puntos de interés o paradas cercanas.</small>
+            <p>${lang === 'en' ? 'No route found between these locations.' : 'No se encontró una ruta entre estas ubicaciones.'}</p>
+            <small>${lang === 'en' ? 'Try selecting other points of interest or nearby stops.' : 'Intenta seleccionar otros puntos de interés o paradas cercanas.'}</small>
           </div>
         `;
         return;
@@ -1413,8 +1408,8 @@ import Icon from './Icon.astro';
         const isFav = storage.isFavoritePlannerRoute(this.selectedOrigin, this.selectedDestination);
         resultsDiv.innerHTML = `
           <div class="route-summary-header">
-            <h3>Rutas de <strong>${this.selectedOrigin.nombre}</strong> a <strong>${this.selectedDestination.nombre}</strong></h3>
-            <button type="button" id="toggle-fav-planner-route-btn" class="fav-planner-route-btn" title="Guardar ruta en favoritos">
+            <h3>${lang === 'en' ? 'Routes from' : 'Rutas de'} <strong>${this.selectedOrigin.nombre}</strong> ${lang === 'en' ? 'to' : 'a'} <strong>${this.selectedDestination.nombre}</strong></h3>
+            <button type="button" id="toggle-fav-planner-route-btn" class="fav-planner-route-btn" title="${t.tripSaveToFavsTitle}">
               ${isFav 
                 ? `<i data-lucide="star" style="fill: currentColor; color: #facc15; width: 22px; height: 22px;"></i>` 
                 : `<i data-lucide="star" style="width: 22px; height: 22px;"></i>`
@@ -1422,7 +1417,7 @@ import Icon from './Icon.astro';
             </button>
           </div>
           <div id="taxi-warning" style="display: none; padding: 1rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; margin-bottom: 1.5rem; color: #92400e; font-style: italic; text-align: center;">
-             🚕 Pues va a haber que coger un taxi...
+             ${lang === 'en' ? '🚕 Looks like you might need to take a taxi...' : '🚕 Pues va a haber que coger un taxi...'}
           </div>
           <div class="results-list">
             ${directRoutes.slice(0, 3).map((l, i) => this.renderDirectRouteCard(l, i)).join('')}
@@ -1636,9 +1631,9 @@ import Icon from './Icon.astro';
 
         if (route.type === 'direct' || route.type === 'nearby') {
           // @ts-ignore
-          const m1 = L.marker([route.originStop.posy, route.originStop.posx]).addTo(this.routeMap).bindPopup(`Sube aquí: ${route.originStop.nombre}`);
+          const m1 = L.marker([route.originStop.posy, route.originStop.posx]).addTo(this.routeMap).bindPopup(`${lang === 'en' ? 'Board here' : 'Sube aquí'}: ${route.originStop.nombre}`);
           // @ts-ignore
-          const m2 = L.marker([route.destStop.posy, route.destStop.posx]).addTo(this.routeMap).bindPopup(`Bájate aquí: ${route.destStop.nombre}`);
+          const m2 = L.marker([route.destStop.posy, route.destStop.posx]).addTo(this.routeMap).bindPopup(`${lang === 'en' ? 'Get off here' : 'Bájate aquí'}: ${route.destStop.nombre}`);
           this.routeMarkers.push(m1, m2);
           bounds.extend([route.originStop.posy, route.originStop.posx]);
           bounds.extend([route.destStop.posy, route.destStop.posx]);
@@ -1647,7 +1642,7 @@ import Icon from './Icon.astro';
 
           if (this.selectedOrigin.type === 'place' && route.walkToOrigin > 30) {
              // @ts-ignore
-             const m0 = L.marker([this.selectedOrigin.posy, this.selectedOrigin.posx], { icon: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/25/25694.png', iconSize: [25, 25] }) }).addTo(this.routeMap).bindPopup("Tu origen");
+             const m0 = L.marker([this.selectedOrigin.posy, this.selectedOrigin.posx], { icon: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/25/25694.png', iconSize: [25, 25] }) }).addTo(this.routeMap).bindPopup(lang === 'en' ? "Your origin" : "Tu origen");
              this.routeMarkers.push(m0);
              bounds.extend([this.selectedOrigin.posy, this.selectedOrigin.posx]);
              this.drawWalkingPath(this.selectedOrigin.posy, this.selectedOrigin.posx, route.originStop.posy, route.originStop.posx, 'origin');
@@ -1655,7 +1650,7 @@ import Icon from './Icon.astro';
 
           if (this.selectedDestination.type === 'place' && route.walkToDest > 30) {
              // @ts-ignore
-             const m3 = L.marker([this.selectedDestination.posy, this.selectedDestination.posx], { icon: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/25/25694.png', iconSize: [25, 25] }) }).addTo(this.routeMap).bindPopup("Tu destino");
+             const m3 = L.marker([this.selectedDestination.posy, this.selectedDestination.posx], { icon: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/25/25694.png', iconSize: [25, 25] }) }).addTo(this.routeMap).bindPopup(lang === 'en' ? "Your destination" : "Tu destino");
              this.routeMarkers.push(m3);
              bounds.extend([this.selectedDestination.posy, this.selectedDestination.posx]);
              this.drawWalkingPath(route.destStop.posy, route.destStop.posx, this.selectedDestination.posy, this.selectedDestination.posx, 'destination');
@@ -1666,7 +1661,7 @@ import Icon from './Icon.astro';
               <span class="line-badge" style="background-color: #${route.color}">${route.lineComer}</span>
               <div>
                 <p><strong>${route.originStop.nombre}</strong> &rarr; <strong>${route.destStop.nombre}</strong></p>
-                <p><small>${route.stopsCount} paradas (~${route.estimatedTravelMins} min)</small></p>
+                <p><small>${route.stopsCount} ${lang === 'en' ? 'stops' : 'paradas'} (~${route.estimatedTravelMins} min)</small></p>
                 <p><small id="walking-time-info"></small></p>
               </div>
             </div>
@@ -1725,7 +1720,9 @@ import Icon from './Icon.astro';
           if (timeInfo) {
             const mins = Math.round(route.duration / 60);
             const dist = Math.round(route.distance);
-            const prefix = tag === 'origin' ? "Camina hasta la parada: " : "Desde la parada camina: ";
+            const prefix = tag === 'origin' 
+              ? (lang === 'en' ? "Walk to stop: " : "Camina hasta la parada: ") 
+              : (lang === 'en' ? "From stop walk: " : "Desde la parada camina: ");
             timeInfo.innerHTML += `<div>${prefix} ${dist}m (${mins} min)</div>`;
           }
         }
@@ -1881,15 +1878,15 @@ import Icon from './Icon.astro';
           <div class="result-header">
             <span class="line-badge" style="background-color: #${l.color}">${l.lineComer}</span>
             <div class="travel-summary">
-              <strong>Ruta directa (~${l.estimatedTravelMins} min)</strong>
-              <small>${l.stopsCount} paradas</small>
+              <strong>${lang === 'en' ? 'Direct route' : 'Ruta directa'} (~${l.estimatedTravelMins} min)</strong>
+              <small>${l.stopsCount} ${lang === 'en' ? 'stops' : 'paradas'}</small>
             </div>
             <div class="route-actions-row">
-              <button class="btn-track-route" data-line="${l.lineId}" data-origin="${l.originStop.id}" data-dest="${l.destStop.id}" title="Seguir este bus">
+              <button class="btn-track-route" data-line="${l.lineId}" data-origin="${l.originStop.id}" data-dest="${l.destStop.id}" title="${lang === 'en' ? 'Track this bus' : 'Seguir este bus'}">
                 <i data-lucide="navigation" style="width: 16px; height: 16px;"></i>
               </button>
               <a href="/stop/${l.originStop.id}" class="btn-view-stop" data-dest="${l.destStop.id}">
-                Ver parada
+                ${lang === 'en' ? 'View stop' : 'Ver parada'}
               </a>
               <button class="fav-route-btn" data-origin="${l.originStop.id}" data-dest="${l.destStop.id}" data-line="${l.lineId}" data-line-name="${l.lineComer}">
                 <i data-lucide="heart" style="width: 20px; height: 20px; fill: ${isFav ? 'currentColor' : 'none'}"></i>
@@ -1897,7 +1894,7 @@ import Icon from './Icon.astro';
             </div>
           </div>
           <div class="real-time-info" data-stop-id="${l.originStop.id}" data-line-id="${l.lineId}" data-travel-mins="${l.estimatedTravelMins}">
-            <div class="loading-small">Consultando tiempo real...</div>
+            <div class="loading-small">${lang === 'en' ? 'Checking real-time...' : 'Consultando tiempo real...'}</div>
           </div>
         </div>
       `;
@@ -1909,24 +1906,24 @@ import Icon from './Icon.astro';
       const isFav = favRoutes.some((f: any) => f.routeId === routeId);
 
       let walkInfo = "";
-      if (l.walkToOrigin > 30) walkInfo += `Camina ${l.walkToOrigin}m hasta <strong>${l.originStop.nombre}</strong>. `;
-      walkInfo += `Toma el bus y bájate en <strong>${l.destStop.nombre}</strong>. `;
-      if (l.walkToDest > 30) walkInfo += `Luego camina ${l.walkToDest}m (${Math.round(l.walkToDest/70)} min) hasta tu destino.`;
+      if (l.walkToOrigin > 30) walkInfo += lang === 'en' ? `Walk ${l.walkToOrigin}m to <strong>${l.originStop.nombre}</strong>. ` : `Camina ${l.walkToOrigin}m hasta <strong>${l.originStop.nombre}</strong>. `;
+      walkInfo += lang === 'en' ? `Catch the bus and get off at <strong>${l.destStop.nombre}</strong>. ` : `Toma el bus y bájate en <strong>${l.destStop.nombre}</strong>. `;
+      if (l.walkToDest > 30) walkInfo += lang === 'en' ? `Then walk ${l.walkToDest}m (${Math.round(l.walkToDest/70)} min) to your destination.` : `Luego camina ${l.walkToDest}m (${Math.round(l.walkToDest/70)} min) hasta tu destino.`;
 
       return `
         <div class="card result-card nearby" data-idx="${idx}" style="--line-color: #${l.color}">
           <div class="result-header">
             <span class="line-badge" style="background-color: #${l.color}">${l.lineComer}</span>
             <div class="travel-summary">
-              <strong>Hacia parada cercana (~${l.estimatedTravelMins} min)</strong>
+              <strong>${lang === 'en' ? 'To nearby stop' : 'Hacia parada cercana'} (~${l.estimatedTravelMins} min)</strong>
               <small>${walkInfo}</small>
             </div>
             <div class="route-actions-row">
-              <button class="btn-track-route" data-line="${l.lineId}" data-origin="${l.originStop.id}" data-dest="${l.destStop.id}" title="Seguir este bus">
+              <button class="btn-track-route" data-line="${l.lineId}" data-origin="${l.originStop.id}" data-dest="${l.destStop.id}" title="${lang === 'en' ? 'Track this bus' : 'Seguir este bus'}">
                 <i data-lucide="navigation" style="width: 16px; height: 16px;"></i>
               </button>
               <a href="/stop/${l.originStop.id}" class="btn-view-stop" data-dest="${l.destStop.id}">
-                Ver parada
+                ${lang === 'en' ? 'View stop' : 'Ver parada'}
               </a>
               <button class="fav-route-btn" data-origin="${l.originStop.id}" data-dest="${l.destStop.id}" data-line="${l.lineId}" data-line-name="${l.lineComer}">
                 <i data-lucide="heart" style="width: 20px; height: 20px; fill: ${isFav ? 'currentColor' : 'none'}"></i>
@@ -1934,7 +1931,7 @@ import Icon from './Icon.astro';
             </div>
           </div>
           <div class="real-time-info" data-stop-id="${l.originStop.id}" data-line-id="${l.lineId}" data-travel-mins="${l.estimatedTravelMins}">
-            <div class="loading-small">Consultando tiempo real...</div>
+            <div class="loading-small">${lang === 'en' ? 'Checking real-time...' : 'Consultando tiempo real...'}</div>
           </div>
         </div>
       `;
@@ -1942,6 +1939,13 @@ import Icon from './Icon.astro';
 
 
     renderTransferRouteCard(r: any, idx: number) {
+      const step1 = lang === 'en'
+        ? `Take line <strong>${r.l1.lin_comer}</strong> to ${r.transferStop.nombre}`
+        : `Toma la línea <strong>${r.l1.lin_comer}</strong> hasta ${r.transferStop.nombre}`;
+      const step2 = lang === 'en'
+        ? `Change to line <strong>${r.l2.lin_comer}</strong> towards your destination`
+        : `Cambia a la línea <strong>${r.l2.lin_comer}</strong> hacia tu destino`;
+
       return `
         <div class="card result-card transfer" data-idx="${idx}" style="--line-color: #${r.l1.color}">
           <div class="result-header">
@@ -1951,13 +1955,13 @@ import Icon from './Icon.astro';
               <span class="line-badge" style="background-color: #${r.l2.color}">${r.l2.lin_comer}</span>
             </div>
             <div class="travel-summary">
-              <strong>Transbordo en ${r.transferStop.nombre}</strong>
-              <small>Total ${r.totalStops} paradas (${r.stops1} + ${r.stops2})</small>
+              <strong>${lang === 'en' ? 'Transfer at' : 'Transbordo en'} ${r.transferStop.nombre}</strong>
+              <small>${lang === 'en' ? 'Total' : 'Total'} ${r.totalStops} ${lang === 'en' ? 'stops' : 'paradas'} (${r.stops1} + ${r.stops2})</small>
             </div>
           </div>
           <div class="transfer-details">
-            <p>1. Toma la línea <strong>${r.l1.lin_comer}</strong> hasta ${r.transferStop.nombre}</p>
-            <p>2. Cambia a la línea <strong>${r.l2.lin_comer}</strong> hacia tu destino</p>
+            <p>1. ${step1}</p>
+            <p>2. ${step2}</p>
           </div>
         </div>
       `;
@@ -2024,9 +2028,11 @@ import Icon from './Icon.astro';
 
                 // Render all buses with the recommended one highlighted
                 // Renderizar todos los buses destacando el recomendado
-                const walkTimeToOrigin = Math.round((l.walkToOrigin || 0) / 70); // ~70m/min walking speed
                 const shownBusesIds = [recommended.bus.bus, secondOption?.bus.bus].filter(Boolean);
                 const hiddenCount = possibleBuses.filter(pb => !shownBusesIds.includes(pb.bus.bus)).length;
+                const toggleBtnText = lang === 'en'
+                  ? `Show ${hiddenCount} more (including late buses)`
+                  : `Mostrar ${hiddenCount} más (incluyendo buses tarde)`;
 
                 infoDiv.innerHTML = `
                   <div class="buses-timeline">
@@ -2036,6 +2042,9 @@ import Icon from './Icon.astro';
                       const isShown = isRec || isSecond;
                       
                       const arrivalAtOrigin = new Date(Date.now() + pb.waitTime * 60000);
+                      const lateWarning = pb.isLate
+                        ? (lang === 'en' ? `⚠️ Arriving late (${Math.abs(pb.diffMins)} min late)` : `⚠️ Llega tarde (${Math.abs(pb.diffMins)} min tarde)`)
+                        : '';
 
                       return `
                         <div class="bus-status ${isRec ? 'success recommended' : (pb.isLate ? 'error' : 'secondary')} ${!isShown ? 'hidden-bus' : ''}" data-bus-idx="${idx}">
@@ -2044,30 +2053,30 @@ import Icon from './Icon.astro';
                             <span class="unit">min</span>
                           </div>
                           <div class="details">
-                            ${isRec ? '<p><strong style="color: #059669;">✨ Recomendado</strong></p>' : ''}
-                            ${isSecond ? '<p><strong style="color: #475569;">🥈 Segunda opción</strong></p>' : ''}
-                            ${pb.isLate ? `<p><strong style="color: #dc2626;">⚠️ Llega tarde (${Math.abs(pb.diffMins)} min tarde)</strong></p>` : ''}
+                            ${isRec ? `<p><strong style="color: #059669;">${lang === 'en' ? '✨ Recommended' : '✨ Recomendado'}</strong></p>` : ''}
+                            ${isSecond ? `<p><strong style="color: #475569;">${lang === 'en' ? '🥈 Second choice' : '🥈 Segunda opción'}</strong></p>` : ''}
+                            ${pb.isLate ? `<p><strong style="color: #dc2626;">${lateWarning}</strong></p>` : ''}
                             
                             <div class="time-step">
                                <span class="dot origin"></span>
-                               <p>Pasa por parada: <strong>${this.formatTime(arrivalAtOrigin)}</strong></p>
+                               <p>${lang === 'en' ? 'Passes by stop:' : 'Pasa por parada:'} <strong>${this.formatTime(arrivalAtOrigin)}</strong></p>
                             </div>
                             <div class="time-step">
                                <span class="dot bus"></span>
-                               <p>Llegada destino: <strong>${this.formatTime(pb.arrival)}</strong> 
-                                  <small>(${pb.isLate ? '' : 'llega '}${Math.abs(pb.diffMins)} min ${pb.isLate ? 'después' : 'antes'})</small>
+                               <p>${lang === 'en' ? 'Destination arrival:' : 'Llegada destino:'} <strong>${this.formatTime(pb.arrival)}</strong> 
+                                  <small>(${pb.isLate ? '' : (lang === 'en' ? 'arrives ' : 'llega ')}${Math.abs(pb.diffMins)} min ${pb.isLate ? (lang === 'en' ? 'after' : 'después') : (lang === 'en' ? 'early' : 'antes')})</small>
                                </p>
                             </div>
                             
                             <div class="bus-actions">
-                              <small>Vehículo nº: <strong>${pb.bus.bus || '---'}</strong></small>
+                              <small>${lang === 'en' ? 'Vehicle no:' : 'Vehículo nº:'} <strong>${pb.bus.bus || '---'}</strong></small>
                               <button class="btn-track-this-bus" 
                                       data-bus="${pb.bus.bus}" 
                                       data-line="${l.lineId}" 
                                       data-origin="${l.originStop.id}" 
                                       data-dest="${l.destStop.id}"
-                                      title="Seguir este bus específico">
-                                <i data-lucide="navigation" style="width: 14px; height: 14px;"></i> Seguir
+                                      title="${lang === 'en' ? 'Track this specific bus' : 'Seguir este bus específico'}">
+                                <i data-lucide="navigation" style="width: 14px; height: 14px;"></i> ${lang === 'en' ? 'Track' : 'Seguir'}
                               </button>
                             </div>
                           </div>
@@ -2076,8 +2085,8 @@ import Icon from './Icon.astro';
                     }).join('')}
                     ${hiddenCount > 0 ? `
                       <button class="btn-toggle-buses" type="button">
-                        <span class="text-show">Mostrar ${hiddenCount} más (incluyendo buses tarde)</span>
-                        <span class="text-hide">Ocultar alternativas</span>
+                        <span class="text-show">${toggleBtnText}</span>
+                        <span class="text-hide">${lang === 'en' ? 'Hide alternatives' : 'Ocultar alternativas'}</span>
                       </button>
                     ` : ''}
                   </div>
@@ -2106,7 +2115,7 @@ import Icon from './Icon.astro';
                         lastEta: null,
                         arrivalTime: null
                       });
-                      alert(`¡Seguimiento iniciado para el bus ${busId}!`);
+                      alert(lang === 'en' ? `Tracking started for bus ${busId}!` : `¡Seguimiento iniciado for el bus ${busId}!`);
                     });
                   });
                 });
@@ -2134,16 +2143,16 @@ import Icon from './Icon.astro';
                       <span class="unit">min</span>
                     </div>
                     <div class="details">
-                      <p>Pasa por parada: <strong>${this.formatTime(arrivalAtOrigin)}</strong></p>
-                      <p>Llegada estimada: <strong>${this.formatTime(arrivalAtDest)}</strong></p>
+                      <p>${lang === 'en' ? 'Passes by stop:' : 'Pasa por parada:'} <strong>${this.formatTime(arrivalAtOrigin)}</strong></p>
+                      <p>${lang === 'en' ? 'Estimated arrival:' : 'Llegada estimada:'} <strong>${this.formatTime(arrivalAtDest)}</strong></p>
                       <div class="bus-actions">
-                        <small>Vehículo nº: <strong>${selectedBus.bus || '---'}</strong></small>
+                        <small>${lang === 'en' ? 'Vehicle no:' : 'Vehículo nº:'} <strong>${selectedBus.bus || '---'}</strong></small>
                         <button class="btn-track-this-bus" 
                                 data-bus="${selectedBus.bus}" 
                                 data-line="${l.lineId}" 
                                 data-origin="${l.originStop.id}" 
                                 data-dest="${l.destStop.id}">
-                          <i data-lucide="navigation" style="width: 14px; height: 14px;"></i> Seguir
+                          <i data-lucide="navigation" style="width: 14px; height: 14px;"></i> ${lang === 'en' ? 'Track' : 'Seguir'}
                         </button>
                       </div>
                     </div>
@@ -2163,7 +2172,7 @@ import Icon from './Icon.astro';
                       lastEta: null,
                       arrivalTime: null
                     });
-                    alert(`¡Seguimiento iniciado para el bus ${busId}!`);
+                    alert(lang === 'en' ? `Tracking started for bus ${busId}!` : `¡Seguimiento iniciado para el bus ${busId}!`);
                   });
                 });
 
@@ -2173,7 +2182,7 @@ import Icon from './Icon.astro';
               infoDiv.innerHTML = `<div class="bus-status warning">Sin buses próximos en tiempo real.</div>`;
             }
           } else {
-            infoDiv.innerHTML = `<div class="bus-status warning">Sin buses próximos en tiempo real.</div>`;
+            infoDiv.innerHTML = `<div class="bus-status warning">${lang === 'en' ? 'No upcoming buses in real-time.' : 'Sin buses próximos en tiempo real.'}</div>`;
           }
         } catch (err) {
           console.error(err);
@@ -2194,7 +2203,7 @@ import Icon from './Icon.astro';
         if (earliestArrival > desiredDate) {
           if (warning) {
             warning.style.display = 'block';
-            warning.innerHTML = '🚕 Ningún bus parece llegar a tiempo... ¡va a haber que coger un taxi!';
+            warning.innerHTML = lang === 'en' ? '🚕 No bus seems to arrive on time... you might need to take a taxi!' : '🚕 Ningún bus parece llegar a tiempo... ¡va a haber que coger un taxi!';
           }
         } else {
           if (warning) warning.style.display = 'none';
@@ -2203,7 +2212,7 @@ import Icon from './Icon.astro';
     }
 
     formatTime(date: Date) {
-      return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleTimeString(lang === 'en' ? 'en-US' : 'es-ES', { hour: '2-digit', minute: '2-digit' });
     }
   }
 

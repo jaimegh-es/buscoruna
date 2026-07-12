@@ -1,13 +1,17 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import Icon from '../components/Icon.astro';
+import { getTranslations } from '../utils/i18n';
+
+const lang = Astro.cookies.get('buscoruna_lang')?.value || 'es';
+const t = getTranslations(lang);
 ---
 
-<Layout title="Favoritos - Coruña Bus">
+<Layout title={`${t.favsTitle} - Coruña Bus`}>
 	<section class="favorites-page">
-    <h2>Mis Favoritos</h2>
+    <h2>{t.favsPageTitle}</h2>
     <div id="favorites-container">
-      <div class="loading">Cargando tus favoritos...</div>
+      <div class="loading">{t.favsLoadingFavs}</div>
     </div>
   </section>
 
@@ -16,6 +20,10 @@ import Icon from '../components/Icon.astro';
     import { API } from '../services/api';
     import { tracking } from '../utils/tracking';
     import { createIcons, Star, Heart, ChevronRight, Map } from 'lucide';
+    import { getTranslations } from '../utils/i18n';
+
+    const lang = document.documentElement.getAttribute('data-lang') || 'es';
+    const t = getTranslations(lang);
 
     // Load and render all favorites categories (stops, routes, planner trajectories)
     // Cargar y renderizar todas las categorías de favoritos (paradas, rutas, trayectos del planificador)
@@ -34,8 +42,8 @@ import Icon from '../components/Icon.astro';
         container.innerHTML = `
           <div class="empty-state">
             <span class="icon"><i data-lucide="star"></i></span>
-            <p>Aún no tienes favoritos.</p>
-            <p><small>Pulsa la estrella en una parada, el corazón en una ruta o guarda un trayecto en el planificador.</small></p>
+            <p>${t.favsNoFavsYet}</p>
+            <p><small>${t.favsHint}</small></p>
           </div>
         `;
         createIcons({ icons: { Star } });
@@ -43,7 +51,7 @@ import Icon from '../components/Icon.astro';
       }
 
       if (!catalog) {
-        container.innerHTML = '<p>Error: Datos del sistema no disponibles.</p>';
+        container.innerHTML = `<p>${t.favsDataError}</p>`;
         return;
       }
 
@@ -59,7 +67,7 @@ import Icon from '../components/Icon.astro';
       // Renderizar paradas favoritas
       if (favIds.length > 0) {
         html += `
-          <h3 class="section-title">Paradas favoritas</h3>
+          <h3 class="section-title">${t.favsStops}</h3>
           <div class="stops-list">
             ${favIds.map(id => {
               const s = catalog.paradas[id];
@@ -68,7 +76,7 @@ import Icon from '../components/Icon.astro';
                 <a href="/stop/${s.id}" class="card stop-card-link">
                   <div class="stop-info">
                     <strong>${s.nombre}</strong>
-                    <small>Parada ${s.id}</small>
+                    <small>${lang === 'en' ? 'Stop' : 'Parada'} ${s.id}</small>
                     <div class="stop-lines">
                       ${s.enlaces.map((lId: any) => {
                         const info = lineMap[lId];
@@ -89,7 +97,7 @@ import Icon from '../components/Icon.astro';
       // Renderizar rutas favoritas de líneas (línea específica que conecta origen y destino)
       if (favRoutes.length > 0) {
         html += `
-          <h3 class="section-title mt-2">Rutas de líneas favoritas</h3>
+          <h3 class="section-title mt-2">${t.favsRoutes}</h3>
           <div class="routes-list">
             ${favRoutes.map(r => {
               const origin = catalog.paradas[r.originId];
@@ -102,8 +110,8 @@ import Icon from '../components/Icon.astro';
                   <div class="route-fav-header">
                     <span class="line-badge-small" style="background-color: ${color}">${r.lineName}</span>
                     <div class="route-fav-text">
-                      <strong>${origin?.nombre || 'Origen'} &rarr; ${dest?.nombre || 'Destino'}</strong>
-                      <small>Desde parada ${r.originId}</small>
+                      <strong>${origin?.nombre || (lang === 'en' ? 'Origin' : 'Origen')} &rarr; ${dest?.nombre || (lang === 'en' ? 'Destination' : 'Destino')}</strong>
+                      <small>${lang === 'en' ? 'From stop' : 'Desde parada'} ${r.originId}</small>
                     </div>
                   </div>
                   <div class="stop-arrow"><i data-lucide="chevron-right"></i></div>
@@ -118,7 +126,7 @@ import Icon from '../components/Icon.astro';
       // Renderizar trayectos favoritos del planificador (consultas de búsqueda Origen -> Destino)
       if (favPlannerRoutes.length > 0) {
         html += `
-          <h3 class="section-title mt-2">Trayectos planificados favoritos</h3>
+          <h3 class="section-title mt-2">${t.favsPlanner}</h3>
           <div class="routes-list">
             ${favPlannerRoutes.map(r => {
               const originName = r.origin.nombre;
@@ -163,8 +171,8 @@ import Icon from '../components/Icon.astro';
                     <div class="route-fav-text">
                       <strong>${originName} &rarr; ${destName}</strong>
                       <small>
-                        ${r.origin.type === 'stop' ? 'Parada ' + r.origin.id : 'Mi ubicación'} &rarr; ${r.destination.type === 'stop' ? 'Parada ' + r.destination.id : 'Ubicación'}
-                        ${r.plannerMode === 'arrive' && r.targetTime ? ` • 🕒 Llegar a las ${r.targetTime}` : ''}
+                        ${r.origin.type === 'stop' ? (lang === 'en' ? 'Stop ' : 'Parada ') + r.origin.id : (lang === 'en' ? 'My location' : 'Mi ubicación')} &rarr; ${r.destination.type === 'stop' ? (lang === 'en' ? 'Stop ' : 'Parada ') + r.destination.id : (lang === 'en' ? 'Location' : 'Ubicación')}
+                        ${r.plannerMode === 'arrive' && r.targetTime ? ` • 🕒 ${lang === 'en' ? 'Arrive at' : 'Llegar a las'} ${r.targetTime}` : ''}
                       </small>
                     </div>
                   </div>

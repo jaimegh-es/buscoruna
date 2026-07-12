@@ -1,14 +1,18 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import Icon from '../../components/Icon.astro';
+import { getTranslations } from '../../utils/i18n';
+
+const lang = Astro.cookies.get('buscoruna_lang')?.value || 'es';
+const t = getTranslations(lang);
 ---
 
-<Layout title="Detalle de Parada - Coruña Bus">
+<Layout title={`${t.stopDetailTitle} - Coruña Bus`}>
   <section class="stop-detail-page">
     <div id="stop-header" class="card">
       <div class="header-main">
         <div class="stop-id-badge" id="display-stop-id">...</div>
-        <h2 id="display-stop-name">Cargando...</h2>
+        <h2 id="display-stop-name">{t.stopDetailLoading}</h2>
         <button id="favorite-btn" class="fav-btn">
           <div id="fav-icon-container">
             <Icon name="star-outline" />
@@ -21,34 +25,34 @@ import Icon from '../../components/Icon.astro';
     <div id="stop-map-container" class="map-container">
       <div id="stop-map" style="height: 250px; border-radius: 12px; z-index: 1;"></div>
       <div class="map-actions">
-        <button id="toggle-satellite" class="map-btn" title="Vista Satélite">
+        <button id="toggle-satellite" class="map-btn" title={t.stopDetailSatelliteView}>
           <Icon name="map" size={20} />
         </button>
-        <button id="locate-me" class="map-btn" title="Mi ubicación">
+        <button id="locate-me" class="map-btn" title={t.stopDetailMyLocation}>
           <Icon name="location" size={20} />
         </button>
       </div>
     </div>
 
     <div id="eta-container">
-      <h3>Próximos buses</h3>
+      <h3>{t.stopDetailNextBuses}</h3>
       <div id="eta-list" class="grid-list">
-        <div class="loading">Consultando tiempos...</div>
+        <div class="loading">{t.stopDetailCheckingTimes}</div>
       </div>
     </div>
 
     <!-- Destination Selector Modal -->
     <div id="destination-modal" class="modal-overlay" style="display: none;">
       <div class="modal-content card">
-        <h3>¿A qué parada vas?</h3>
-        <p class="text-muted small">Selecciona tu destino para calcular la llegada.</p>
+        <h3>{t.stopDetailWhereTo}</h3>
+        <p class="text-muted small">{t.stopDetailSelectDest}</p>
         <div id="stops-list-modal" class="modal-list"></div>
-        <button id="close-modal" class="btn-secondary mt-1">Cancelar</button>
+        <button id="close-modal" class="btn-secondary mt-1">{t.stopDetailCancel}</button>
       </div>
     </div>
 
     <div id="stop-lines" class="mt-2">
-      <h3>Líneas en esta parada</h3>
+      <h3>{t.stopDetailPassingLines}</h3>
       <div id="lines-passing" class="flex-wrap gap-1"></div>
     </div>
   </section>
@@ -57,9 +61,11 @@ import Icon from '../../components/Icon.astro';
     import { storage } from '../../utils/storage';
     import { API } from '../../services/api';
     import { tracking } from '../../utils/tracking';
-    // Import Bell icon for the ETA alerts feature
-    // Importar el icono Bell (Campana) para la funcionalidad de alertas de llegada (ETA)
     import { createIcons, Star, Navigation, Map, LocateFixed, Bell } from 'lucide';
+    import { getTranslations } from '../../utils/i18n';
+
+    const lang = document.documentElement.getAttribute('data-lang') || 'es';
+    const t = getTranslations(lang);
 
     // Get ID from URL
     const pathParts = window.location.pathname.split('/');
@@ -103,7 +109,7 @@ import Icon from '../../components/Icon.astro';
 
       stopData = catalog.paradas[stopId];
       if (!stopData) {
-        document.getElementById('display-stop-name')!.textContent = 'Parada no encontrada';
+        document.getElementById('display-stop-name')!.textContent = lang === 'en' ? 'Stop not found' : 'Parada no encontrada';
         return;
       }
 
@@ -253,7 +259,7 @@ import Icon from '../../components/Icon.astro';
                       <strong>${l.buses[0]?.destino || ''}</strong>
                       <div class="eta-bus-info">
                         ${l.buses[0]?.bus ? `<span class="bus-id">Bus: ${l.buses[0].bus}</span>` : ''}
-                        ${l.buses.length > 1 ? `<span class="next-label">Ver +${l.buses.length - 1} buses</span>` : ''}
+                        ${l.buses.length > 1 ? `<span class="next-label">${lang === 'en' ? `See +${l.buses.length - 1} buses` : `Ver +${l.buses.length - 1} buses`}</span>` : ''}
                       </div>
                     </div>
                   </div>
@@ -263,10 +269,10 @@ import Icon from '../../components/Icon.astro';
                       <span class="time-unit">min</span>
                     </div>
                     ${l.buses[0]?.bus ? `
-                      <button class="btn-track-subtle" data-bus="${l.buses[0].bus}" data-line="${l.linea}" title="Subir a este bus (GPS)">
+                      <button class="btn-track-subtle" data-bus="${l.buses[0].bus}" data-line="${l.linea}" title="${lang === 'en' ? 'Board this bus (GPS)' : 'Subir a este bus (GPS)'}">
                         <i data-lucide="navigation" style="width: 18px; height: 18px;"></i>
                       </button>
-                      <button class="btn-bell-subtle" data-bus="${l.buses[0].bus}" data-line="${l.linea}" title="Aviso de llegada (Campana)">
+                      <button class="btn-bell-subtle" data-bus="${l.buses[0].bus}" data-line="${l.linea}" title="${lang === 'en' ? 'Arrival Alert (Bell)' : 'Aviso de llegada (Campana)'}">
                         <i data-lucide="bell" style="width: 18px; height: 18px;"></i>
                       </button>
                     ` : ''}
@@ -278,16 +284,16 @@ import Icon from '../../components/Icon.astro';
                     ${l.buses.slice(1).map((b: any, bIdx: number) => `
                       <div class="extra-bus-row">
                         <div class="extra-bus-main">
-                          <span>Próximo bus: <strong>${b.destino || ''}</strong></span>
+                          <span>${lang === 'en' ? 'Next bus' : 'Próximo bus'}: <strong>${b.destino || ''}</strong></span>
                           ${b.bus ? `<small class="extra-bus-id">Bus: ${b.bus}</small>` : ''}
                         </div>
                         <div class="extra-bus-right">
                           <span class="extra-time"><strong>${b.tiempo}</strong> min</span>
                           ${b.bus ? `
-                            <button class="btn-track-subtle-small" data-bus="${b.bus}" data-line="${l.linea}" title="Seguimiento GPS">
+                            <button class="btn-track-subtle-small" data-bus="${b.bus}" data-line="${l.linea}" title="${lang === 'en' ? 'GPS Tracking' : 'Seguimiento GPS'}">
                               <i data-lucide="navigation" style="width: 14px; height: 14px;"></i>
                             </button>
-                            <button class="btn-bell-subtle-small" data-bus="${b.bus}" data-line="${l.linea}" title="Aviso de llegada">
+                            <button class="btn-bell-subtle-small" data-bus="${b.bus}" data-line="${l.linea}" title="${lang === 'en' ? 'Arrival Alert' : 'Aviso de llegada'}">
                               <i data-lucide="bell" style="width: 14px; height: 14px;"></i>
                             </button>
                           ` : ''}
@@ -375,7 +381,9 @@ import Icon from '../../components/Icon.astro';
               });
               
               const threshold = parseInt(localStorage.getItem('buscoruna_eta_alert_threshold') || '0');
-              const thresholdText = threshold === 0 ? 'está llegando' : `queden ${threshold} min o menos`;
+              const thresholdText = threshold === 0 
+                ? (lang === 'en' ? 'is arriving' : 'está llegando') 
+                : (lang === 'en' ? `${threshold} min or less remain` : `queden ${threshold} min o menos`);
               
               // Ask for browser notification permissions if not set
               // Solicitar permisos de notificación si no están concedidos
@@ -383,15 +391,17 @@ import Icon from '../../components/Icon.astro';
                 Notification.requestPermission();
               }
               
-              alert(`🔔 ¡Aviso de llegada activado! Te avisaremos cuando el autobús ${busId} esté a ${thresholdText} de esta parada.`);
+              alert(lang === 'en' 
+                ? `🔔 Arrival alert activated! We will notify you when bus ${busId} is at ${thresholdText} from this stop.` 
+                : `🔔 ¡Aviso de llegada activado! Te avisaremos cuando el autobús ${busId} esté a ${thresholdText} de esta parada.`);
             });
           });
 
         } else {
-          container.innerHTML = '<div class="empty-state-small">No hay buses próximos en este momento.</div>';
+          container.innerHTML = `<div class="empty-state-small">${lang === 'en' ? 'No upcoming buses at this moment.' : 'No hay buses próximos en este momento.'}</div>`;
         }
       } catch (err) {
-        container.innerHTML = '<div class="error">Error al conectar con el servidor.</div>';
+        container.innerHTML = `<div class="error">${lang === 'en' ? 'Error connecting to the server.' : 'Error al conectar con el servidor.'}</div>`;
       }
     }
 
@@ -413,14 +423,14 @@ import Icon from '../../components/Icon.astro';
 
       const modalList = document.getElementById('stops-list-modal')!;
       if (upcomingStopIds.length === 0) {
-        modalList.innerHTML = '<p class="text-muted">No hay paradas posteriores en esta ruta.</p>';
+        modalList.innerHTML = `<p class="text-muted">${lang === 'en' ? 'No subsequent stops on this route.' : 'No hay paradas posteriores en esta ruta.'}</p>`;
       } else {
         modalList.innerHTML = upcomingStopIds.map(sId => {
           const s = catalog.paradas[sId];
           return `
             <div class="modal-list-item" data-stop="${sId}">
               <strong>${s?.nombre || sId}</strong>
-              <small>Parada ${sId}</small>
+              <small>${lang === 'en' ? 'Stop' : 'Parada'} ${sId}</small>
             </div>
           `;
         }).join('');
@@ -449,7 +459,7 @@ import Icon from '../../components/Icon.astro';
       });
 
       document.getElementById('destination-modal')!.style.display = 'none';
-      alert(`¡Seguimiento iniciado! Te avisaremos cuando llegues a tu destino.`);
+      alert(lang === 'en' ? 'Tracking started! We will notify you when you arrive at your destination.' : '¡Seguimiento iniciado! Te avisaremos cuando llegues a tu destino.');
     }
 
     function updateFavoriteUI() {

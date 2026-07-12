@@ -1,5 +1,9 @@
 ---
 import Icon from './Icon.astro';
+import { getTranslations } from '../utils/i18n';
+
+const lang = Astro.cookies.get('buscoruna_lang')?.value || 'es';
+const t = getTranslations(lang);
 ---
 
 <div id="landing-page" class="landing-overlay" style="display: none;">
@@ -8,9 +12,9 @@ import Icon from './Icon.astro';
     <div class="landing-hero-section">
       <img src="/logo.png" alt="Coruña Bus" class="landing-logo" />
       <h1>Coruña<span>Bus</span></h1>
-      <p class="hero-tagline">Tu tiempo es oro. Muévete por Coruña con inteligencia.</p>
+      <p class="hero-tagline">{t.landingTagline}</p>
       <button id="open-app-btn" class="btn-primary start-btn">
-        Entrar a la App
+        {t.landingEnterBtn}
       </button>
     </div>
 
@@ -21,12 +25,12 @@ import Icon from './Icon.astro';
           <div class="feature-icon-box">
             <Icon name="search" size={24} />
           </div>
-          <h2>Planificador de Rutas</h2>
-          <p>Dinos a dónde quieres ir y a qué hora necesitas llegar. Nosotros calculamos la mejor combinación y te decimos exactamente cuánto te queda para coger el bus.</p>
+          <h2>{t.landingFeature1Title}</h2>
+          <p>{t.landingFeature1Desc}</p>
           <ul class="feature-list">
-            <li>Busca paradas cercanas automáticamente.</li>
-            <li>Acceso directo a detalles de ruta y paradas.</li>
-            <li>Horarios optimizados en tiempo real.</li>
+            <li>{t.landingFeature1Bullet1}</li>
+            <li>{t.landingFeature1Bullet2}</li>
+            <li>{t.landingFeature1Bullet3}</li>
           </ul>
         </div>
         <div class="feature-video-container">
@@ -42,8 +46,8 @@ import Icon from './Icon.astro';
           <div class="feature-icon-box">
             <Icon name="refresh" size={24} />
           </div>
-          <h2>Calculadora de Tiempo</h2>
-          <p>Visualiza en segundos a qué hora llegará tu bus. ¿Vas con retraso? ¿Llegas justo? Compruébalo al instante y avisa a quien te espera.</p>
+          <h2>{t.landingFeature2Title}</h2>
+          <p>{t.landingFeature2Desc}</p>
         </div>
         <div class="feature-video-container">
           <video autoplay loop muted playsinline class="demo-video">
@@ -58,8 +62,8 @@ import Icon from './Icon.astro';
           <div class="feature-icon-box">
             <Icon name="stop" size={24} />
           </div>
-          <h2>Buscador de Paradas</h2>
-          <p>Encuentra todas las paradas de la ciudad. Filtra por número, nombre o simplemente usa tu ubicación para ver qué tienes más cerca.</p>
+          <h2>{t.landingFeature3Title}</h2>
+          <p>{t.landingFeature3Desc}</p>
         </div>
         <div class="feature-video-container">
           <video autoplay loop muted playsinline class="demo-video">
@@ -74,12 +78,12 @@ import Icon from './Icon.astro';
           <div class="feature-icon-box">
             <Icon name="shield" size={24} />
           </div>
-          <h2>Privacidad y Sin Instalación</h2>
-          <p>Accede directamente desde tu navegador sin descargar nada de la App Store. Respetamos tu privacidad: la app no accede a tus archivos, contactos ni datos personales.</p>
+          <h2>{t.landingFeature4Title}</h2>
+          <p>{t.landingFeature4Desc}</p>
           <ul class="feature-list">
-            <li>Sin acceso al sistema ni archivos.</li>
-            <li>No requiere cuenta ni registro.</li>
-            <li>Instalación opcional como Web App.</li>
+            <li>{t.landingFeature4Bullet1}</li>
+            <li>{t.landingFeature4Bullet2}</li>
+            <li>{t.landingFeature4Bullet3}</li>
           </ul>
         </div>
       </section>
@@ -90,8 +94,8 @@ import Icon from './Icon.astro';
           <div class="feature-icon-box">
             <Icon name="ban" size={24} />
           </div>
-          <h2>100% Libre de Anuncios</h2>
-          <p>Disfruta de una experiencia limpia y enfocada en lo que importa: llegar a tiempo. Sin banners molestos, sin rastreadores y sin interrupciones publicitarias.</p>
+          <h2>{t.landingFeature5Title}</h2>
+          <p>{t.landingFeature5Desc}</p>
         </div>
       </section>
 
@@ -99,7 +103,7 @@ import Icon from './Icon.astro';
         <img src="/logo.png" alt="Coruña Bus" class="footer-logo" />
         <p>Coruña Bus - 2026</p>
         <button id="open-app-footer-btn" class="btn-secondary">
-          Abrir App Web
+          {t.landingOpenAppFooter}
         </button>
       </footer>
     </div>

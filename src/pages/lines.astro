@@ -1,18 +1,22 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import Icon from '../components/Icon.astro';
+import { getTranslations } from '../utils/i18n';
+
+const lang = Astro.cookies.get('buscoruna_lang')?.value || 'es';
+const t = getTranslations(lang);
 ---
 
-<Layout title="Líneas - Coruña Bus">
+<Layout title={`${t.linesTitle} - Coruña Bus`}>
 	<section class="lines-page">
     <div id="lines-view">
-      <h2>Líneas de bus</h2>
-      <div id="lines-list" class="grid-list">Cargando líneas...</div>
+      <h2>{t.linesTitle}</h2>
+      <div id="lines-list" class="grid-list">{t.linesLoadingLines}</div>
     </div>
 
     <div id="line-detail-view" style="display: none;">
       <button id="back-to-lines" class="btn-back">
-        <Icon name="chevron-left" size={20} class="icon-back" /> Volver
+        <Icon name="chevron-left" size={20} class="icon-back" /> {t.linesBackBtn}
       </button>
       <div id="line-info-header"></div>
       <div id="line-map" style="height: 300px; margin: 1rem 0; border-radius: 12px;"></div>
@@ -24,6 +28,10 @@ import Icon from '../components/Icon.astro';
     import { API } from '../services/api';
     import { storage } from '../utils/storage';
     import { createIcons, Bus, MapPin, ChevronLeft } from 'lucide';
+    import { getTranslations } from '../utils/i18n';
+
+    const lang = document.documentElement.getAttribute('data-lang') || 'es';
+    const t = getTranslations(lang);
     
     let map: any = null;
     let busMarkers: any[] = [];
@@ -83,7 +91,7 @@ import Icon from '../components/Icon.astro';
       detailView.style.display = 'block';
       
       const header = document.getElementById('line-info-header')!;
-      header.innerHTML = '<p>Cargando detalles de la línea...</p>';
+      header.innerHTML = `<p>${t.linesLoadingDetail}</p>`;
 
       const catalog = storage.getCatalog();
       const lineData = catalog?.actualizacion.lineas.find((l: any) => l.id === lineId);
@@ -98,8 +106,8 @@ import Icon from '../components/Icon.astro';
           </div>
         </div>
         <div class="direction-toggle">
-          <button class="dir-btn active" data-dir="0">Ida: ${lineData.nombre_dest}</button>
-          ${lineData.rutas[1] ? `<button class="dir-btn" data-dir="1">Vuelta: ${lineData.nombre_orig}</button>` : ''}
+          <button class="dir-btn active" data-dir="0">${t.linesIda} ${lineData.nombre_dest}</button>
+          ${lineData.rutas[1] ? `<button class="dir-btn" data-dir="1">${t.linesVuelta} ${lineData.nombre_orig}</button>` : ''}
         </div>
       `;
 
@@ -132,7 +140,7 @@ import Icon from '../components/Icon.astro';
               <div class="stop-item" data-id="${pId}">
                 <div class="stop-dot" style="background-color: #${lineData.color}"></div>
                 <div class="stop-content-nav">
-                  <a href="/stop/${pId}" class="stop-name-link">${s?.nombre || `Parada ${pId}`}</a>
+                  <a href="/stop/${pId}" class="stop-name-link">${s?.nombre || `${t.linesStopLabel} ${pId}`}</a>
                   <button class="center-stop-btn" data-lat="${s?.posy}" data-lon="${s?.posx}">
                     <i data-lucide="map-pin" style="width: 14px; height: 14px;"></i>
                   </button>
@@ -245,7 +253,7 @@ import Icon from '../components/Icon.astro';
                   iconSize: [30, 30]
                 })
               }).addTo(map);
-              marker.bindPopup(`Bus: ${b.bus}<br>Hacia: ${b.destino || 'desconocido'}`);
+              marker.bindPopup(`Bus: ${b.bus}<br>${lang === 'en' ? 'Towards' : 'Hacia'}: ${b.destino || (lang === 'en' ? 'unknown' : 'desconocido')}`);
               busMarkers.push(marker);
             });
 

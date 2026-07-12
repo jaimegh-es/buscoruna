@@ -1,5 +1,9 @@
 ---
 import Icon from './Icon.astro';
+import { getTranslations } from '../utils/i18n';
+
+const lang = Astro.cookies.get('buscoruna_lang')?.value || 'es';
+const t = getTranslations(lang);
 ---
 
 <div id="install-popup" class="install-popup" style="display: none;">
@@ -7,8 +11,8 @@ import Icon from './Icon.astro';
     <div class="install-header">
       <img src="/logo.png" alt="Coruña Bus" class="install-logo" />
       <div class="install-text">
-        <strong>Instalar Coruña Bus</strong>
-        <p id="install-msg">Añade la app a tu pantalla de inicio para un acceso rápido y offline.</p>
+        <strong>{t.installTitle}</strong>
+        <p id="install-msg">{t.installDesc}</p>
       </div>
       <button id="close-install" class="close-install-btn" aria-label="Cerrar">
         <Icon name="x" size={20} />
@@ -16,11 +20,11 @@ import Icon from './Icon.astro';
     </div>
     
     <div id="ios-instructions" style="display: none;" class="ios-guide">
-      <p>Pulsa el botón de <strong>compartir</strong> <Icon name="share" size={16} /> y luego en <strong>"Añadir a pantalla de inicio"</strong> <Icon name="plus" size={16} />.</p>
+      <p>{t.installIosGuide}</p>
     </div>
 
     <button id="do-install" class="btn-primary install-action-btn">
-      Instalar ahora
+      {t.installBtn}
     </button>
   </div>
 </div>
@@ -131,6 +135,10 @@ import Icon from './Icon.astro';
 </style>
 
 <script>
+  import { getTranslations } from '../utils/i18n';
+  const lang = document.documentElement.getAttribute('data-lang') || 'es';
+  const t = getTranslations(lang);
+
   let deferredPrompt: any;
   const popup = document.getElementById('install-popup');
   const installBtn = document.getElementById('do-install');
@@ -159,9 +167,9 @@ import Icon from './Icon.astro';
         if (isIos) {
           if (installBtn) installBtn.style.display = 'none';
           if (iosInstructions) iosInstructions.style.display = 'block';
-          if (installMsg) installMsg.textContent = 'Añade Coruña Bus a tu pantalla de inicio.';
+          if (installMsg) installMsg.textContent = lang === 'en' ? 'Add Coruña Bus to your home screen.' : 'Añade Coruña Bus a tu pantalla de inicio.';
         } else if (isDebug && !deferredPrompt) {
-          if (installBtn) installBtn.textContent = 'Instalar (Demo)';
+          if (installBtn) installBtn.textContent = lang === 'en' ? 'Install (Demo)' : 'Instalar (Demo)';
         }
         popup.style.display = 'block';
         console.log('[PWA] Popup visible');
@@ -197,7 +205,7 @@ import Icon from './Icon.astro';
   installBtn?.addEventListener('click', async () => {
     if (!deferredPrompt) {
        if (window.location.search.includes('debug_pwa')) {
-         alert('Esto abriría el diálogo nativo de instalación en HTTPS.');
+         alert(lang === 'en' ? 'This would open the native installation dialog on HTTPS.' : 'Esto abriría el diálogo nativo de instalación en HTTPS.');
          if (popup) popup.style.display = 'none';
        }
        return;

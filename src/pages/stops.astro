@@ -1,26 +1,30 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import Icon from '../components/Icon.astro';
+import { getTranslations } from '../utils/i18n';
+
+const lang = Astro.cookies.get('buscoruna_lang')?.value || 'es';
+const t = getTranslations(lang);
 ---
 
-<Layout title="Paradas - Coruña Bus">
+<Layout title={`${t.stopsTitle} - Coruña Bus`}>
 	<section class="stops-page">
 	  <div class="header-section">
-	    <h2>Paradas</h2>
-	    <button id="refresh-gps" class="btn-icon" title="Localizar por GPS">
+	    <h2>{t.stopsTitle}</h2>
+	    <button id="refresh-gps" class="btn-icon" title={t.stopsGpsTitle}>
 				<Icon name="location" size={24} />
 			</button>
 	  </div>
 
     <div class="search-container card">
-      <input type="text" id="stop-search-input" placeholder="Buscar por nombre o número de parada..." autocomplete="off" />
+      <input type="text" id="stop-search-input" placeholder={t.stopsSearchPlaceholder} autocomplete="off" />
       <div id="search-results-count" class="search-hint"></div>
     </div>
 
 	  <div id="nearby-map" style="height: 250px; margin-bottom: 1.5rem; border-radius: 12px; z-index: 1;"></div>
 
 	  <div id="stops-container">
-	    <div class="loading">Iniciando...</div>
+	    <div class="loading">{t.stopsLoadingText}</div>
 	  </div>
 	</section>
 
@@ -28,6 +32,10 @@ import Icon from '../components/Icon.astro';
 	  import { storage } from '../utils/storage';
 	  import { API } from '../services/api';
 		import { createIcons, MapPin, ChevronRight, LocateFixed } from 'lucide';
+		import { getTranslations } from '../utils/i18n';
+
+		const lang = document.documentElement.getAttribute('data-lang') || 'es';
+		const t = getTranslations(lang);
 
 	  let map: any = null;
 	  let markers: any[] = [];
@@ -39,10 +47,10 @@ import Icon from '../components/Icon.astro';
 	    const container = document.getElementById('stops-container');
 	    if (!container) return;
 
-	    container.innerHTML = '<div class="loading">Buscando ubicación...</div>';
+	    container.innerHTML = `<div class="loading">${t.stopsSearchingLoc}</div>`;
 
 	    if (!navigator.geolocation) {
-	      container.innerHTML = '<p class="error">Tu navegador no soporta geolocalización.</p>';
+	      container.innerHTML = `<p class="error">${t.stopsNoGeolocation}</p>`;
         showStopsList(currentLat, currentLon); // Fallback to center
 	      return;
 	    }
@@ -81,7 +89,7 @@ import Icon from '../components/Icon.astro';
 	      weight: 2,
 	      opacity: 1,
 	      fillOpacity: 0.8
-	    }).addTo(map).bindPopup("Tú estás aquí");
+	    }).addTo(map).bindPopup(t.stopsUserLocPopup);
 	  }
 
 	  function showStopsList(lat: number, lon: number, filterQuery: string = '') {
@@ -90,7 +98,7 @@ import Icon from '../components/Icon.astro';
       const hint = document.getElementById('search-results-count')!;
 
 	    if (!catalog || !catalog.paradas) {
-	      container.innerHTML = '<p class="loading-small">Cargando catálogo de paradas...</p>';
+	      container.innerHTML = `<p class="loading-small">${t.stopsCatalogLoading}</p>`;
 	      return;
 	    }
 
@@ -104,13 +112,13 @@ import Icon from '../components/Icon.astro';
           s.nombre.toLowerCase().includes(filterQuery.toLowerCase()) || 
           s.id.toString().includes(filterQuery)
         );
-        hint.textContent = `Encontradas ${stops.length} paradas`;
+        hint.textContent = t.stopsFoundStops.replace('{n}', stops.length.toString());
       } else {
         hint.textContent = '';
       }
 
 	    if (stops.length === 0) {
-	      container.innerHTML = '<p class="empty-state-small">No se encontraron paradas.</p>';
+	      container.innerHTML = `<p class="empty-state-small">${t.stopsNoStops}</p>`;
 	      return;
 	    }
 
@@ -139,9 +147,9 @@ import Icon from '../components/Icon.astro';
 	            <div class="stop-info">
 	              <div class="stop-name-row">
                   <strong>${s.nombre}</strong>
-                  <span class="stop-distance">${Math.round(s.dist)}m</span>
+                  <span class="stop-distance">${Math.round(s.dist)}${t.stopsDistanceSuffix}</span>
                 </div>
-	              <small>Parada ${s.id}</small>
+	              <small>${t.stopsIdLabel} ${s.id}</small>
 	              <div class="stop-lines">
 	                ${s.enlaces.map((lId: any) => {
                     const lineInfo = lineMap[lId];

@@ -1,21 +1,25 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import TripCalculator from "../components/TripCalculator.astro";
+import { getTranslations } from "../utils/i18n";
+
+const lang = Astro.cookies.get('buscoruna_lang')?.value || 'es';
+const t = getTranslations(lang);
 ---
 
-<Layout title="Planear Ruta - Coruña Bus">
+<Layout title={`${t.plannerWhereTo} - Coruña Bus`}>
     <section class="welcome">
-        <h2>¿A dónde quieres ir?</h2>
-        <p>Calcula la mejor combinación de buses en tiempo real.</p>
+        <h2>{t.plannerWhereTo}</h2>
+        <p>{t.plannerSubText}</p>
     </section>
 
     <TripCalculator />
 
     <section class="quick-links">
         <div class="card">
-            <h3>Paradas cercanas</h3>
-            <p>Encuentra las paradas a tu alrededor.</p>
-            <a href="/stops" class="btn-secondary">Ver paradas</a>
+            <h3>{t.plannerStopsNearCardTitle}</h3>
+            <p>{t.plannerStopsNearCardDesc}</p>
+            <a href="/stops" class="btn-secondary">{t.plannerStopsNearCardBtn}</a>
         </div>
     </section>
 </Layout>

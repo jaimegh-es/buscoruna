@@ -9,21 +9,29 @@ import InstallPopup from "../components/InstallPopup.astro";
 import Landing from "../components/Landing.astro";
 import ProjectMenu from "../components/ProjectMenu.astro";
 import ProjectDrawer from "../components/ProjectDrawer.astro";
+import { getTranslations } from "../utils/i18n";
+
+const acceptLanguage = Astro.request.headers.get('accept-language') || '';
+const defaultLang = acceptLanguage.toLowerCase().includes('en') ? 'en' : 'es';
+const cookieLang = Astro.cookies.get('buscoruna_lang')?.value;
+const lang = cookieLang || defaultLang;
+const t = getTranslations(lang);
+const showLangSelector = !cookieLang;
 
 const { title } = Astro.props;
 ---
 
 <!doctype html>
-<html lang="es">
+<html lang={lang} data-lang={lang}>
     <head>
         <meta charset="UTF-8" />
         <meta
             name="description"
-            content="Coruña Bus - El mejor planificador de rutas y tiempos en tiempo real para los buses de A Coruña. Consulta paradas, líneas y horarios actualizados."
+            content={t.metaDescription || "Coruña Bus - El mejor planificador de rutas y tiempos en tiempo real para los buses de A Coruña. Consulta paradas, líneas y horarios actualizados."}
         />
         <meta
             name="keywords"
-            content="bus coruña, tranvias coruña, tiempos bus coruña, paradas bus coruña, transporte publico a coruña"
+            content={t.metaKeywords || "bus coruña, tranvias coruña, tiempos bus coruña, paradas bus coruña, transporte publico a coruña"}
         />
         <meta
             name="viewport"
@@ -53,11 +61,11 @@ const { title } = Astro.props;
         <!-- SEO & Social Media -->
         <meta
             property="og:title"
-            content={title || "Coruña Bus - Tiempos en tiempo real"}
+            content={title || "Coruña Bus"}
         />
         <meta
             property="og:description"
-            content="Planifica tu ruta y consulta tiempos de llegada de los buses de A Coruña en tiempo real."
+            content={t.ogDescription || "Planifica tu ruta y consulta tiempos de llegada de los buses de A Coruña en tiempo real."}
         />
         <meta property="og:image" content="/logo.png" />
         <meta property="og:type" content="website" />
@@ -65,7 +73,7 @@ const { title } = Astro.props;
         <meta name="twitter:title" content="Coruña Bus" />
         <meta
             name="twitter:description"
-            content="Tiempos y rutas de bus en A Coruña al instante."
+            content={t.twitterDescription || "Tiempos y rutas de bus en A Coruña al instante."}
         />
         <meta name="twitter:image" content="/logo.png" />
 
@@ -91,10 +99,10 @@ const { title } = Astro.props;
             <div class="loader-content">
                 <img
                     src="/logo.png"
-                    alt="Cargando..."
+                    alt={t.loading}
                     class="loader-logo-pulsing"
                 />
-                <span class="loader-text">Cargando datos</span>
+                <span class="loader-text">{t.loadingData}</span>
             </div>
         </div>
 
@@ -118,14 +126,14 @@ const { title } = Astro.props;
                     <button
                         id="global-refresh-btn"
                         class="refresh-btn"
-                        title="Actualizar datos"
+                        title={t.updateData}
                     >
                         <Icon name="refresh" size={18} />
                     </button>
                     <button
                         id="open-settings-btn"
                         class="refresh-btn"
-                        title="Ajustes de alertas"
+                        title={t.alertSettings}
                     >
                         <Icon name="settings" size={18} />
                     </button>
@@ -139,21 +147,21 @@ const { title } = Astro.props;
             <footer class="global-recommendation">
                 <div class="card recommendation-card">
                     <Icon name="heart" size={20} class="text-primary" />
-                    <p>¿Te gusta Coruña Bus? ¡Recomiéndalo a tus amigos!</p>
+                    <p>{t.recomendarApp}</p>
                     <div class="recommendation-actions">
                         <button id="share-app-btn" class="btn-share-subtle"
-                            >Compartir App</button
+                            >{t.compartirApp}</button
                         >
                         <a
                             href="https://github.com/jaimegh-es/buscoruna"
                             target="_blank"
                             class="btn-github-subtle"
                         >
-                            Sugerencias (GitHub)
+                            {t.sugerencias}
                         </a>
                     </div>
                     <p class="contact-info">
-                        ¿Tienes dudas? Escríbenos a <a
+                        {t.contacto} <a
                             href="mailto:contacto@inled.es"
                             >contacto@inled.es</a>
                     </p>
@@ -161,12 +169,7 @@ const { title } = Astro.props;
 
                 <div class="legal-disclaimer">
                     <p>
-                        <strong>Aviso Legal:</strong> Coruña Bus es una aplicación
-                        independiente de carácter informativo. No tiene relación oficial
-                        con la Compañía de Tranvías de La Coruña ni con el Ayuntamiento
-                        de A Coruña. Los datos se obtienen de fuentes abiertas. No
-                        nos hacemos responsables de errores de predicción ni de retrasos
-                        de los buses.
+                        <strong>{t.disclaimerTitle}</strong> {t.disclaimerContent}
                     </p>
                 </div>
             </footer>
@@ -178,19 +181,19 @@ const { title } = Astro.props;
                 <div class="tracking-main">
                     <span class="tracking-bus-badge" id="track-bus-id">...</span>
                     <div class="tracking-text">
-                        <strong>Hacia <span id="track-dest-name">...</span></strong>
-                        <small id="track-status">Calculando llegada...</small>
+                        <strong>{t.trackingBarDest} <span id="track-dest-name">...</span></strong>
+                        <small id="track-status">{t.trackingBarCalc}</small>
                     </div>
                     <button
                         id="edit-tracking-dest"
                         class="edit-track-btn"
-                        title="Cambiar destino"
+                        title={t.trackingBarEdit}
                     >
                         <Icon name="edit" size={14} />
                     </button>
                 </div>
                 <div class="tracking-eta" id="track-eta-val">--</div>
-                <button id="stop-tracking" class="stop-track-btn">
+                <button id="stop-tracking" class="stop-track-btn" title={t.trackingBarStop}>
                     <Icon name="x" size={20} />
                 </button>
             </div>
@@ -202,13 +205,13 @@ const { title } = Astro.props;
             <div class="gps-alert-card">
                 <div class="gps-alert-header">
                     <Icon name="bus" size={24} />
-                    <h3>¡Próxima Parada!</h3>
+                    <h3>{t.gpsAlertTitle}</h3>
                 </div>
                 <div class="gps-alert-body">
-                    <p>Estás llegando a tu parada final: <strong id="gps-alert-dest-name">...</strong></p>
-                    <p class="gps-alert-cta">🔔 ¡Pulsa el botón de solicitar parada en el autobús!</p>
+                    <p>{t.gpsAlertArriving} <strong id="gps-alert-dest-name">...</strong></p>
+                    <p class="gps-alert-cta">{t.gpsAlertCta}</p>
                 </div>
-                <button type="button" id="btn-close-gps-alert" class="btn-primary">Entendido</button>
+                <button type="button" id="btn-close-gps-alert" class="btn-primary">{t.gpsAlertUnderstand}</button>
             </div>
         </div>
 
@@ -216,7 +219,7 @@ const { title } = Astro.props;
         <div id="settings-modal" class="modal-overlay" style="display: none;">
             <div class="modal-content settings-modal-content">
                 <div class="modal-header">
-                    <h3>Ajustes de Alertas</h3>
+                    <h3>{t.settingsTitle}</h3>
                     <button type="button" id="close-settings" class="close-btn">
                         <Icon name="x" size={24} />
                     </button>
@@ -226,11 +229,11 @@ const { title } = Astro.props;
                     <div class="setting-item">
                         <div class="setting-info">
                             <label class="setting-title" for="settings-enable-gps-alert">
-                                <span>Aviso de bajada por GPS</span>
+                                <span>{t.settingsGpsTitle}</span>
                                 <input type="checkbox" id="settings-enable-gps-alert" />
                             </label>
-                            <p class="setting-desc">Te avisa al llegar o pasar por la parada anterior a tu destino para que pulses el botón de solicitud del autobús.</p>
-                            <p class="setting-warn">⚠️ La app debe estar en primer plano con la pantalla encendida. Requiere GPS continuo. Puede fallar o gastar más batería.</p>
+                            <p class="setting-desc">{t.settingsGpsDesc}</p>
+                            <p class="setting-warn">{t.settingsGpsWarn}</p>
                         </div>
                     </div>
 
@@ -238,20 +241,20 @@ const { title } = Astro.props;
                     <div class="setting-item">
                         <div class="setting-info">
                             <label class="setting-title" for="settings-enable-eta-alert">
-                                <span>Aviso de llegada del bus</span>
+                                <span>{t.settingsEtaTitle}</span>
                                 <input type="checkbox" id="settings-enable-eta-alert" />
                             </label>
-                            <p class="setting-desc">Te avisa cuando el autobús que estás esperando se aproxime a tu parada de origen.</p>
-                            <p class="setting-warn">⚠️ La app debe estar en primer plano con la pantalla encendida para recibir el aviso. Si minimizas o bloqueas el móvil, no llegará.</p>
+                            <p class="setting-desc">{t.settingsEtaDesc}</p>
+                            <p class="setting-warn">{t.settingsEtaWarn}</p>
                             
                             <div class="setting-sub-option" id="eta-alert-threshold-group">
-                                <label for="settings-eta-threshold">Avisar cuando queden:</label>
+                                <label for="settings-eta-threshold">{t.settingsEtaMinutes}</label>
                                 <select id="settings-eta-threshold">
-                                    <option value="0">0 minutos (Llegando)</option>
-                                    <option value="1">1 minuto</option>
-                                    <option value="2">2 minutos</option>
-                                    <option value="3">3 minutos</option>
-                                    <option value="5">5 minutos</option>
+                                    <option value="0">{t.settingsEtaMinutes0}</option>
+                                    <option value="1">{t.settingsEtaMinutes1}</option>
+                                    <option value="2">{t.settingsEtaMinutes2}</option>
+                                    <option value="3">{t.settingsEtaMinutes3}</option>
+                                    <option value="5">{t.settingsEtaMinutes5}</option>
                                 </select>
                             </div>
                         </div>
@@ -261,16 +264,29 @@ const { title } = Astro.props;
                     <div class="setting-item">
                         <div class="setting-info">
                             <label class="setting-title" for="settings-enable-bg-keep-awake">
-                                <span>Mantener activo en segundo plano</span>
+                                <span>{t.settingsBgTitle}</span>
                                 <input type="checkbox" id="settings-enable-bg-keep-awake" />
                             </label>
-                            <p class="setting-desc">Mantiene la pantalla encendida (Wake Lock) y reproduce audio silencioso, como hace YouTube. Ayuda a que la app no se suspenda, pero en Android el sistema puede matarla si lleva mucho tiempo en segundo plano.</p>
+                            <p class="setting-desc">{t.settingsBgDesc}</p>
+                        </div>
+                    </div>
+
+                    <!-- Setting 4: Language Selection -->
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <label class="setting-title" for="settings-lang-select">
+                                <span>{t.settingsLanguage}</span>
+                            </label>
+                            <select id="settings-lang-select" style="margin-top: 0.5rem; width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid #eee; font-size: 1rem; background: var(--card-bg); color: var(--text);">
+                                <option value="es" selected={lang === 'es'}>{t.welcomeSelectorEs}</option>
+                                <option value="en" selected={lang === 'en'}>{t.welcomeSelectorEn}</option>
+                            </select>
                         </div>
                     </div>
                 </div>
                 <div class="settings-actions">
-                    <button type="button" id="btn-test-notification" class="btn-secondary">Probar Notificación</button>
-                    <button type="button" id="btn-save-settings" class="btn-primary">Guardar Ajustes</button>
+                    <button type="button" id="btn-test-notification" class="btn-secondary">{t.testNotification}</button>
+                    <button type="button" id="btn-save-settings" class="btn-primary">{t.saveSettings}</button>
                 </div>
             </div>
         </div>
@@ -284,41 +300,64 @@ const { title } = Astro.props;
             style="display: none;"
         >
             <div class="modal-content card">
-                <h3>¿A qué parada vas?</h3>
+                <h3>{t.globalDestinationTitle}</h3>
                 <p class="text-muted small">
-                    Selecciona tu destino en la línea <strong
+                    {t.globalDestinationSub} <strong
                         id="modal-line-name">...</strong
                     >
                 </p>
                 <div id="global-stops-list-modal" class="modal-list"></div>
                 <button id="close-global-modal" class="btn-secondary mt-1"
-                    >Cancelar</button
+                    >{t.cancel}</button
                 >
             </div>
         </div>
         <nav class="bottom-nav">
             <a href="/" class="nav-item">
                 <span class="icon"><Icon name="home" /></span>
-                <span class="label">Inicio</span>
+                <span class="label">{t.bottomNavHome}</span>
             </a>
             <a href="/planner" class="nav-item">
                 <span class="icon"><Icon name="search" /></span>
-                <span class="label">Planear</span>
+                <span class="label">{t.bottomNavPlanner}</span>
             </a>
             <a href="/stops" class="nav-item">
                 <span class="icon"><Icon name="stop" /></span>
-                <span class="label">Paradas</span>
+                <span class="label">{t.bottomNavStops}</span>
             </a>
             <a href="/lines" class="nav-item">
                 <span class="icon"><Icon name="bus" /></span>
-                <span class="label">Líneas</span>
+                <span class="label">{t.bottomNavLines}</span>
             </a>
             <a href="/favorites" class="nav-item">
                 <span class="icon"><Icon name="star" /></span>
-                <span class="label">Favoritos</span>
+                <span class="label">{t.bottomNavFavs}</span>
             </a>
         </nav>
         <ProjectDrawer />
+
+        <!-- First-time Language Selector Modal -->
+        {showLangSelector && (
+            <div id="first-time-lang-selector-modal" class="modal-overlay" style="display: flex;">
+                <div class="modal-content lang-selector-modal-content">
+                    <div class="lang-selector-header">
+                        <img src="/logo.png" alt="Coruña Bus" class="lang-selector-logo" />
+                        <h3>{t.welcomeSelectorTitle}</h3>
+                        <p>{t.welcomeSelectorSub}</p>
+                    </div>
+                    <div class="lang-selector-options">
+                        <button type="button" class="lang-btn es-btn" data-lang="es">
+                            <span class="flag">🇪🇸</span>
+                            <span class="lang-name">{t.welcomeSelectorEs}</span>
+                        </button>
+                        <button type="button" class="lang-btn en-btn" data-lang="en">
+                            <span class="flag">🇬🇧</span>
+                            <span class="lang-name">{t.welcomeSelectorEn}</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
     </body>
 </html>
 <style is:global>
@@ -1052,12 +1091,98 @@ const { title } = Astro.props;
         line-height: 1.4;
         border-top: 1px solid #eee;
     }
+
+    /* Language Selector Modal Styles */
+    .lang-selector-modal-content {
+        text-align: center;
+        padding: 2.5rem 2rem;
+        max-width: 420px;
+        border-radius: 20px;
+        box-shadow: 0 15px 50px rgba(0, 0, 0, 0.25);
+        background: var(--card-bg);
+        color: var(--text);
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        animation: scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        border: 1px solid #eee;
+    }
+
+    @keyframes scaleUp {
+        from { transform: scale(0.9); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+
+    .lang-selector-logo {
+        width: 80px;
+        height: 80px;
+        border-radius: 18px;
+        margin-bottom: 0.75rem;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+
+    .lang-selector-header h3 {
+        font-size: 1.35rem;
+        margin-bottom: 0.5rem;
+        color: var(--text);
+        font-weight: 700;
+    }
+
+    .lang-selector-header p {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        margin-bottom: 1rem;
+        line-height: 1.4;
+    }
+
+    .lang-selector-options {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        width: 100%;
+    }
+
+    .lang-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        padding: 1rem;
+        border: 2px solid #eee;
+        border-radius: 14px;
+        background: var(--card-bg);
+        cursor: pointer;
+        font-size: 1.15rem;
+        font-weight: 600;
+        color: var(--text);
+        transition: all 0.25s ease;
+        width: 100%;
+    }
+
+    .lang-btn:hover {
+        border-color: var(--primary);
+        background: rgba(244, 67, 54, 0.05);
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(244, 67, 54, 0.1);
+    }
+
+    .lang-btn:active {
+        transform: translateY(0);
+    }
+
+    .lang-btn .flag {
+        font-size: 1.5rem;
+    }
 </style>
 
 <script>
     import { tracking } from "../utils/tracking";
     import { API, isApiLoading } from "../services/api";
     import { storage } from "../utils/storage";
+    import { getTranslations } from "../utils/i18n";
+
+    const lang = document.documentElement.getAttribute('data-lang') || 'es';
+    const t = getTranslations(lang);
 
     // Helper function to send notifications on both desktop and mobile (Android/Chrome ready)
     // Función auxiliar para enviar notificaciones en escritorio y móvil (lista para Android/Chrome)
@@ -1092,8 +1217,10 @@ const { title } = Astro.props;
     // Show persistent background tracking notification
     // Mostrar la notificación persistente de seguimiento en segundo plano
     function showBackgroundNotification() {
-        sendNotification("Coruña Bus - Seguimiento activo", {
-            body: "La app se mantendrá activa en segundo plano para avisarte de tus paradas.",
+        const title = lang === 'en' ? 'Coruña Bus - Active tracking' : 'Coruña Bus - Seguimiento activo';
+        const bodyText = lang === 'en' ? 'The app will stay active in the background to alert you about your stops.' : 'La app se mantendrá activa en segundo plano para avisarte de tus paradas.';
+        sendNotification(title, {
+            body: bodyText,
             tag: "tracking-bg",
             silent: true,
             icon: "/logo.png",
@@ -1136,7 +1263,9 @@ const { title } = Astro.props;
         const el = document.getElementById("last-update");
         if (el) {
             const now = new Date();
-            el.innerHTML = `Actualizado<br><strong>${now.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</strong>`;
+            const label = lang === 'en' ? 'Updated' : 'Actualizado';
+            const locale = lang === 'en' ? 'en-US' : 'es-ES';
+            el.innerHTML = `${label}<br><strong>${now.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</strong>`;
         }
     }
 
@@ -1187,9 +1316,9 @@ const { title } = Astro.props;
         const trackTitleEl = document.querySelector("#tracking-bar .tracking-text strong");
         if (trackTitleEl) {
             if (info.destinationStopId.toString() === info.originStopId.toString()) {
-                trackTitleEl.innerHTML = `Esperando en <span id="track-dest-name">${destStopName}</span>`;
+                trackTitleEl.innerHTML = `${t.trackingBarWaiting} <span id="track-dest-name">${destStopName}</span>`;
             } else {
-                trackTitleEl.innerHTML = `Hacia <span id="track-dest-name">${destStopName}</span>`;
+                trackTitleEl.innerHTML = `${t.trackingBarDest} <span id="track-dest-name">${destStopName}</span>`;
             }
         } else {
             const destSpan = document.getElementById("track-dest-name");
@@ -1225,8 +1354,12 @@ const { title } = Astro.props;
                                         
                                         // Send system notification (compatible with Android/Chrome)
                                         // Enviar notificación del sistema (compatible con Android/Chrome)
-                                        sendNotification("🚌 ¡Tu autobús está llegando!", {
-                                            body: `El bus ${info.busId} llegará a tu parada de origen en ${waitTime} min. ¡Sube al bus!`,
+                                        const notifyTitle = lang === 'en' ? '🚌 Your bus is arriving!' : '🚌 ¡Tu autobús está llegando!';
+                                        const notifyBody = lang === 'en' 
+                                            ? `Bus ${info.busId} will arrive at your origin stop in ${waitTime} min. Board the bus!`
+                                            : `El bus ${info.busId} llegará a tu parada de origen en ${waitTime} min. ¡Sube al bus!`;
+                                        sendNotification(notifyTitle, {
+                                            body: notifyBody,
                                             requireInteraction: true,
                                             icon: "/logo.png",
                                             badge: "/logo.png"
@@ -1245,7 +1378,10 @@ const { title } = Astro.props;
                                         } catch (e) {}
 
                                         // Show custom in-app banner alert if user is looking at screen
-                                        alert(`🔔 ¡Aviso de llegada! Tu autobús (Bus ${info.busId}) llegará en ${waitTime} min.`);
+                                        const alertText = lang === 'en'
+                                            ? `🔔 Arrival alert! Your bus (Bus ${info.busId}) will arrive in ${waitTime} min.`
+                                            : `🔔 ¡Aviso de llegada! Tu autobús (Bus ${info.busId}) llegará en ${waitTime} min.`;
+                                        alert(alertText);
                                     }
                                 }
                             }
@@ -1294,7 +1430,7 @@ const { title } = Astro.props;
                 const arrivalTime = new Date(Date.now() + time * 60000);
                 let timeStr = "--:--";
                 try {
-                    timeStr = arrivalTime.toLocaleTimeString("es-ES", {
+                    timeStr = arrivalTime.toLocaleTimeString(lang === 'en' ? 'en-US' : 'es-ES', {
                         hour: "2-digit",
                         minute: "2-digit",
                     });
@@ -1303,14 +1439,14 @@ const { title } = Astro.props;
                 }
 
                 document.getElementById("track-status")!.textContent =
-                    `Llegada: ${timeStr}`;
+                    `${t.trackingArrival}: ${timeStr}`;
                 if (time === 0) {
                     if (info.destinationStopId.toString() === info.originStopId.toString()) {
                         document.getElementById("track-status")!.textContent =
-                            "¡Llegando a tu parada!";
+                            t.trackingArrivingStop;
                     } else {
                         document.getElementById("track-status")!.textContent =
-                            "¡Llegando a destino!";
+                            t.trackingArrivingDest;
                     }
                 }
             } else {
@@ -1386,10 +1522,10 @@ const { title } = Astro.props;
                     document.getElementById("track-eta-val")!.textContent =
                         estimatedMins.toString();
                     document.getElementById("track-status")!.textContent =
-                        `~${stopsLeft} paradas para llegar`;
+                        `~${stopsLeft} ${t.trackingStopsAway}`;
                 } else {
                     document.getElementById("track-status")!.textContent =
-                        "Buscando bus...";
+                        t.trackingSearchingBus;
                     document.getElementById("track-eta-val")!.textContent =
                         "--";
                 }
@@ -1397,7 +1533,7 @@ const { title } = Astro.props;
         } catch (err) {
             console.warn("Failed to update tracking ETA", err);
             document.getElementById("track-status")!.textContent =
-                "Error de conexión";
+                t.trackingConnectionError;
         } finally {
             isUpdating = false;
         }
@@ -1684,8 +1820,12 @@ const { title } = Astro.props;
 
                 // Send background push/system notification if permission granted (compatible with Android/Chrome)
                 // Enviar notificación del sistema si los permisos han sido concedidos (compatible con Android/Chrome)
-                sendNotification("⚠️ ¡PULSA EL BOTÓN DE PARADA!", {
-                    body: `Te aproximas a tu destino: ${destStop.nombre}. ¡Avisa al conductor!`,
+                const gpsTitle = lang === 'en' ? '⚠️ PRESS THE STOP BUTTON!' : '⚠️ ¡PULSA EL BOTÓN DE PARADA!';
+                const gpsBodyText = lang === 'en'
+                    ? `You are approaching your destination: ${destStop.nombre}. Alert the driver!`
+                    : `Te aproximas a tu destino: ${destStop.nombre}. ¡Avisa al conductor!`;
+                sendNotification(gpsTitle, {
+                    body: gpsBodyText,
                     requireInteraction: true,
                     icon: "/logo.png",
                     badge: "/logo.png"
@@ -1840,11 +1980,13 @@ const { title } = Astro.props;
         const etaAlertInput = document.getElementById("settings-enable-eta-alert") as HTMLInputElement;
         const etaThresholdSelect = document.getElementById("settings-eta-threshold") as HTMLSelectElement;
         const keepAwakeInput = document.getElementById("settings-enable-bg-keep-awake") as HTMLInputElement;
+        const langSelect = document.getElementById("settings-lang-select") as HTMLSelectElement;
         
         if (gpsAlertInput) gpsAlertInput.checked = localStorage.getItem('buscoruna_gps_alert_enabled') === 'true';
         if (etaAlertInput) etaAlertInput.checked = localStorage.getItem('buscoruna_eta_alert_enabled') === 'true';
         if (etaThresholdSelect) etaThresholdSelect.value = localStorage.getItem('buscoruna_eta_alert_threshold') || '0';
         if (keepAwakeInput) keepAwakeInput.checked = localStorage.getItem('buscoruna_bg_keep_awake') === 'true';
+        if (langSelect) langSelect.value = document.documentElement.getAttribute('data-lang') || 'es';
         
         if (settingsModal) {
             settingsModal.style.display = "flex";
@@ -1866,21 +2008,29 @@ const { title } = Astro.props;
     // Test notification button
     // Botón de prueba de notificaciones
     document.getElementById("btn-test-notification")?.addEventListener("click", () => {
+        const testTitle = lang === 'en' ? '🚌 Coruña Bus Test' : '🚌 Prueba de Coruña Bus';
+        const testBody = lang === 'en' 
+            ? 'It works! Notifications are correctly configured on your device.' 
+            : '¡Funciona! Las notificaciones están bien configuradas en tu dispositivo.';
+        const testDenied = lang === 'en'
+            ? '⚠️ Notification permission denied. Enable it in your browser settings.'
+            : '⚠️ Permiso de notificaciones denegado. Actívalo en los ajustes de tu navegador.';
+
         if (Notification.permission !== "granted") {
             Notification.requestPermission().then((perm) => {
                 if (perm === "granted") {
-                    sendNotification("🚌 Prueba de Coruña Bus", {
-                        body: "¡Funciona! Las notificaciones están bien configuradas en tu dispositivo.",
+                    sendNotification(testTitle, {
+                        body: testBody,
                         icon: "/logo.png",
                         badge: "/logo.png"
                     });
                 } else {
-                    alert("⚠️ Permiso de notificaciones denegado. Actívalo en los ajustes de tu navegador.");
+                    alert(testDenied);
                 }
             });
         } else {
-            sendNotification("🚌 Prueba de Coruña Bus", {
-                body: "¡Funciona! Las notificaciones están bien configuradas en tu dispositivo.",
+            sendNotification(testTitle, {
+                body: testBody,
                 icon: "/logo.png",
                 badge: "/logo.png"
             });
@@ -1894,16 +2044,21 @@ const { title } = Astro.props;
         const etaAlertInput = document.getElementById("settings-enable-eta-alert") as HTMLInputElement;
         const etaThresholdSelect = document.getElementById("settings-eta-threshold") as HTMLSelectElement;
         const keepAwakeInput = document.getElementById("settings-enable-bg-keep-awake") as HTMLInputElement;
+        const langSelect = document.getElementById("settings-lang-select") as HTMLSelectElement;
 
         const gpsEnabled = gpsAlertInput?.checked ? 'true' : 'false';
         const etaEnabled = etaAlertInput?.checked ? 'true' : 'false';
         const etaThreshold = etaThresholdSelect?.value || '0';
         const keepAwakeEnabled = keepAwakeInput?.checked ? 'true' : 'false';
+        const selectedLang = langSelect?.value || 'es';
+        const oldLang = document.documentElement.getAttribute('data-lang') || 'es';
 
         localStorage.setItem('buscoruna_gps_alert_enabled', gpsEnabled);
         localStorage.setItem('buscoruna_eta_alert_enabled', etaEnabled);
         localStorage.setItem('buscoruna_eta_alert_threshold', etaThreshold);
         localStorage.setItem('buscoruna_bg_keep_awake', keepAwakeEnabled);
+        localStorage.setItem('buscoruna_lang', selectedLang);
+        document.cookie = "buscoruna_lang=" + selectedLang + ";path=/;max-age=" + (60 * 60 * 24 * 365);
 
         // Ask for browser notification permissions if any alert checked
         if (gpsAlertInput?.checked || etaAlertInput?.checked || keepAwakeInput?.checked) {
@@ -1914,6 +2069,10 @@ const { title } = Astro.props;
 
         applySettings();
         closeSettings();
+
+        if (selectedLang !== oldLang) {
+            window.location.reload();
+        }
     });
 
     // Close settings if clicked outside of the content container
@@ -1948,5 +2107,19 @@ const { title } = Astro.props;
     const initialInfo = tracking.get();
     if (initialInfo) {
         applySettings();
+    }
+
+    // First-time language selector UI Events
+    const firstTimeLangModal = document.getElementById("first-time-lang-selector-modal");
+    if (firstTimeLangModal) {
+        const langBtns = firstTimeLangModal.querySelectorAll(".lang-btn");
+        langBtns.forEach(btn => {
+            btn.addEventListener("click", () => {
+                const selectedLang = btn.getAttribute("data-lang") || "es";
+                localStorage.setItem("buscoruna_lang", selectedLang);
+                document.cookie = "buscoruna_lang=" + selectedLang + ";path=/;max-age=" + (60 * 60 * 24 * 365);
+                window.location.reload();
+            });
+        });
     }
 </script>

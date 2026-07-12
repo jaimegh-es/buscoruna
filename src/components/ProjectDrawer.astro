@@ -1,20 +1,24 @@
 ---
 import Icon from "./Icon.astro";
+import { getTranslations } from "../utils/i18n";
+
+const lang = Astro.cookies.get('buscoruna_lang')?.value || 'es';
+const t = getTranslations(lang);
 ---
 
 <div id="project-menu-overlay" class="project-menu-overlay">
     <div class="project-menu-content">
         <div class="project-menu-header">
-            <h3>Nuestros Proyectos</h3>
+            <h3>{t.projectsTitle}</h3>
             <button id="close-project-menu" class="close-btn">
                 <Icon name="x" size={24} />
             </button>
         </div>
         <div id="project-list" class="project-list">
-            <div class="loading-projects">Cargando proyectos...</div>
+            <div class="loading-projects">{t.projectsLoading}</div>
         </div>
         <div class="project-menu-footer">
-            <p>Descubre más en <a href="https://inled.es" target="_blank">inled.es</a></p>
+            <p>{t.projectsFooter} <a href="https://inled.es" target="_blank">inled.es</a></p>
         </div>
     </div>
 </div>
@@ -185,6 +189,8 @@ import Icon from "./Icon.astro";
             const projects: Project[] = await response.json();
             
             if (projectList) {
+                // Since project descriptions are fetched from external json, we show them as is,
+                // but we translate structure and error states.
                 projectList.innerHTML = projects.map(project => `
                     <a href="${project.link}" target="_blank" class="project-card">
                         <img src="${project.logo}" alt="${project.name}" class="project-logo" />
@@ -199,7 +205,9 @@ import Icon from "./Icon.astro";
         } catch (error) {
             console.error('Error fetching projects:', error);
             if (projectList) {
-                projectList.innerHTML = '<div class="loading-projects">Error al cargar los proyectos. Inténtalo más tarde.</div>';
+                const lang = document.documentElement.getAttribute('data-lang') || 'es';
+                const errorMsg = lang === 'en' ? 'Error loading projects. Try again later.' : 'Error al cargar los proyectos. Inténtalo más tarde.';
+                projectList.innerHTML = `<div class="loading-projects">${errorMsg}</div>`;
             }
         }
     }

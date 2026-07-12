@@ -2,9 +2,9 @@
 import Layout from "../../layouts/Layout.astro";
 
 const { slug } = Astro.params;
+const lang = Astro.cookies.get('buscoruna_lang')?.value || 'es';
 
-// In a real app, this would be a markdown file or a DB call
-const posts: Record<string, any> = {
+const postsEs: Record<string, any> = {
     "mejor-aplicacion-buses-coruna": {
         title: "Las mejores apps de buses de Coruña",
         content: `
@@ -39,6 +39,42 @@ const posts: Record<string, any> = {
     },
 };
 
+const postsEn: Record<string, any> = {
+    "mejor-aplicacion-buses-coruna": {
+        title: "The best bus apps in Coruña",
+        content: `
+      <p>Getting around A Coruña is not always easy, especially when you rely on urban bus schedules. Although official applications exist, many users look for a smoother, faster, and more private experience. This is where <strong>Coruña Bus</strong> comes in.</p>
+
+      <h2>Real-time, precise times</h2>
+      <p>Unlike other apps that only show theoretical schedules, our platform connects directly to real-time data. If the line 1A bus is running late, you will know to the second.</p>
+
+      <h2>Smart route calculator</h2>
+      <p>Our calculator does not just tell you which bus to catch, but also how long you will walk to the stop and what the most efficient combination is based on current traffic.</p>
+
+      <h2>Privacy first</h2>
+      <p>We do not track your data, we do not request registrations, and we do not sell your location. It is a tool made by and for Coruña locals.</p>
+    `,
+        date: "2026-06-09",
+    },
+    "ahorrar-tiempo-bus-coruna": {
+        title: "How to save time on your bus trips in A Coruña",
+        content: `
+      <p>Time is money, especially when you are just on time to get to work or for an appointment. Here we give you 3 key tips to optimize your trips.</p>
+
+      <h2>1. Use real-time tracking</h2>
+      <p>Do not leave home until you see the bus is less than 5 minutes away. With Coruña Bus, you can see exactly where your bus is.</p>
+
+      <h2>2. Know your alternatives</h2>
+      <p>Sometimes, a stop that is 2 minutes further has a line that drops you closer to your destination. Use our nearby stops map to explore.</p>
+
+      <h2>3. Save your favorites</h2>
+      <p>Do not waste time searching. Save your home and work stops to favorites to consult them with a single tap from the Dashboard.</p>
+    `,
+        date: "2026-06-08",
+    },
+};
+
+const posts = lang === 'en' ? postsEn : postsEs;
 const post = posts[slug || ""];
 
 if (!post) {
@@ -54,7 +90,7 @@ if (!post) {
         </header>
         <div class="post-content" set:html={post.content} />
         <footer>
-            <a href="/blog" class="back-link">&larr; Volver al blog</a>
+            <a href="/blog" class="back-link">{lang === 'en' ? '← Back to blog' : '← Volver al blog'}</a>
         </footer>
     </article>
 </Layout>

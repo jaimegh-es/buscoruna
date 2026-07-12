@@ -1,8 +1,12 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import Icon from "../components/Icon.astro";
+import { getTranslations } from "../utils/i18n";
 
-const posts = [
+const lang = Astro.cookies.get('buscoruna_lang')?.value || 'es';
+const t = getTranslations(lang);
+
+const postsEs = [
   {
     title: "La mejor aplicación de buses en Coruña: ¿Por qué elegir Coruña Bus?",
     slug: "mejor-aplicacion-buses-coruna",
@@ -16,13 +20,30 @@ const posts = [
     date: "2026-06-08"
   }
 ];
+
+const postsEn = [
+  {
+    title: "The best bus app in Coruña: Why choose Coruña Bus?",
+    slug: "mejor-aplicacion-buses-coruna",
+    description: "Discover why Coruña Bus is the ultimate tool for getting around the city. Real-time arrival, optimized routes, and total privacy.",
+    date: "2026-06-09"
+  },
+  {
+    title: "How to save time on your bus trips in A Coruña",
+    slug: "ahorrar-tiempo-bus-coruna",
+    description: "Tips and tricks to use Coruña public transport like a pro. Avoid unnecessary waiting times with our route calculator.",
+    date: "2026-06-08"
+  }
+];
+
+const posts = lang === 'en' ? postsEn : postsEs;
 ---
 
-<Layout title="Blog - Coruña Bus | Noticias y Guías de Transporte">
+<Layout title={lang === 'en' ? "Blog - Coruña Bus | News & Transport Guides" : "Blog - Coruña Bus | Noticias y Guías de Transporte"}>
   <div class="blog-container">
     <header class="blog-header">
       <h1>Blog Coruña<span>Bus</span></h1>
-      <p>Consejos, noticias y guías para moverte por la ciudad.</p>
+      <p>{lang === 'en' ? "Tips, news, and guides for getting around the city." : "Consejos, noticias y guías para moverte por la ciudad."}</p>
     </header>
 
     <div class="posts-grid">
@@ -32,7 +53,7 @@ const posts = [
           <p class="post-desc">{post.description}</p>
           <div class="post-meta">
             <time>{post.date}</time>
-            <a href={`/blog/${post.slug}`} class="read-more">Leer más</a>
+            <a href={`/blog/${post.slug}`} class="read-more">{lang === 'en' ? "Read more" : "Leer más"}</a>
           </div>
         </article>
       ))}
