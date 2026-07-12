@@ -2,7 +2,10 @@
 import Icon from './Icon.astro';
 import { getTranslations } from '../utils/i18n';
 
-const lang = Astro.cookies.get('buscoruna_lang')?.value || 'es';
+const acceptLanguage = Astro.request.headers.get('accept-language') || '';
+const defaultLang = acceptLanguage.toLowerCase().includes('en') ? 'en' : 'es';
+const cookieLang = Astro.cookies.get('buscoruna_lang')?.value;
+const lang = cookieLang || defaultLang;
 const t = getTranslations(lang);
 ---
 
