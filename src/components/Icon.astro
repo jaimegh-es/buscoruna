@@ -18,11 +18,15 @@ import {
   Share,
   Plus,
   Home,
-  Settings
+  Settings,
+  Navigation2,
+  Maximize2,
+  Minimize2,
+  Camera
 } from '@lucide/astro';
 
 interface Props {
-  name: 'refresh' | 'edit' | 'settings' | 'search' | 'stop' | 'bus' | 'star' | 'heart' | 'map' | 'x' | 'chevron-right' | 'chevron-left' | 'location' | 'star-outline' | 'heart-outline' | 'shield' | 'ban' | 'menu' | 'share' | 'plus' | 'home';
+  name: 'refresh' | 'edit' | 'settings' | 'search' | 'stop' | 'bus' | 'star' | 'heart' | 'map' | 'x' | 'chevron-right' | 'chevron-left' | 'location' | 'star-outline' | 'heart-outline' | 'shield' | 'ban' | 'menu' | 'share' | 'plus' | 'home' | 'maximize' | 'minimize' | 'street-view' | 'navigation';
   class?: string;
   size?: number;
 }
@@ -50,7 +54,11 @@ const iconMap = {
   menu: Menu,
   share: Share,
   plus: Plus,
-  home: Home
+  home: Home,
+  maximize: Maximize2,
+  minimize: Minimize2,
+  'street-view': Camera,
+  navigation: Navigation2
 };
 
 const SelectedIcon = iconMap[name];

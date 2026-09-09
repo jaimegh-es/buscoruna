@@ -94,16 +94,10 @@ const { title } = Astro.props;
         <Landing />
         <InstallPopup />
 
-        <!-- Global Loader Overlay -->
-        <div id="global-api-loader" class="global-loader-overlay">
-            <div class="loader-content">
-                <img
-                    src="/logo.png"
-                    alt={t.loading}
-                    class="loader-logo-pulsing"
-                />
-                <span class="loader-text">{t.loadingData}</span>
-            </div>
+        <!-- Global Loader Popup (non-blocking, sits above the header) -->
+        <div id="global-api-loader" class="global-loader-popup" role="status" aria-live="polite">
+            <span class="loader-spinner" aria-hidden="true"></span>
+            <span class="loader-text">{t.loadingData}</span>
         </div>
 
         <header class="main-header">
@@ -428,63 +422,108 @@ const { title } = Astro.props;
         font-weight: 800;
     }
 
-    /* Global Loading Spinner */
-    .global-loader-overlay {
+    /* Global Loading Spinner (non-blocking popup above the header) */
+    .global-loader-popup {
         position: fixed;
         top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(245, 245, 247, 0.7);
-        backdrop-filter: blur(2px);
-        z-index: 5000;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 5001;
         display: none;
         align-items: center;
-        justify-content: center;
+        gap: 0.5rem;
+        background: rgba(255, 255, 255, 0.95);
+        color: var(--primary);
+        padding: 0.4rem 1rem 0.45rem;
+        border-radius: 0 0 12px 12px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        pointer-events: none;
     }
 
-    .global-loader-overlay.active {
+    .global-loader-popup.active {
         display: flex;
+        animation: loader-pop-slide 0.25s ease-out;
     }
 
-    .loader-content {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 1.5rem;
-    }
-
-    .loader-logo-pulsing {
-        width: 100px;
-        height: 100px;
-        border-radius: 24px;
-        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
-        animation: logo-pulse 1.5s ease-in-out infinite;
-        object-fit: cover;
-    }
-
-    @keyframes logo-pulse {
-        0% {
-            transform: scale(0.92);
-            opacity: 0.8;
+    @keyframes loader-pop-slide {
+        from {
+            transform: translateX(-50%) translateY(-12px);
+            opacity: 0;
         }
-        50% {
-            transform: scale(1.08);
+        to {
+            transform: translateX(-50%) translateY(0);
             opacity: 1;
         }
-        100% {
-            transform: scale(0.92);
-            opacity: 0.8;
-        }
+    }
+
+    .loader-spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(244, 67, 54, 0.25);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+        flex-shrink: 0;
     }
 
     .loader-text {
+        font-size: 0.75rem;
         font-weight: 700;
         color: var(--primary);
-        font-size: 0.9rem;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        text-shadow: 0 2px 4px rgba(255, 255, 255, 0.5);
+        white-space: nowrap;
+    }
+
+    /* Stylized loading pills used across pages (stops, planner, etc.) */
+    .loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.6rem;
+        margin: 1.25rem auto;
+        padding: 0.7rem 1.25rem;
+        width: fit-content;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid #e2e8f0;
+        border-radius: 999px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+        color: var(--text);
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .loading::before,
+    .loading-small::before {
+        content: '';
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(244, 67, 54, 0.25);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+        flex-shrink: 0;
+    }
+
+    .loading-small {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.35rem 0.75rem;
+        width: fit-content;
+        background: #f8fafc;
+        border: 1px solid #eef2f7;
+        border-radius: 999px;
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .loading-small::before {
+        width: 12px;
+        height: 12px;
     }
 
     .header-content h1 span {
@@ -1177,7 +1216,7 @@ const { title } = Astro.props;
 
 <script>
     import { tracking } from "../utils/tracking";
-    import { API, isApiLoading } from "../services/api";
+    import { API, isApiLoading, isApiCooldownActive } from "../services/api";
     import { storage } from "../utils/storage";
     import { getTranslations } from "../utils/i18n";
 
@@ -1285,6 +1324,10 @@ const { title } = Astro.props;
     let trackingInterval: any = null;
     let isUpdating = false;
 
+    // Cache + throttle for the expensive func=2 (full line info) ETA fallback.
+    let lastLineInfoCheck = 0;
+    let lineInfoCache = { foundInLine: false, stopsLeft: -1 };
+
     async function updateTrackingUI() {
         if (isUpdating) return;
         const info = tracking.get();
@@ -1303,6 +1346,18 @@ const { title } = Astro.props;
         isUpdating = true;
         bar.style.display = "block";
         document.getElementById("track-bus-id")!.textContent = info.busId;
+
+        // Global circuit breaker open: pause network polling, keep the bar alive.
+        if (isApiCooldownActive()) {
+            document.getElementById("track-status")!.textContent =
+                t.trackingConnectionError;
+            document.getElementById("track-eta-val")!.textContent = "--";
+            isUpdating = false;
+            if (!trackingInterval) {
+                trackingInterval = setInterval(updateTrackingUI, 60000);
+            }
+            return;
+        }
 
         const catalog = storage.getCatalog();
         let destStopName = info.destinationStopId.toString();
@@ -1451,66 +1506,83 @@ const { title } = Astro.props;
                 }
             } else {
                 // Step 2: Fallback - Check full line info (func=2)
-                const lineData = await API.getLineInfo(info.lineId);
-                let foundInLine = false;
-                let stopsLeft = -1;
+                // Throttled: only hit this expensive endpoint once per minute,
+                // reuse the cached stops-left in between.
+                let foundInLine = lineInfoCache.foundInLine;
+                let stopsLeft = lineInfoCache.stopsLeft;
+                const lineInfoStale = Date.now() - lastLineInfoCheck >= 60000;
 
-                if (lineData && lineData.paradas && catalog) {
-                    // Normalize lineData paradas into a flat list of stops with their buses
-                    const stopsWithBuses = [];
-                    if (Array.isArray(lineData.paradas)) {
-                        for (const dir of lineData.paradas) {
-                            if (Array.isArray(dir.paradas)) {
-                                for (const p of dir.paradas) {
-                                    if (
-                                        Array.isArray(p.buses) &&
-                                        p.buses.some(
-                                            (b: any) =>
-                                                b.bus &&
-                                                b.bus.toString() ===
-                                                    info.busId.toString(),
-                                        )
-                                    ) {
-                                        stopsWithBuses.push(
-                                            parseInt(p.id.toString()),
+                if (lineInfoStale) {
+                    lastLineInfoCheck = Date.now();
+                    lineInfoCache.foundInLine = false;
+                    lineInfoCache.stopsLeft = -1;
+
+                    try {
+                        const lineData = await API.getLineInfo(info.lineId);
+
+                        if (lineData && lineData.paradas && catalog) {
+                            // Normalize lineData paradas into a flat list of stops with their buses
+                            const stopsWithBuses = [];
+                            if (Array.isArray(lineData.paradas)) {
+                                for (const dir of lineData.paradas) {
+                                    if (Array.isArray(dir.paradas)) {
+                                        for (const p of dir.paradas) {
+                                            if (
+                                                Array.isArray(p.buses) &&
+                                                p.buses.some(
+                                                    (b: any) =>
+                                                        b.bus &&
+                                                        b.bus.toString() ===
+                                                            info.busId.toString(),
+                                                )
+                                            ) {
+                                                stopsWithBuses.push(
+                                                    parseInt(p.id.toString()),
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (stopsWithBuses.length > 0) {
+                                const busAtStopId = stopsWithBuses[0];
+                                const targetDestIdNum = parseInt(
+                                    info.destinationStopId.toString(),
+                                );
+
+                                const line = catalog.actualizacion.lineas.find(
+                                    (l: any) =>
+                                        l.id.toString() === info.lineId.toString(),
+                                );
+                                if (line && Array.isArray(line.rutas)) {
+                                    for (const route of line.rutas) {
+                                        if (!Array.isArray(route.paradas)) continue;
+                                        const routeParadas = route.paradas.map((p) =>
+                                            parseInt(p.toString()),
                                         );
+                                        const bIdx = routeParadas.indexOf(busAtStopId);
+                                        const dIdx =
+                                            routeParadas.indexOf(targetDestIdNum);
+
+                                        if (
+                                            bIdx !== -1 &&
+                                            dIdx !== -1 &&
+                                            bIdx <= dIdx
+                                        ) {
+                                            stopsLeft = dIdx - bIdx;
+                                            foundInLine = true;
+                                            lineInfoCache.foundInLine = true;
+                                            lineInfoCache.stopsLeft = dIdx - bIdx;
+                                            break;
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-
-                    if (stopsWithBuses.length > 0) {
-                        const busAtStopId = stopsWithBuses[0];
-                        const targetDestIdNum = parseInt(
-                            info.destinationStopId.toString(),
-                        );
-
-                        const line = catalog.actualizacion.lineas.find(
-                            (l: any) =>
-                                l.id.toString() === info.lineId.toString(),
-                        );
-                        if (line && Array.isArray(line.rutas)) {
-                            for (const route of line.rutas) {
-                                if (!Array.isArray(route.paradas)) continue;
-                                const routeParadas = route.paradas.map((p) =>
-                                    parseInt(p.toString()),
-                                );
-                                const bIdx = routeParadas.indexOf(busAtStopId);
-                                const dIdx =
-                                    routeParadas.indexOf(targetDestIdNum);
-
-                                if (
-                                    bIdx !== -1 &&
-                                    dIdx !== -1 &&
-                                    bIdx <= dIdx
-                                ) {
-                                    stopsLeft = dIdx - bIdx;
-                                    foundInLine = true;
-                                    break;
-                                }
-                            }
-                        }
+                    } catch (lineErr) {
+                        // Ignore transient failures on the throttled fallback.
+                        lineInfoCache.foundInLine = false;
                     }
                 }
 
@@ -1539,7 +1611,7 @@ const { title } = Astro.props;
         }
 
         if (!trackingInterval) {
-            trackingInterval = setInterval(updateTrackingUI, 15000);
+            trackingInterval = setInterval(updateTrackingUI, 60000);
         }
     }
 
@@ -1674,11 +1746,11 @@ const { title } = Astro.props;
                 "none";
         });
 
-    // Auto refresh every 30 seconds
+    // Auto refresh every 60 seconds
     setInterval(() => {
         window.dispatchEvent(new CustomEvent("request-refresh"));
         updateLastRefreshTime();
-    }, 30000);
+    }, 60000);
 
     // Initial time
     updateLastRefreshTime();

@@ -34,6 +34,10 @@ const t = getTranslations(lang);
                 <div class="action-icon bus"><Icon name="bus" /></div>
                 <span>{t.homeActionLines}</span>
             </a>
+            <a href="/planner" class="action-card">
+                <div class="action-icon tracking"><Icon name="navigation" /></div>
+                <span>{t.homeActionTrack}</span>
+            </a>
         </section>
 
         <section class="favorites-section">
@@ -371,7 +375,7 @@ const t = getTranslations(lang);
 
     .quick-actions {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(4, 1fr);
         gap: 1rem;
     }
 
@@ -404,6 +408,7 @@ const t = getTranslations(lang);
     .action-icon.search { background: linear-gradient(135deg, #f44336, #ff7043); }
     .action-icon.location { background: linear-gradient(135deg, #2196f3, #4fc3f2); }
     .action-icon.bus { background: linear-gradient(135deg, #4caf50, #81c784); }
+    .action-icon.tracking { background: linear-gradient(135deg, #9c27b0, #ba68c8); }
 
     .action-card span {
         font-size: 0.85rem;

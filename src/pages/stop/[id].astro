@@ -25,6 +25,15 @@ const t = getTranslations(lang);
     <div id="stop-map-container" class="map-container">
       <div id="stop-map" style="height: 250px; border-radius: 12px; z-index: 1;"></div>
       <div class="map-actions">
+        <button id="expand-stop-map" class="map-btn" title={t.mapExpand}>
+          <Icon name="maximize" size={20} />
+        </button>
+        <button id="collapse-stop-map" class="map-btn" style="display: none;" title={t.mapCollapse}>
+          <Icon name="minimize" size={20} />
+        </button>
+        <button id="street-view-btn" class="map-btn" title={t.streetViewBtn}>
+          <Icon name="street-view" size={20} />
+        </button>
         <button id="toggle-satellite" class="map-btn" title={t.stopDetailSatelliteView}>
           <Icon name="map" size={20} />
         </button>
@@ -39,6 +48,12 @@ const t = getTranslations(lang);
       <div id="eta-list" class="grid-list">
         <div class="loading">{t.stopDetailCheckingTimes}</div>
       </div>
+    </div>
+
+    <!-- Refresh cooldown banner (shown when the server fails) -->
+    <div id="cooldown-banner" class="cooldown-banner" style="display: none;">
+      <div class="cooldown-title">...</div>
+      <div class="cooldown-desc">...</div>
     </div>
 
     <!-- Destination Selector Modal -->
@@ -59,7 +74,7 @@ const t = getTranslations(lang);
 
   <script>
     import { storage } from '../../utils/storage';
-    import { API } from '../../services/api';
+    import { API, isApiCooldownActive } from '../../services/api';
     import { tracking } from '../../utils/tracking';
     import { createIcons, Star, Navigation, Map, LocateFixed, Bell } from 'lucide';
     import { getTranslations } from '../../utils/i18n';
@@ -79,6 +94,99 @@ const t = getTranslations(lang);
     let userMarker: any = null;
     let watchId: any = null;
     let guidanceLine: any = null;
+
+    // Refresh cooldown (protects the upstream API from being hammered)
+    const COOLDOWN_MS = 30000;
+    const COOLDOWN_KEY = 'buscoruna_eta_cooldown_until';
+    let cooldownUntil = parseInt(sessionStorage.getItem(COOLDOWN_KEY) || '0', 10) || 0;
+    let cooldownTimer: any = null;
+    let etaInterval: any = null;
+    const cooldownBanner = document.getElementById('cooldown-banner');
+
+    function isCooldownActive() {
+      return Date.now() < cooldownUntil;
+    }
+
+    function restartEtaRefresh() {
+      if (etaInterval) clearInterval(etaInterval);
+      etaInterval = setInterval(fetchETAs, 60000);
+    }
+
+    function stopEtaRefresh() {
+      if (etaInterval) {
+        clearInterval(etaInterval);
+        etaInterval = null;
+      }
+    }
+
+    function startCooldown() {
+      if (isCooldownActive()) return; // don't extend an already active cooldown
+      stopEtaRefresh();
+      cooldownUntil = Date.now() + COOLDOWN_MS;
+      sessionStorage.setItem(COOLDOWN_KEY, cooldownUntil.toString());
+      renderCooldownBanner();
+    }
+
+    function finishCooldown() {
+      if (cooldownTimer) {
+        clearInterval(cooldownTimer);
+        cooldownTimer = null;
+      }
+      if (cooldownBanner) cooldownBanner.style.display = 'none';
+      sessionStorage.removeItem(COOLDOWN_KEY);
+      cooldownUntil = 0;
+      restartEtaRefresh();
+      fetchETAs();
+      fetchETAs();
+    }
+
+    function renderCooldownBanner() {
+      if (!cooldownBanner) return;
+      const titleEl = cooldownBanner.querySelector('.cooldown-title');
+      const descEl = cooldownBanner.querySelector('.cooldown-desc');
+
+      const tick = () => {
+        const remaining = Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000));
+        if (remaining <= 0) {
+          finishCooldown();
+          return;
+        }
+        if (titleEl) titleEl.textContent = t.cooldownBannerTitle;
+        if (descEl) descEl.innerHTML = t.cooldownBannerDesc.replace('{n}', String(remaining));
+      };
+
+      cooldownBanner.style.display = 'block';
+      tick();
+      if (cooldownTimer) clearInterval(cooldownTimer);
+      cooldownTimer = setInterval(tick, 1000);
+    }
+
+    function setupMapExpand() {
+      const expandBtn = document.getElementById('expand-stop-map');
+      const collapseBtn = document.getElementById('collapse-stop-map');
+      const container = document.getElementById('stop-map-container');
+
+      const setFullscreen = (on: boolean) => {
+        container?.classList.toggle('map-fullscreen', on);
+        if (expandBtn) expandBtn.style.display = on ? 'none' : 'flex';
+        if (collapseBtn) collapseBtn.style.display = on ? 'flex' : 'none';
+        setTimeout(() => map?.invalidateSize(), on ? 100 : 250);
+      };
+
+      expandBtn?.addEventListener('click', () => setFullscreen(true));
+      collapseBtn?.addEventListener('click', () => setFullscreen(false));
+
+      // Google Street View of the stop
+      const streetViewBtn = document.getElementById('street-view-btn');
+      streetViewBtn?.addEventListener('click', () => {
+        if (!stopData) return;
+        window.open(
+          `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${stopData.posy},${stopData.posx}`,
+          '_blank',
+          'noopener'
+        );
+      });
+    }
 
     // Render Lucide icons on dynamic elements, including Bell
     // Renderizar iconos de Lucide en elementos dinámicos, incluyendo Bell
@@ -115,13 +223,29 @@ const t = getTranslations(lang);
 
       renderStopInfo();
       initMap();
-      fetchETAs();
+      setupMapExpand();
       updateFavoriteUI();
 
-      // Refresh ETAs every 30s
-      setInterval(fetchETAs, 30000);
+      // If a cooldown is still active (persisted via sessionStorage), wait it out
+      if (Date.now() < cooldownUntil) {
+        renderCooldownBanner();
+      } else {
+        fetchETAs();
+        restartEtaRefresh();
+      }
 
-      window.addEventListener('request-refresh', fetchETAs);
+      window.addEventListener('request-refresh', () => {
+        if (!isCooldownActive()) fetchETAs();
+      });
+
+      // Coordinate with the global API circuit breaker: show the banner and
+      // pause refreshes whenever the breaker opens (from any page).
+      window.addEventListener('api-cooldown-start', () => {
+        if (!isCooldownActive()) startCooldown();
+      });
+      window.addEventListener('api-cooldown-end', () => {
+        if (cooldownUntil > 0) finishCooldown();
+      });
 
       document.getElementById('close-modal')?.addEventListener('click', () => {
         document.getElementById('destination-modal')!.style.display = 'none';
@@ -241,6 +365,7 @@ const t = getTranslations(lang);
       const container = document.getElementById('eta-list')!;
       const catalog = storage.getCatalog();
       if (!catalog) return;
+      if (isApiCooldownActive()) return; // global breaker open - fail fast, keep banner
 
       try {
         const data = await API.getStopArrivals(stopId);
@@ -401,7 +526,9 @@ const t = getTranslations(lang);
           container.innerHTML = `<div class="empty-state-small">${lang === 'en' ? 'No upcoming buses at this moment.' : 'No hay buses próximos en este momento.'}</div>`;
         }
       } catch (err) {
+        console.error('ETA fetch error:', err);
         container.innerHTML = `<div class="error">${lang === 'en' ? 'Error connecting to the server.' : 'Error al conectar con el servidor.'}</div>`;
+        startCooldown();
       }
     }
 
@@ -492,6 +619,64 @@ const t = getTranslations(lang);
   .map-container {
     position: relative;
     margin-bottom: 1.5rem;
+  }
+
+  .map-container.map-fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 5002;
+    background: #fff;
+    margin: 0;
+  }
+
+  .map-container.map-fullscreen #stop-map {
+    position: absolute;
+    inset: 0;
+    height: 100vh !important;
+    width: 100vw;
+    border-radius: 0;
+    z-index: 1;
+  }
+
+  .map-container.map-fullscreen .map-actions {
+    top: 12px;
+    right: 12px;
+    z-index: 1000;
+  }
+
+  /* Refresh cooldown banner */
+  .cooldown-banner {
+    background: #fff7ed;
+    border: 1px solid #fdba74;
+    color: #9a3412;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    text-align: center;
+    animation: cooldownIn 0.25s ease-out;
+  }
+
+  @keyframes cooldownIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .cooldown-title {
+    font-weight: 800;
+    font-size: 0.95rem;
+  }
+
+  .cooldown-title::before {
+    content: '⏳ ';
+  }
+
+  .cooldown-desc {
+    font-size: 0.8rem;
+    opacity: 0.9;
   }
 
   .map-actions {

@@ -102,6 +102,7 @@ export const translations = {
     homeActionPlan: "Planear ruta",
     homeActionStops: "Paradas cerca",
     homeActionLines: "Ver líneas",
+    homeActionTrack: "¿En qué bus voy?",
     homeMyFavorites: "Mis favoritos",
     homeViewAll: "Ver todos",
     homeLoadingFavorites: "Cargando favoritos...",
@@ -234,6 +235,52 @@ export const translations = {
     stopDetailTrackConfirm: "Destino establecido. Recibirás un aviso por GPS al aproximarte.",
     stopDetailTrackArrivingNear: "Llegando en {n} min",
 
+    // Stop list & map controls
+    mapExpand: "Ampliar mapa",
+    mapCollapse: "Reducir mapa",
+    mapCloseFullscreen: "Cerrar mapa ampliado",
+    streetViewBtn: "Street View",
+    stopNoLines: "Sin líneas asignadas",
+    stopViewDetail: "Ver parada",
+    stopOpenInMaps: "Abrir en Google Maps",
+
+    // Refresh cooldown (server errors)
+    cooldownBannerTitle: "Servidor temporalmente no disponible",
+    cooldownBannerDesc: "Espera {n}s antes de volver a intentarlo para no saturar el servidor.",
+    cooldownRetryNow: "Reintentar ahora",
+    cooldownActiveFromSession: "Esperando para refrescar ({n}s)...",
+
+    // TripCalculator future planning
+    tripDateLabel: "Fecha del viaje",
+    tripDatePlaceholder: "Hoy",
+    tripFutureDateHint: "Para fechas futuras verás qué línea coger, pero sin predicción de llegada en tiempo real.",
+    tripFutureDateBanner: "🗓️ Planificación estática para {date}. No hay predicción de llegada en tiempo real: solo se indica qué línea coger.",
+    tripNoRealTime: "Sin tiempo real para esta fecha",
+    tripDateToday: "Hoy",
+    tripDateTomorrow: "Mañana",
+
+    // BusTracker component
+    trackerTitle: "¿En qué bus vas?",
+    trackerSub: "Indica el número del bus o usa tu ubicación para detectar en qué línea viajas, elige tu parada de bajada y mira cuánto te queda.",
+    trackerByNumber: "Número de bus",
+    trackerByLocation: "Mi ubicación",
+    trackerNumberPlaceholder: "Ej: 61",
+    trackerDetectBtn: "Detectar bus",
+    trackerLocateBtn: "Localizar mi bus",
+    trackerScanning: "Rastreando buses de todas las líneas...",
+    trackerLocating: "Consultando tu ubicación...",
+    trackerNotFound: "No se encontró ningún bus con ese número en circulación. Revisa el número (suele estar junto al bus) e inténtalo de nuevo.",
+    trackerNoBusesNear: "No se encontró ningún bus cerca de tu ubicación. Inténtalo cuando un bus esté más próximo.",
+    trackerFoundBus: "Detectado: bus {num} de la línea {line} hacia {dest}",
+    trackerSelectDest: "Elige tu parada de bajada:",
+    trackerDestRemaining: "{m} paradas · ~{min} min más",
+    trackerDestTrack: "Seguir este bus hasta aquí",
+    trackerStarted: "Seguimiento iniciado. El tiempo restante se actualiza en la barra de seguimiento inferior.",
+    trackerCancel: "Cambiar de bus",
+    trackerNearStop: "Estás cerca de",
+    trackerGeoError: "No se pudo obtener tu ubicación. Asegúrate de haber dado permiso de geolocalización.",
+    trackerNoCatalog: "El catálogo de líneas aún no está disponible. Inténtalo de nuevo en unos segundos.",
+
     // Blog Page & Posts
     blogTitle: "Blog - Coruña Bus | Noticias y Guías de Transporte",
     blogHeaderTitle: "Blog Coruña",
@@ -364,6 +411,7 @@ export const translations = {
     homeActionPlan: "Plan route",
     homeActionStops: "Nearby stops",
     homeActionLines: "View lines",
+    homeActionTrack: "Which bus am I on?",
     homeMyFavorites: "My favorites",
     homeViewAll: "View all",
     homeLoadingFavorites: "Loading favorites...",
@@ -495,6 +543,52 @@ export const translations = {
     stopDetailGpsErrorDesc: "Could not obtain your precise location.",
     stopDetailTrackConfirm: "Destination set. You will receive a GPS alert when approaching.",
     stopDetailTrackArrivingNear: "Arriving in {n} min",
+
+    // Stop list & map controls
+    mapExpand: "Expand map",
+    mapCollapse: "Collapse map",
+    mapCloseFullscreen: "Close expanded map",
+    streetViewBtn: "Street View",
+    stopNoLines: "No lines assigned",
+    stopViewDetail: "View stop",
+    stopOpenInMaps: "Open in Google Maps",
+
+    // Refresh cooldown (server errors)
+    cooldownBannerTitle: "Server temporarily unavailable",
+    cooldownBannerDesc: "Wait {n}s before trying again to avoid saturating the server.",
+    cooldownRetryNow: "Retry now",
+    cooldownActiveFromSession: "Waiting to refresh ({n}s)...",
+
+    // TripCalculator future planning
+    tripDateLabel: "Trip date",
+    tripDatePlaceholder: "Today",
+    tripFutureDateHint: "For future dates you'll see which line to take, but without real-time arrival prediction.",
+    tripFutureDateBanner: "🗓️ Static planning for {date}. No real-time arrival prediction: only indicates which line to take.",
+    tripNoRealTime: "No real-time for this date",
+    tripDateToday: "Today",
+    tripDateTomorrow: "Tomorrow",
+
+    // BusTracker component
+    trackerTitle: "Which bus are you on?",
+    trackerSub: "Enter the bus number or use your location to detect which line you're riding on, pick your stop and see how much time is left.",
+    trackerByNumber: "Bus number",
+    trackerByLocation: "My location",
+    trackerNumberPlaceholder: "e.g. 61",
+    trackerDetectBtn: "Detect bus",
+    trackerLocateBtn: "Locate my bus",
+    trackerScanning: "Scanning buses on all lines...",
+    trackerLocating: "Checking your location...",
+    trackerNotFound: "No bus with that number is currently running. Check the number (usually next to the bus) and try again.",
+    trackerNoBusesNear: "No bus found near your location. Try again when a bus is closer.",
+    trackerFoundBus: "Detected: bus {num} on line {line} towards {dest}",
+    trackerSelectDest: "Choose your stop:",
+    trackerDestRemaining: "{m} stops · ~{min} min left",
+    trackerDestTrack: "Track this bus to here",
+    trackerStarted: "Tracking started. Remaining time updates in the bottom tracking bar.",
+    trackerCancel: "Change bus",
+    trackerNearStop: "You are near",
+    trackerGeoError: "Could not get your location. Make sure you allow location access.",
+    trackerNoCatalog: "The line catalog is not available yet. Try again in a few seconds.",
 
     // Blog Page & Posts
     blogTitle: "Blog - Coruña Bus | News and Transport Guides",

@@ -25,7 +25,7 @@ const t = getTranslations(lang);
   </section>
 
   <script>
-    import { API } from '../services/api';
+    import { API, isApiCooldownActive } from '../services/api';
     import { storage } from '../utils/storage';
     import { createIcons, Bus, MapPin, ChevronLeft } from 'lucide';
     import { getTranslations } from '../utils/i18n';
@@ -224,6 +224,7 @@ const t = getTranslations(lang);
       if (refreshInterval) clearInterval(refreshInterval);
       
       const updateBuses = async () => {
+        if (isApiCooldownActive()) return; // global breaker open - pause polling
         try {
           const data = await API.getMapData(lineId, 'B');
           if (data.resultado === 'OK' && data.mapas && data.mapas[0]) {
@@ -266,7 +267,7 @@ const t = getTranslations(lang);
       };
 
       updateBuses();
-      refreshInterval = setInterval(updateBuses, 15000);
+      refreshInterval = setInterval(updateBuses, 60000);
     }
 
     function updateBusPositionsInList(buses: any[]) {

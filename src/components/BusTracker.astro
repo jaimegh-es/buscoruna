@@ -1,0 +1,834 @@
+---
+import { getTranslations } from '../utils/i18n';
+import Icon from './Icon.astro';
+
+const lang = Astro.cookies.get('buscoruna_lang')?.value || 'es';
+const t = getTranslations(lang);
+---
+
+<bus-tracker>
+  <div class="bustracker card">
+    <div class="tracker-head">
+      <span class="tracker-head-icon"><Icon name="bus" size={22} /></span>
+      <div>
+        <h3>{t.trackerTitle}</h3>
+        <p class="tracker-sub">{t.trackerSub}</p>
+      </div>
+    </div>
+
+    <div class="tracker-tabs">
+      <button type="button" class="tracker-tab active" data-mode="number">
+        <span class="tracker-tab-num">#</span>
+        {t.trackerByNumber}
+      </button>
+      <button type="button" class="tracker-tab" data-mode="location">
+        <Icon name="location" size={16} />
+        {t.trackerByLocation}
+      </button>
+    </div>
+
+    <div class="tracker-pane active" id="tracker-pane-number">
+      <div class="tracker-row">
+        <input type="tel" inputmode="numeric" id="tracker-bus-number" placeholder={t.trackerNumberPlaceholder} />
+      </div>
+      <div class="tracker-row">
+        <button type="button" id="tracker-number-btn" class="btn-primary tracker-full-btn">{t.trackerDetectBtn}</button>
+      </div>
+    </div>
+
+    <div class="tracker-pane" id="tracker-pane-location">
+      <button type="button" id="tracker-location-btn" class="btn-secondary tracker-locate-btn">
+        <Icon name="location" size={16} />
+        {t.trackerLocateBtn}
+      </button>
+    </div>
+
+    <div id="tracker-status"></div>
+    <div id="tracker-result"></div>
+  </div>
+</bus-tracker>
+
+<style is:global>
+  bus-tracker {
+    display: block;
+    width: 100%;
+  }
+
+  bus-tracker .bustracker {
+    margin-bottom: 2rem;
+  }
+
+  bus-tracker .tracker-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  bus-tracker .tracker-head h3 {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+
+  bus-tracker .tracker-head-icon {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary);
+    color: white;
+    border-radius: 12px;
+  }
+
+  bus-tracker .tracker-sub {
+    margin: 0.25rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+
+  bus-tracker .tracker-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin: 1rem 0 0.75rem;
+  }
+
+  bus-tracker .tracker-tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.55rem 0.5rem;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  bus-tracker .tracker-tab.active {
+    background: #eff6ff;
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+
+  bus-tracker .tracker-tab-num {
+    font-weight: 800;
+    font-size: 0.9rem;
+  }
+
+  bus-tracker .tracker-pane {
+    display: none;
+  }
+
+  bus-tracker .tracker-pane.active {
+    display: block;
+  }
+
+  bus-tracker .tracker-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  bus-tracker .tracker-row + .tracker-row {
+    margin-top: 0.5rem;
+  }
+
+  bus-tracker .tracker-row input {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 1rem;
+    background: #fff;
+  }
+
+  bus-tracker .tracker-row input:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+
+  bus-tracker .tracker-full-btn {
+    width: 100%;
+  }
+
+  bus-tracker .tracker-locate-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  bus-tracker #tracker-status {
+    margin-top: 0.75rem;
+  }
+
+  bus-tracker #tracker-status .loading {
+    margin: 0.5rem auto;
+  }
+
+  bus-tracker .tracker-error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+    border-radius: 10px;
+    padding: 0.7rem 0.9rem;
+    font-size: 0.85rem;
+  }
+
+  bus-tracker .tracker-found {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+  }
+
+  bus-tracker .tracker-found-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+
+  bus-tracker .tracker-found .line-badge {
+    white-space: nowrap;
+  }
+
+  bus-tracker .tracker-found small {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--text-muted);
+  }
+
+  bus-tracker .tracker-dest-title {
+    margin: 1rem 0 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  bus-tracker .tracker-dest-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  bus-tracker .tracker-dest-item-wrap {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #fff;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+
+  bus-tracker .tracker-dest-item-wrap:has(.tracker-dest-item.open) {
+    border-color: var(--primary);
+  }
+
+  bus-tracker .tracker-dest-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.15s;
+  }
+
+  bus-tracker .tracker-dest-item:hover {
+    background: #f8fafc;
+  }
+
+  bus-tracker .tracker-dest-item small {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+
+  bus-tracker .tracker-dest-caret {
+    margin-left: auto;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    transition: transform 0.2s;
+  }
+
+  bus-tracker .tracker-dest-item.open .tracker-dest-caret {
+    transform: rotate(180deg);
+    color: var(--primary);
+  }
+
+  bus-tracker .tracker-dest-actions {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.6rem 0.8rem;
+    border-top: 1px dashed #e2e8f0;
+    background: #fafbfc;
+  }
+
+  bus-tracker .tracker-dest-track {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: none;
+    border-radius: 8px;
+    background: var(--primary);
+    color: white;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  bus-tracker .tracker-dest-track:active {
+    transform: scale(0.97);
+  }
+
+  bus-tracker .tracker-dest-view {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text);
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  bus-tracker .tracker-started {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1e40af;
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  bus-tracker .tracker-reset {
+    margin-top: 0.75rem;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+</style>
+
+<script>
+  import { storage } from '../utils/storage';
+  import { API } from '../services/api';
+  import { tracking } from '../utils/tracking';
+  import { getTranslations } from '../utils/i18n';
+
+  const lang = document.documentElement.getAttribute('data-lang') || 'es';
+  const t = getTranslations(lang);
+
+  class BusTracker extends HTMLElement {
+    private catalog: any = null;
+    private mode: 'number' | 'location' = 'number';
+    private userPos: { lat: number; lon: number } | null = null;
+    private scanning = false;
+    private currentBus: { bus: any; line: any } | null = null;
+    private scanCache: { at: number; key: string; entries: any[] } | null = null;
+    private SCAN_CACHE_MS = 15000;
+    // Bus positions get stale quickly, but for *detection* (which line is bus
+    // X on / is a bus near me) several minutes of age is perfectly fine. The
+    // live tracking bar uses dedicated arrival/ETA endpoints, not this cache.
+    private LINE_MAP_CACHE_MS = 900000;
+    private LINE_MAP_CACHE_KEY = 'buscoruna_line_map';
+    // Mapping bus number -> line id, learned from previous detections. Lets
+    // re-detecting the same bus cost 0-1 requests instead of a full scan.
+    private BUS_LINE_CACHE_KEY = 'buscoruna_bus_line';
+    private BUS_LINE_CACHE_MS = 3600000;
+
+    connectedCallback() {
+      this.catalog = storage.getCatalog();
+      window.addEventListener('catalog-loaded', () => {
+        this.catalog = storage.getCatalog();
+      });
+
+      this.setupTabs();
+      this.setupNumberSearch();
+      this.setupLocationSearch();
+    }
+
+    setupTabs() {
+      const tabs = this.querySelectorAll('.tracker-tab');
+      tabs.forEach(btn => {
+        btn.addEventListener('click', () => {
+          this.mode = btn.getAttribute('data-mode') as 'number' | 'location';
+          tabs.forEach(b => b.classList.toggle('active', b === btn));
+          (this.querySelector('#tracker-pane-number') as HTMLElement).classList.toggle('active', this.mode === 'number');
+          (this.querySelector('#tracker-pane-location') as HTMLElement).classList.toggle('active', this.mode === 'location');
+          this.showStatus('');
+          this.showResult('');
+        });
+      });
+    }
+
+    setupNumberSearch() {
+      const input = this.querySelector('#tracker-bus-number') as HTMLInputElement;
+      const btn = this.querySelector('#tracker-number-btn') as HTMLButtonElement;
+
+      const run = () => this.searchByNumber(input.value.trim());
+      btn.addEventListener('click', run);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') run();
+      });
+    }
+
+    setupLocationSearch() {
+      const btn = this.querySelector('#tracker-location-btn') as HTMLButtonElement;
+      btn.addEventListener('click', () => this.searchByLocation());
+    }
+
+    async searchByNumber(busNumber: string) {
+      if (!busNumber || this.scanning) return;
+      this.showStatus(`<div class="loading">${t.trackerScanning}</div>`);
+      this.showResult('');
+      this.scanning = true;
+      try {
+        const found = await this.scanLines(busNumber);
+        if (found) {
+          this.showDetected(found);
+        } else {
+          this.showResult(`<div class="tracker-error">${t.trackerNotFound}</div>`);
+        }
+      } finally {
+        this.scanning = false;
+      }
+    }
+
+    async searchByLocation() {
+      if (this.scanning) return;
+      this.showStatus(`<div class="loading">${t.trackerLocating}</div>`);
+      this.showResult('');
+      this.scanning = true;
+      try {
+        this.userPos = await this.getUserPosition();
+        if (!this.userPos) {
+          this.showResult(`<div class="tracker-error">${t.trackerGeoError}</div>`);
+          return;
+        }
+        this.showStatus(`<div class="loading">${t.trackerScanning}</div>`);
+        const found = await this.scanLines();
+        if (found) {
+          this.showDetected(found);
+        } else {
+          this.showResult(`<div class="tracker-error">${t.trackerNoBusesNear}</div>`);
+        }
+      } finally {
+        this.scanning = false;
+      }
+    }
+
+    getUserPosition(): Promise<{ lat: number; lon: number } | null> {
+      if (!navigator.geolocation) return Promise.resolve(null);
+      return new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+          () => resolve(null),
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 15000 }
+        );
+      });
+    }
+
+    async scanLines(busNumber?: string) {
+      const lineIds = await this.candidateLineIds(busNumber);
+      if (lineIds.length === 0) {
+        this.showStatus('');
+        this.showResult(`<div class="tracker-error">${t.trackerNoCatalog}</div>`);
+        return null;
+      }
+
+      // Check the lines that serve stops near the user first: the bus is very
+      // likely close to them, so we often find it before touching most lines.
+      const orderedIds = this.orderLinesByProximity(lineIds);
+
+      // Number mode: if we already learned which line this bus number runs on,
+      // just re-check that single line (fresh or cached) instead of rescanning.
+      if (busNumber) {
+        const knownLineId = this.getBusLineCache(busNumber);
+        if (knownLineId) {
+          const knownHit = await this.tryLine(knownLineId, busNumber);
+          if (knownHit) return { bus: knownHit.bus, line: knownHit.line };
+        }
+
+        // Scan in small batches and stop as soon as the bus is found, so we
+        // never spend API budget on lines that come after the hit.
+        const acc: any[] = [];
+        const BATCH = 3;
+        for (let i = 0; i < orderedIds.length; i += BATCH) {
+          const entries = await this.fetchBusEntries(orderedIds.slice(i, i + BATCH));
+          acc.push(...entries);
+          const hit = acc.find(e => e.bus.bus && e.bus.bus.toString() === busNumber);
+          if (hit) {
+            this.setBusLineCache(busNumber, hit.line.id);
+            return { bus: hit.bus, line: hit.line };
+          }
+        }
+        return null;
+      }
+
+      // Location mode: nearest bus over the full candidate set (reuse a recent
+      // scan while the user keeps interacting with the detection).
+      const cacheKey = orderedIds.slice().sort((a: number, b: number) => a - b).join(',');
+      let entries: any[] = this.scanCache &&
+        Date.now() - this.scanCache.at < this.SCAN_CACHE_MS &&
+        this.scanCache.key === cacheKey
+        ? this.scanCache.entries
+        : [];
+
+      if (entries.length === 0) {
+        entries = await this.fetchBusEntries(orderedIds);
+        this.scanCache = { at: Date.now(), key: cacheKey, entries };
+      }
+
+      if (this.userPos) {
+        let nearest: { bus: any; line: any; dist: number } | null = null;
+        for (const e of entries) {
+          const d = this.getDistance(this.userPos.lat, this.userPos.lon, e.bus.posy, e.bus.posx);
+          if (!nearest || d < nearest.dist) nearest = { bus: e.bus, line: e.line, dist: d };
+        }
+        if (nearest && nearest.dist <= 2000) {
+          return { bus: nearest.bus, line: nearest.line };
+        }
+        return null;
+      }
+
+      return null;
+    }
+
+    // Check a single line for a given bus number (reuses cached map data).
+    async tryLine(lineId: number, busNumber: string) {
+      const lines = await this.getCatalogLines();
+      if (!lines) return null;
+      const line = lines.find((l: any) => l && l.id.toString() === lineId.toString());
+      if (!line) return null;
+      const entries = await this.fetchBusEntries([line.id]);
+      const hit = entries.find(e => e.bus.bus && e.bus.bus.toString() === busNumber);
+      return hit || null;
+    }
+
+    // Put lines that serve stops within 1.5km of the user (if known) first.
+    orderLinesByProximity(lineIds: number[]): number[] {
+      if (!this.userPos) return lineIds;
+      const nearby = this.findNearbyStops(this.userPos.lat, this.userPos.lon, 1500);
+      const priority = new Set<number>();
+      nearby.forEach((s: any) => {
+        (s.enlaces || []).forEach((lid: any) => {
+          const id = parseInt(lid.toString(), 10);
+          if (!isNaN(id)) priority.add(id);
+        });
+      });
+      return [...lineIds.filter(id => priority.has(id)), ...lineIds.filter(id => !priority.has(id))];
+    }
+
+    getBusLineCache(busNumber: string): number | null {
+      try {
+        const raw = sessionStorage.getItem(`${this.BUS_LINE_CACHE_KEY}_${busNumber}`);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed.lineId !== 'number' || typeof parsed.at !== 'number') return null;
+        if (Date.now() - parsed.at > this.BUS_LINE_CACHE_MS) return null;
+        return parsed.lineId;
+      } catch {
+        return null;
+      }
+    }
+
+    setBusLineCache(busNumber: string, lineId: number) {
+      try {
+        sessionStorage.setItem(`${this.BUS_LINE_CACHE_KEY}_${busNumber}`, JSON.stringify({ lineId, at: Date.now() }));
+      } catch {
+        // ignore
+      }
+    }
+
+    // Fetch bus positions for a set of lines in parallel (the API queue keeps
+    // concurrency bounded), resolving to one entry per bus. Per-line map data is
+    // cached for a few minutes so repeated detections reuse it without spending
+    // API budget; stale cache is used as fallback when the API is unavailable.
+    async fetchBusEntries(lineIds: number[]) {
+      const lines = await this.getCatalogLines();
+      if (!lines) return [];
+      const byId = new Map(lines.map((l: any) => [l.id.toString(), l]));
+
+      const results = await Promise.allSettled(
+        lineIds.map(async (id) => {
+          const line = byId.get(id.toString());
+          if (!line || !line.id) return [] as any[];
+          const cacheKey = line.id.toString();
+          const cached = this.readLineMapCache(cacheKey);
+
+          let data: any;
+          if (cached && Date.now() - cached.at < this.LINE_MAP_CACHE_MS) {
+            data = cached.data;
+          } else {
+            try {
+              data = await API.getMapData(line.id, 'B');
+              if (data && data.resultado === 'OK') {
+                this.writeLineMapCache(cacheKey, data);
+              }
+            } catch (err) {
+              data = cached ? cached.data : null;
+            }
+          }
+
+          if (!data || data.resultado !== 'OK' || !data.mapas || !data.mapas[0] || !Array.isArray(data.mapas[0].buses)) return [] as any[];
+          const entries: any[] = [];
+          for (const dir of data.mapas[0].buses) {
+            for (const b of dir.buses || []) {
+              entries.push({ bus: { ...b, sentido: dir.sentido }, line });
+            }
+          }
+          return entries;
+        })
+      );
+
+      return results.flatMap(r => (r.status === 'fulfilled' ? r.value : []));
+    }
+
+    readLineMapCache(id: string): { at: number; data: any } | null {
+      try {
+        const raw = sessionStorage.getItem(`${this.LINE_MAP_CACHE_KEY}_${id}`);
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        return null;
+      }
+    }
+
+    writeLineMapCache(id: string, data: any) {
+      try {
+        sessionStorage.setItem(`${this.LINE_MAP_CACHE_KEY}_${id}`, JSON.stringify({ at: Date.now(), data }));
+      } catch {
+        // storage full/unavailable - ignore
+      }
+    }
+
+    // Number mode: scan all lines. Location mode: narrow down to the lines that
+    // serve the stops closest to the user, which is a fraction of all lines.
+    async candidateLineIds(busNumber?: string): Promise<number[]> {
+      const lines = await this.getCatalogLines();
+      if (!lines) return [];
+      const allIds = lines.filter((l: any) => l && l.id).map((l: any) => l.id);
+
+      if (busNumber || !this.userPos) return allIds;
+
+      const nearby = this.findNearbyStops(this.userPos.lat, this.userPos.lon, 1500);
+      const set = new Set<number>();
+      nearby.forEach((s: any) => {
+        (s.enlaces || []).forEach((lid: any) => {
+          const id = parseInt(lid.toString(), 10);
+          if (!isNaN(id)) set.add(id);
+        });
+      });
+      const candidates = [...set];
+      return candidates.length > 0 ? candidates : allIds;
+    }
+
+    async getCatalogLines() {
+      this.catalog = storage.getCatalog();
+      if (!this.catalog || !this.catalog.actualizacion || !this.catalog.actualizacion.lineas) return null;
+      return this.catalog.actualizacion.lineas;
+    }
+
+    findNearbyStops(lat: number, lon: number, radiusMeters: number) {
+      this.catalog = storage.getCatalog();
+      if (!this.catalog || !this.catalog.paradas) return [];
+      return Object.values(this.catalog.paradas)
+        .map((s: any) => ({ ...s, dist: this.getDistance(lat, lon, s.posy, s.posx) }))
+        .filter((s: any) => s.dist <= radiusMeters)
+        .sort((a: any, b: any) => a.dist - b.dist);
+    }
+
+    showDetected(found: { bus: any; line: any }) {
+      const routeInfo = this.resolveRoute(found.bus, found.line);
+      if (!routeInfo) {
+        this.showResult(`<div class="tracker-error">${t.trackerNotFound}</div>`);
+        return;
+      }
+
+      const lineComer = found.line.lin_comer || found.line.id;
+      const destName = found.bus.destino || '';
+      this.currentBus = found;
+
+      this.showStatus('');
+      this.showResult(`
+        <div class="tracker-found">
+          <div class="tracker-found-header">
+            <span class="line-badge" style="background-color: #${found.line.color || 'f44336'}">${lineComer}</span>
+            <span>${t.trackerFoundBus
+              .replace('{num}', found.bus.bus)
+              .replace('{line}', lineComer)
+              .replace('{dest}', destName)}</span>
+          </div>
+          <small>${routeInfo.nearestStop ? `${t.trackerNearStop} <strong>${routeInfo.nearestStop.nombre}</strong>` : ''}</small>
+        </div>
+        <div class="tracker-dest-title">${t.trackerSelectDest}</div>
+        <div class="tracker-dest-list">
+          ${routeInfo.route.paradas.slice(routeInfo.nearestIdx + 1).map((pid: any, i: number) => {
+            const stop = this.catalog.paradas?.[pid];
+            if (!stop) return '';
+            const remaining = i + 1;
+            return `
+              <div class="tracker-dest-item-wrap">
+                <button type="button" class="tracker-dest-item" data-stop-id="${pid}" data-stop-name="${stop.nombre.replace(/"/g, '&quot;')}">
+                  <span>${stop.nombre}</span>
+                  <small>${t.trackerDestRemaining.replace('{m}', remaining.toString()).replace('{min}', Math.round(remaining * 2).toString())}</small>
+                  <span class="tracker-dest-caret" aria-hidden="true">▾</span>
+                </button>
+                <div class="tracker-dest-actions" data-stop-id="${pid}" hidden>
+                  <button type="button" class="tracker-dest-track" data-stop-id="${pid}">${t.trackerDestTrack}</button>
+                  <a href="/stop/${pid}" class="tracker-dest-view">${lang === 'en' ? 'View stop' : 'Ver parada'}</a>
+                </div>
+              </div>
+            `;
+          }).join('') || '<div class="tracker-error">—</div>'}
+        </div>
+      `);
+
+      this.querySelectorAll('.tracker-dest-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+          this.toggleDestActions(btn);
+        });
+      });
+
+      this.querySelectorAll('.tracker-dest-track').forEach(btn => {
+        btn.addEventListener('click', () => {
+          this.startTracking(routeInfo, btn.getAttribute('data-stop-id')!);
+        });
+      });
+    }
+
+    resolveRoute(bus: any, line: any) {
+      const paradasById = this.catalog?.paradas || {};
+      let best: any = null;
+      const destNorm = String(bus.destino || '').toLowerCase().trim();
+
+      for (let di = 0; di < (line.rutas || []).length; di++) {
+        const route = line.rutas[di];
+        if (!route || !route.paradas || route.paradas.length < 2) continue;
+
+        let nearestIdx = -1;
+        let minDist = Infinity;
+        route.paradas.forEach((pid: any, i: number) => {
+          const s = paradasById[pid];
+          if (s) {
+            const d = this.getDistance(bus.posy, bus.posx, s.posy, s.posx);
+            if (d < minDist) { minDist = d; nearestIdx = i; }
+          }
+        });
+        if (nearestIdx === -1 || minDist > 1000) continue;
+
+        const lastStop = paradasById[route.paradas[route.paradas.length - 1]];
+        const destMatches = destNorm === '' || !lastStop || lastStop.nombre.toLowerCase().includes(destNorm);
+        const remaining = route.paradas.length - 1 - nearestIdx;
+
+        if (!best || (destMatches && !best.destMatches) || (destMatches === best.destMatches && remaining > best.remaining)) {
+          best = { route, di, nearestIdx, minDist, destMatches, remaining };
+        }
+      }
+      // Prefer a matching route even with fewer remaining stops if none matched
+      if (best) return this.finalizeRoute(best);
+      return null;
+    }
+
+    finalizeRoute(info: any) {
+      const paradasById = this.catalog?.paradas || {};
+      const nearestStop = paradasById[info.route.paradas[info.nearestIdx]];
+      return { ...info, nearestStop };
+    }
+
+    toggleDestActions(btn: HTMLElement) {
+      const wrap = btn.closest('.tracker-dest-item-wrap');
+      const actions = wrap?.querySelector('.tracker-dest-actions');
+      if (!actions) return;
+      const willOpen = actions.hasAttribute('hidden');
+
+      this.querySelectorAll('.tracker-dest-actions').forEach(a => a.setAttribute('hidden', ''));
+      this.querySelectorAll('.tracker-dest-item').forEach(el => el.classList.remove('open'));
+
+      if (willOpen) {
+        actions.removeAttribute('hidden');
+        btn.classList.add('open');
+      }
+    }
+
+    startTracking(routeInfo: any, stopId: string) {
+      const destId = parseInt(stopId);
+      const originId = parseInt(routeInfo.route.paradas[routeInfo.nearestIdx]);
+      const bus = this.currentBus?.bus;
+
+      if (!bus || isNaN(destId)) return;
+
+      tracking.set({
+        busId: bus.bus.toString(),
+        lineId: this.currentBus.line.id,
+        destinationStopId: destId,
+        originStopId: originId,
+        lastEta: null,
+        arrivalTime: null
+      });
+
+      this.showStatus('');
+      this.showResult(`
+        <div class="tracker-started">
+          <span>✅</span> ${t.trackerStarted}
+        </div>
+        <button type="button" class="tracker-reset" id="tracker-reset-btn">${t.trackerCancel}</button>
+      `);
+      this.querySelector('#tracker-reset-btn')?.addEventListener('click', () => {
+        this.currentBus = null;
+        this.showResult('');
+        this.showStatus('');
+      });
+    }
+
+    getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    showStatus(html: string) {
+      const el = this.querySelector('#tracker-status');
+      if (el) el.innerHTML = html;
+    }
+
+    showResult(html: string) {
+      const el = this.querySelector('#tracker-result');
+      if (el) el.innerHTML = html;
+    }
+  }
+
+  customElements.define('bus-tracker', BusTracker);
+</script>

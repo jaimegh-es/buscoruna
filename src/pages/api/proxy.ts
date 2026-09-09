@@ -83,10 +83,38 @@ export const GET: APIRoute = async ({ request }) => {
     });
     
     clearTimeout(timeoutId);
-    
-    const data = await response.json();
+
+    // The upstream is aggressively rate-limited (1 req/s, 4/min; it answers 429
+    // with an HTML body). Always read the raw body first - JSON.parse on an HTML
+    // error page would crash the proxy - and mirror the upstream status so the
+    // client can honor the cooldown with a proper Retry-After.
+    const upstreamStatus = response.status;
+    const raw = await response.text();
+
+    let data: any;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      const isRateLimit = upstreamStatus === 429;
+      const retryAfter = response.headers.get('retry-after') || (isRateLimit ? '60' : '');
+      return new Response(
+        JSON.stringify({
+          error: isRateLimit ? 'rate_limited' : 'upstream_unavailable',
+          upstream_status: upstreamStatus,
+        }),
+        {
+          status: isRateLimit ? 429 : (upstreamStatus >= 400 ? upstreamStatus : 502),
+          headers: {
+            'Content-Type': 'application/json',
+            ...(retryAfter ? { 'Retry-After': retryAfter } : {}),
+            'Access-Control-Allow-Origin': origin || (referer ? new URL(referer).origin : '*'),
+          },
+        }
+      );
+    }
+
     return new Response(JSON.stringify(data), {
-      status: 200,
+      status: upstreamStatus >= 400 ? upstreamStatus : 200,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': origin || (referer ? new URL(referer).origin : '*'),

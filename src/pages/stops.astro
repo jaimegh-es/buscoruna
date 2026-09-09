@@ -21,7 +21,15 @@ const t = getTranslations(lang);
       <div id="search-results-count" class="search-hint"></div>
     </div>
 
-	  <div id="nearby-map" style="height: 250px; margin-bottom: 1.5rem; border-radius: 12px; z-index: 1;"></div>
+	  <div id="nearby-map-wrap" class="nearby-map-wrap">
+	    <div id="nearby-map" style="height: 250px; border-radius: 12px; z-index: 1;"></div>
+	    <button id="expand-map-btn" class="map-overlay-btn" title={t.mapExpand}>
+	      <Icon name="maximize" size={18} />
+	    </button>
+	    <button id="collapse-map-btn" class="map-overlay-btn" style="display: none;" title={t.mapCloseFullscreen}>
+	      <Icon name="minimize" size={18} />
+	    </button>
+	  </div>
 
 	  <div id="stops-container">
 	    <div class="loading">{t.stopsLoadingText}</div>
@@ -31,7 +39,7 @@ const t = getTranslations(lang);
 	<script>
 	  import { storage } from '../utils/storage';
 	  import { API } from '../services/api';
-		import { createIcons, MapPin, ChevronRight, LocateFixed } from 'lucide';
+		import { createIcons, MapPin, ChevronRight, LocateFixed, Map, Camera } from 'lucide';
 		import { getTranslations } from '../utils/i18n';
 
 		const lang = document.documentElement.getAttribute('data-lang') || 'es';
@@ -139,51 +147,104 @@ const t = getTranslations(lang);
 	      .sort((a, b) => a.dist - b.dist)
 	      .slice(0, 20);
 
-	    container.innerHTML = `
-	      <div class="stops-list">
-	        ${nearby.map((s: any, index) => `
-	          <a href="/stop/${s.id}" class="card stop-card-link">
-              <div class="stop-badge">${index + 1}</div>
-	            <div class="stop-info">
-	              <div class="stop-name-row">
-                  <strong>${s.nombre}</strong>
-                  <span class="stop-distance">${Math.round(s.dist)}${t.stopsDistanceSuffix}</span>
+container.innerHTML = `
+      <div class="stops-list">
+        ${nearby.map((s: any, index) => {
+          const hasLines = (Array.isArray(s.enlaces) ? s.enlaces : []).some((lId: any) => !!lineMap[lId]);
+          const noLinesClass = hasLines ? '' : 'stop-no-lines';
+          const badgeTitle = hasLines ? '' : t.stopNoLines;
+          return `
+          <div class="card stop-card ${noLinesClass}" data-idx="${index}">
+            <div class="stop-card-main">
+              <button class="stop-badge" data-toggle="stop" title="${badgeTitle}" aria-expanded="false">${index + 1}</button>
+              <button type="button" class="stop-info-link" data-toggle="stop" aria-expanded="false">
+                <div class="stop-info">
+                  <div class="stop-name-row">
+                    <strong>${s.nombre}</strong>
+                    <span class="stop-distance">${Math.round(s.dist)}${t.stopsDistanceSuffix}</span>
+                  </div>
+                  <small>${t.stopsIdLabel} ${s.id}</small>
+                  <div class="stop-lines">
+                    ${hasLines
+                      ? (s.enlaces || []).map((lId: any) => {
+                          const lineInfo = lineMap[lId];
+                          if (!lineInfo) return '';
+                          return `<span class="line-tag" style="background-color: #${lineInfo.color}">${lineInfo.name}</span>`;
+                        }).join('')
+                      : `<span class="line-tag line-tag-gray">${t.stopNoLines}</span>`
+                    }
+                  </div>
                 </div>
-	              <small>${t.stopsIdLabel} ${s.id}</small>
-	              <div class="stop-lines">
-	                ${s.enlaces.map((lId: any) => {
-                    const lineInfo = lineMap[lId];
-                    if (!lineInfo) return '';
-                    return `<span class="line-tag" style="background-color: #${lineInfo.color}">${lineInfo.name}</span>`;
-                  }).join('')}
-	              </div>
-	            </div>
-	            <div class="stop-arrow"><i data-lucide="chevron-right"></i></div>
-	          </a>
-	        `).join('')}
-	      </div>
-	    `;
+                <div class="stop-arrow"><i data-lucide="chevron-right"></i></div>
+              </button>
+            </div>
+            <div class="stop-details">
+              <div class="stop-detail-actions">
+                <a href="/stop/${s.id}" class="btn-stop-detail">
+                  <i data-lucide="map-pin" style="width: 14px; height: 14px;"></i> ${t.stopViewDetail}
+                </a>
+                <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${s.posy},${s.posx}" target="_blank" rel="noopener" class="btn-stop-detail">
+                  <i data-lucide="camera" style="width: 14px; height: 14px;"></i> ${t.streetViewBtn}
+                </a>
+                <a href="https://www.google.com/maps/dir/?api=1&destination=${s.posy},${s.posx}" target="_blank" rel="noopener" class="btn-stop-detail">
+                  <i data-lucide="map" style="width: 14px; height: 14px;"></i> ${t.stopOpenInMaps}
+                </a>
+              </div>
+            </div>
+          </div>
+        `;
+        }).join('')}
+      </div>
+    `;
 
       createIcons({
         icons: {
           MapPin,
           ChevronRight,
-          LocateFixed
+          LocateFixed,
+          Map,
+          Camera
         }
+      });
+
+      // Toggle inline card from the number badge or the info link
+      container.querySelectorAll('.stop-card [data-toggle="stop"]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const card = (e.currentTarget as HTMLElement).closest('.stop-card');
+          if (!card) return;
+          const expanded = card.classList.toggle('expanded');
+          card.querySelectorAll('[data-toggle="stop"]').forEach((el) => {
+            el.setAttribute('aria-expanded', String(expanded));
+          });
+        });
       });
 
       // @ts-ignore
       const bounds = L.latLngBounds([[lat, lon]]);
       nearby.forEach((s, index) => {
+        const hasLines = (Array.isArray(s.enlaces) ? s.enlaces : []).some((lId: any) => !!lineMap[lId]);
         // @ts-ignore
         const customIcon = L.divIcon({
-          html: `<div class="map-stop-marker"><span>${index + 1}</span></div>`,
+          html: `<div class="map-stop-marker ${hasLines ? '' : 'map-stop-marker-gray'}"><span>${index + 1}</span></div>`,
           className: 'custom-stop-icon',
           iconSize: [24, 24],
           iconAnchor: [12, 12]
         });
         // @ts-ignore
-        const m = L.marker([s.posy, s.posx], { icon: customIcon }).addTo(map).bindPopup(s.nombre);
+        const m = L.marker([s.posy, s.posx], { icon: customIcon }).addTo(map)
+          .bindPopup(s.nombre)
+          .on('click', () => {
+            const card = container.querySelector(`.stop-card[data-idx="${index}"]`);
+            if (card) {
+              card.classList.add('expanded');
+              card.querySelectorAll('[data-toggle="stop"]').forEach((el) => {
+                el.setAttribute('aria-expanded', 'true');
+              });
+              card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          });
         markers.push(m);
         bounds.extend([s.posy, s.posx]);
       });
@@ -213,6 +274,26 @@ const t = getTranslations(lang);
     loadNearbyStops();
     document.getElementById('refresh-gps')?.addEventListener('click', loadNearbyStops);
     
+    // Expand / collapse the map (fullscreen)
+    const mapWrap = document.getElementById('nearby-map-wrap');
+    const expandMapBtn = document.getElementById('expand-map-btn');
+    const collapseMapBtn = document.getElementById('collapse-map-btn');
+
+    function setMapFullscreen(on: boolean) {
+      if (!mapWrap) return;
+      mapWrap.classList.toggle('fullscreen', on);
+      if (expandMapBtn) expandMapBtn.style.display = on ? 'none' : 'flex';
+      if (collapseMapBtn) collapseMapBtn.style.display = on ? 'flex' : 'none';
+      if (on && map) {
+        setTimeout(() => map.invalidateSize(), 100);
+      } else {
+        setTimeout(() => map?.invalidateSize(), 250);
+      }
+    }
+
+    expandMapBtn?.addEventListener('click', () => setMapFullscreen(true));
+    collapseMapBtn?.addEventListener('click', () => setMapFullscreen(false));
+
     // Listen for catalog loading if it wasn't ready
     window.addEventListener('catalog-loaded', () => {
       loadNearbyStops();
@@ -275,19 +356,51 @@ const t = getTranslations(lang);
     padding-left: 0.5rem;
   }
 
-  .stop-card-link {
+  .stop-card {
+    padding: 0;
+    margin-bottom: 1rem;
+    text-decoration: none;
+    color: inherit;
+    overflow: hidden;
+  }
+
+  .stop-card-main {
     display: flex;
     gap: 1rem;
     align-items: center;
     padding: 1rem;
-    margin-bottom: 1rem;
+  }
+
+  .stop-info-link {
+    flex-grow: 1;
+    min-width: 0;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
     text-decoration: none;
     color: inherit;
     transition: transform 0.1s;
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    cursor: pointer;
+    text-align: left;
   }
 
-  .stop-card-link:active {
+  .stop-info-link:active {
     transform: scale(0.98);
+  }
+
+  .stop-arrow {
+    flex-shrink: 0;
+    color: var(--text-muted);
+    transition: transform 0.2s ease;
+  }
+
+  .stop-card.expanded .stop-arrow {
+    transform: rotate(90deg);
   }
 
   .stop-badge {
@@ -302,6 +415,74 @@ const t = getTranslations(lang);
     font-weight: bold;
     flex-shrink: 0;
     font-size: 0.9rem;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+
+  .stop-badge:active {
+    transform: scale(0.9);
+  }
+
+  /* Stops with no assigned lines appear in gray */
+  .stop-no-lines .stop-badge {
+    background: #b6b6b6;
+  }
+
+  .stop-no-lines .stop-name-row strong {
+    color: var(--text-muted);
+  }
+
+  .stop-no-lines .stop-name-row strong::after {
+    content: ' 🚫';
+    font-size: 0.7rem;
+  }
+
+  .line-tag-gray {
+    background: #b6b6b6 !important;
+  }
+
+  .stop-details {
+    display: none;
+    border-top: 1px dashed #eee;
+    padding: 0.75rem 1rem 1rem;
+    background: #fafafa;
+  }
+
+  .stop-card.expanded .stop-details {
+    display: block;
+    animation: stopDetailsIn 0.2s ease-out;
+  }
+
+  @keyframes stopDetailsIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .stop-detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .btn-stop-detail {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    color: #334155;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.15s;
+  }
+
+  .btn-stop-detail:active {
+    background: #f1f5f9;
+    transform: scale(0.96);
   }
 
   .stop-info {
@@ -365,5 +546,64 @@ const t = getTranslations(lang);
     font-weight: bold;
     font-size: 12px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  }
+
+  .map-stop-marker-gray {
+    background: #b6b6b6;
+  }
+
+  .nearby-map-wrap {
+    position: relative;
+    margin-bottom: 1.5rem;
+    border-radius: 12px;
+    z-index: 1;
+  }
+
+  .nearby-map-wrap.fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 5002;
+    background: #fff;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .nearby-map-wrap.fullscreen #nearby-map {
+    position: absolute;
+    inset: 0;
+    height: 100vh !important;
+    width: 100vw;
+    border-radius: 0;
+    z-index: 1;
+  }
+
+  .map-overlay-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1000;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: white;
+    color: var(--text);
+    border: 1px solid #ddd;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .map-overlay-btn:active {
+    transform: scale(0.93);
+  }
+
+  .nearby-map-wrap.fullscreen .leaflet-control-container .leaflet-top.leaflet-right {
+    right: 10px;
+  }
+
+  .nearby-map-wrap.fullscreen .map-overlay-btn {
+    top: 12px;
   }
 </style>

@@ -158,6 +158,26 @@ const t = getTranslations(lang);
     color: var(--text-muted);
   }
 
+  .future-date-banner {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1e40af;
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .static-plan-note {
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    background: #f8fafc;
+    border-top: 1px solid #f1f5f9;
+  }
+
   .main-calculator-card {
     margin-bottom: 2rem;
   }
@@ -740,11 +760,18 @@ const t = getTranslations(lang);
   .transfer-details p {
     margin: 0.25rem 0;
   }
+
+  .transfer-walk-note {
+    display: block;
+    margin-top: 0.35rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
 </style>
 
 <script>
   import { storage } from '../utils/storage';
-  import { API } from '../services/api';
+  import { API, isApiCooldownActive } from '../services/api';
   import { Geocoding } from '../services/geocoding';
   import { 
     createIcons, 
@@ -774,6 +801,7 @@ const t = getTranslations(lang);
     private tempSelectedStop: any = null;
     private lastResults: any[] = [];
     private plannerMode: 'now' | 'arrive' = 'now';
+    private plannedDate: string = '';
 
     constructor() {
       super();
@@ -890,6 +918,11 @@ const t = getTranslations(lang);
         if (timeGroup) timeGroup.style.display = 'none';
       }
 
+      const targetDate = urlParams.get('targetDate');
+      if (targetDate) {
+        this.plannedDate = targetDate;
+      }
+
       if (this.selectedOrigin && this.selectedDestination) {
         this.calculate();
       }
@@ -949,6 +982,9 @@ const t = getTranslations(lang);
       
       this.catalog = storage.getCatalog();
       if (!this.catalog) return;
+
+      const dateInput = this.querySelector('#target-date') as HTMLInputElement;
+      this.plannedDate = dateInput?.value || this.plannedDate || '';
 
       const allLines = this.catalog.actualizacion.lineas;
 
@@ -1290,6 +1326,9 @@ const t = getTranslations(lang);
       const allLines = this.catalog.actualizacion.lineas;
       const allStopsArray = Object.values(this.catalog.paradas);
 
+      // Future-date planning: show which line to take but skip real-time prediction
+      const isFutureDate = !!(this.plannedDate && !this.isSameDay(this.plannedDate, new Date()));
+
       // Prepare origin and destination stops
       let originStops = [];
       if (this.selectedOrigin.type === 'stop') {
@@ -1347,8 +1386,8 @@ const t = getTranslations(lang);
       let transferRoutes: any[] = [];
       if (directRoutes.length < 2) {
         // Try transfers between the top origin and destination stops
-        const topO = originStops.slice(0, 3);
-        const topD = destStops.slice(0, 3);
+        const topO = originStops.slice(0, 4);
+        const topD = destStops.slice(0, 4);
         
         for (const oStop of topO) {
           for (const dStop of topD) {
@@ -1362,9 +1401,9 @@ const t = getTranslations(lang);
                  walkToOrigin: Math.round(oStop.walkDist),
                  walkToDest: Math.round(dStop.walkDist)
               };
-              // Deduplicate by line combination and transfer stop
-              const key = `${r.l1.id}-${r.l2.id}-${r.transferStop.id}`;
-              if (!transferRoutes.find(tr => `${tr.l1.id}-${tr.l2.id}-${tr.transferStop.id}` === key)) {
+              // Deduplicate by line combination and transfer stop pair
+              const key = `${r.l1.id}-${r.l2.id}-${r.transferStop.id}-${r.transferBoardStop.id}`;
+              if (!transferRoutes.find(tr => `${tr.l1.id}-${tr.l2.id}-${tr.transferStop.id}-${tr.transferBoardStop.id}` === key)) {
                 transferRoutes.push(routeObj);
               }
             });
@@ -1372,7 +1411,7 @@ const t = getTranslations(lang);
         }
       }
       
-      transferRoutes.sort((a, b) => (a.totalStops * 2 + a.walkDist/50) - (b.totalStops * 2 + b.walkDist/50));
+      transferRoutes.sort((a, b) => (a.totalStops * 2 + a.walkDist/50 + (a.walkTransfer || 0)/25) - (b.totalStops * 2 + b.walkDist/50 + (b.walkTransfer || 0)/25));
       console.log(`Found ${transferRoutes.length} transfer routes`);
 
       if (directRoutes.length === 0 && nearbyRoutes.length === 0 && transferRoutes.length === 0) {
@@ -1416,12 +1455,17 @@ const t = getTranslations(lang);
               }
             </button>
           </div>
+          ${isFutureDate ? `
+          <div class="future-date-banner">
+            ${t.tripFutureDateBanner.replace('{date}', this.formatPlannedDate(this.plannedDate))}
+          </div>
+        ` : ''}
           <div id="taxi-warning" style="display: none; padding: 1rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; margin-bottom: 1.5rem; color: #92400e; font-style: italic; text-align: center;">
              ${lang === 'en' ? '🚕 Looks like you might need to take a taxi...' : '🚕 Pues va a haber que coger un taxi...'}
           </div>
           <div class="results-list">
-            ${directRoutes.slice(0, 3).map((l, i) => this.renderDirectRouteCard(l, i)).join('')}
-            ${nearbyRoutes.slice(0, 3).map((l, i) => this.renderNearbyRouteCard(l, i + directRoutes.length)).join('')}
+            ${directRoutes.slice(0, 3).map((l, i) => this.renderDirectRouteCard(l, i, !isFutureDate)).join('')}
+            ${nearbyRoutes.slice(0, 3).map((l, i) => this.renderNearbyRouteCard(l, i + directRoutes.length, !isFutureDate)).join('')}
             ${transferRoutes.slice(0, 2).map((l, i) => this.renderTransferRouteCard(l, i + directRoutes.length + nearbyRoutes.length)).join('')}
           </div>
         `;
@@ -1491,8 +1535,10 @@ const t = getTranslations(lang);
           });
         });
 
-        const toFetch = [...directRoutes.slice(0,2), ...nearbyRoutes.slice(0,2)];
-        this.fetchRealTime(toFetch);
+        if (!isFutureDate) {
+          const toFetch = [...directRoutes.slice(0,2), ...nearbyRoutes.slice(0,2)];
+          this.fetchRealTime(toFetch);
+        }
 
         // Add favorite button listeners
         resultsDiv.querySelectorAll('.fav-route-btn').forEach(btn => {
@@ -1765,13 +1811,21 @@ const t = getTranslations(lang);
       const results: any[] = [];
       const sOriginId = originId.toString();
       const sDestId = destId.toString();
-      
+      const MAX_TRANSFER_WALK = 200;
+
       const originStop = stops.find(s => s.id.toString() === sOriginId);
       const destStop = stops.find(s => s.id.toString() === sDestId);
       if (!originStop || !destStop) return [];
 
-      const linesAtOrigin = originStop.enlaces;
-      const linesAtDest = destStop.enlaces;
+      const linesAtOrigin = originStop.enlaces || [];
+      const linesAtDest = destStop.enlaces || [];
+
+      const pushIfNew = (r: any) => {
+        const key = `${r.l1.id}-${r.l2.id}-${r.transferStop.id}-${r.transferBoardStop.id}`;
+        if (!results.find(x => `${x.l1.id}-${x.l2.id}-${x.transferStop.id}-${x.transferBoardStop.id}` === key)) {
+          results.push(r);
+        }
+      };
 
       linesAtOrigin.forEach((l1Id: any) => {
         const line1 = lines.find(l => l.id.toString() === l1Id.toString());
@@ -1781,18 +1835,17 @@ const t = getTranslations(lang);
           const oIdx = r1.paradas.findIndex((p: any) => p.toString() === sOriginId);
           if (oIdx === -1) return;
 
-          // Look for potential transfer stops (major stops or any stop with connections)
           for (let i = oIdx + 1; i < r1.paradas.length; i++) {
             const transferStopId = r1.paradas[i];
             const transferStop = stops.find(s => s.id.toString() === transferStopId.toString());
             if (!transferStop || transferStopId.toString() === sDestId) continue;
 
-            const linesAtTransfer = transferStop.enlaces;
-            // Lines that are at the transfer stop AND at the destination stop
-            const commonLines = linesAtTransfer.filter((lId: any) => 
+            const linesAtTransfer = transferStop.enlaces || [];
+
+            // Case A: exact same stop is served by line2
+            const commonLines = linesAtTransfer.filter((lId: any) =>
               linesAtDest.some((d: any) => d.toString() === lId.toString())
             );
-
             commonLines.forEach((l2Id: any) => {
               if (l2Id.toString() === l1Id.toString()) return;
               const line2 = lines.find(l => l.id.toString() === l2Id.toString());
@@ -1801,15 +1854,46 @@ const t = getTranslations(lang);
               line2.rutas.forEach((r2: any) => {
                 const tIdx = r2.paradas.findIndex((p: any) => p.toString() === transferStopId.toString());
                 const dIdx = r2.paradas.findIndex((p: any) => p.toString() === sDestId);
-
                 if (tIdx !== -1 && dIdx !== -1 && tIdx < dIdx) {
-                  // Found a connection!
-                  const transferKey = `${line1.id}-${line2.id}-${transferStopId}`;
-                  if (!results.find(r => `${r.l1.id}-${r.l2.id}-${r.transferStop.id}` === transferKey)) {
-                    results.push({
+                  pushIfNew({
+                    l1: line1,
+                    l2: line2,
+                    transferStop: transferStop,
+                    transferBoardStop: transferStop,
+                    walkTransfer: 0,
+                    boardOnTransferStop: true,
+                    stops1: i - oIdx,
+                    stops2: dIdx - tIdx,
+                    totalStops: (i - oIdx) + (dIdx - tIdx),
+                    originStop: originStop,
+                    destStop: destStop
+                  });
+                }
+              });
+            });
+
+            // Case B: walking transfer to a nearby stop served by line2
+            const nearby = this.findNearbyStops(transferStop.posy, transferStop.posx, MAX_TRANSFER_WALK);
+            nearby.forEach((nb: any) => {
+              if (nb.id.toString() === transferStopId.toString()) return;
+              const linesAtNb = nb.enlaces || [];
+              linesAtNb.forEach((l2Id: any) => {
+                if (l2Id.toString() === l1Id.toString()) return;
+                if (!linesAtDest.some((d: any) => d.toString() === l2Id.toString())) return;
+                const line2 = lines.find(l => l.id.toString() === l2Id.toString());
+                if (!line2) return;
+
+                line2.rutas.forEach((r2: any) => {
+                  const tIdx = r2.paradas.findIndex((p: any) => p.toString() === nb.id.toString());
+                  const dIdx = r2.paradas.findIndex((p: any) => p.toString() === sDestId);
+                  if (tIdx !== -1 && dIdx !== -1 && tIdx < dIdx) {
+                    pushIfNew({
                       l1: line1,
                       l2: line2,
                       transferStop: transferStop,
+                      transferBoardStop: nb,
+                      walkTransfer: Math.round(nb.dist),
+                      boardOnTransferStop: false,
                       stops1: i - oIdx,
                       stops2: dIdx - tIdx,
                       totalStops: (i - oIdx) + (dIdx - tIdx),
@@ -1817,15 +1901,15 @@ const t = getTranslations(lang);
                       destStop: destStop
                     });
                   }
-                }
+                });
               });
             });
           }
         });
       });
 
-      // Sort by total stops and take the best few
-      return results.sort((a, b) => a.totalStops - b.totalStops).slice(0, 4);
+      const rank = (r: any) => r.totalStops * 2 + r.walkTransfer / 25;
+      return results.sort((a, b) => rank(a) - rank(b)).slice(0, 4);
     }
 
     findNearbyStops(lat: number, lon: number, radiusMeters: number) {
@@ -1868,7 +1952,7 @@ const t = getTranslations(lang);
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
-    renderDirectRouteCard(l: any, idx: number) {
+    renderDirectRouteCard(l: any, idx: number, showRealtime: boolean = true) {
       const favRoutes = storage.getFavoriteRoutes();
       const routeId = `${l.originStop.id}-${l.destStop.id}-${l.lineId}`;
       const isFav = favRoutes.some((f: any) => f.routeId === routeId);
@@ -1893,14 +1977,17 @@ const t = getTranslations(lang);
               </button>
             </div>
           </div>
-          <div class="real-time-info" data-stop-id="${l.originStop.id}" data-line-id="${l.lineId}" data-travel-mins="${l.estimatedTravelMins}">
-            <div class="loading-small">${lang === 'en' ? 'Checking real-time...' : 'Consultando tiempo real...'}</div>
-          </div>
+          ${showRealtime
+            ? `<div class="real-time-info" data-stop-id="${l.originStop.id}" data-line-id="${l.lineId}" data-travel-mins="${l.estimatedTravelMins}">
+                <div class="loading-small">${lang === 'en' ? 'Checking real-time...' : 'Consultando tiempo real...'}</div>
+              </div>`
+            : `<div class="real-time-info"><div class="static-plan-note">📆 ${t.tripNoRealTime} — ${lang === 'en' ? 'take line' : 'coge la línea'} <strong>${l.lineComer}</strong> ${lang === 'en' ? 'and get off at' : 'y bájate en'} <strong>${l.destStop.nombre}</strong></div></div>`
+          }
         </div>
       `;
     }
 
-    renderNearbyRouteCard(l: any, idx: number) {
+    renderNearbyRouteCard(l: any, idx: number, showRealtime: boolean = true) {
       const favRoutes = storage.getFavoriteRoutes();
       const routeId = `${l.originStop.id}-${l.destStop.id}-${l.lineId}`;
       const isFav = favRoutes.some((f: any) => f.routeId === routeId);
@@ -1930,9 +2017,12 @@ const t = getTranslations(lang);
               </button>
             </div>
           </div>
-          <div class="real-time-info" data-stop-id="${l.originStop.id}" data-line-id="${l.lineId}" data-travel-mins="${l.estimatedTravelMins}">
-            <div class="loading-small">${lang === 'en' ? 'Checking real-time...' : 'Consultando tiempo real...'}</div>
-          </div>
+          ${showRealtime
+            ? `<div class="real-time-info" data-stop-id="${l.originStop.id}" data-line-id="${l.lineId}" data-travel-mins="${l.estimatedTravelMins}">
+                <div class="loading-small">${lang === 'en' ? 'Checking real-time...' : 'Consultando tiempo real...'}</div>
+              </div>`
+            : `<div class="real-time-info"><div class="static-plan-note">📆 ${t.tripNoRealTime} — ${lang === 'en' ? 'take line' : 'coge la línea'} <strong>${l.lineComer}</strong></div></div>`
+          }
         </div>
       `;
     }
@@ -1942,9 +2032,20 @@ const t = getTranslations(lang);
       const step1 = lang === 'en'
         ? `Take line <strong>${r.l1.lin_comer}</strong> to ${r.transferStop.nombre}`
         : `Toma la línea <strong>${r.l1.lin_comer}</strong> hasta ${r.transferStop.nombre}`;
-      const step2 = lang === 'en'
-        ? `Change to line <strong>${r.l2.lin_comer}</strong> towards your destination`
-        : `Cambia a la línea <strong>${r.l2.lin_comer}</strong> hacia tu destino`;
+
+      let step2;
+      if (r.boardOnTransferStop) {
+        step2 = lang === 'en'
+          ? `Change to line <strong>${r.l2.lin_comer}</strong> towards your destination`
+          : `Cambia a la línea <strong>${r.l2.lin_comer}</strong> hacia tu destino`;
+      } else {
+        step2 = lang === 'en'
+          ? `Walk ${r.walkTransfer}m to <strong>${r.transferBoardStop.nombre}</strong> and change to line <strong>${r.l2.lin_comer}</strong>`
+          : `Camina ${r.walkTransfer}m hasta <strong>${r.transferBoardStop.nombre}</strong> y cambia a la línea <strong>${r.l2.lin_comer}</strong>`;
+      }
+      const boardNote = r.boardOnTransferStop
+        ? ''
+        : `<small class="transfer-walk-note">🚶 ${r.walkTransfer} m ${lang === 'en' ? 'walking' : 'a pie'} (${Math.round(r.walkTransfer/70)} min)</small>`;
 
       return `
         <div class="card result-card transfer" data-idx="${idx}" style="--line-color: #${r.l1.color}">
@@ -1956,7 +2057,8 @@ const t = getTranslations(lang);
             </div>
             <div class="travel-summary">
               <strong>${lang === 'en' ? 'Transfer at' : 'Transbordo en'} ${r.transferStop.nombre}</strong>
-              <small>${lang === 'en' ? 'Total' : 'Total'} ${r.totalStops} ${lang === 'en' ? 'stops' : 'paradas'} (${r.stops1} + ${r.stops2})</small>
+              <small>${lang === 'en' ? 'Total' : 'Total'} ${r.totalStops} ${lang === 'en' ? 'stops' : 'paradas'} (${r.stops1} + ${r.stops2})${r.walkTransfer ? ` · 🚶 ${r.walkTransfer} m` : ''}</small>
+              ${boardNote}
             </div>
           </div>
           <div class="transfer-details">
@@ -1971,6 +2073,12 @@ const t = getTranslations(lang);
       const targetTimeInput = this.querySelector('#target-time') as HTMLInputElement;
       const desiredTime = targetTimeInput?.value;
       let earliestArrival: Date | null = null;
+
+      // Future-date planning: no real-time prediction available
+      if (this.plannedDate && !this.isSameDay(this.plannedDate, new Date())) return;
+
+      // Global circuit breaker open: skip real-time enrichment quietly.
+      if (isApiCooldownActive()) return;
       
       // Safety buffer in minutes
       const SAFE_BUFFER = 7; 
@@ -2213,6 +2321,21 @@ const t = getTranslations(lang);
 
     formatTime(date: Date) {
       return date.toLocaleTimeString(lang === 'en' ? 'en-US' : 'es-ES', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    isSameDay(dateStr: string, date: Date) {
+      if (!dateStr) return false;
+      const parts = dateStr.split('-').map(Number);
+      if (parts.length !== 3 || parts.some(isNaN)) return false;
+      const [y, m, d] = parts;
+      return y === date.getFullYear() && m === date.getMonth() + 1 && d === date.getDate();
+    }
+
+    formatPlannedDate(dateStr: string) {
+      const parts = dateStr.split('-').map(Number);
+      if (parts.length !== 3 || parts.some(isNaN)) return dateStr;
+      const dt = new Date(parts[0], parts[1] - 1, parts[2]);
+      return dt.toLocaleDateString(lang === 'en' ? 'en-US' : 'es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
     }
   }
 
