@@ -80,6 +80,31 @@ export const storage = {
     localStorage.setItem('favorite_planner_routes', JSON.stringify(favs));
     return favs;
   },
+  // Custom stop nicknames ("Mi casa", "Trabajo", ...)
+  // Nombres personalizados de paradas ("Mi casa", "Trabajo", ...)
+  getStopNames: (): Record<string, string> => {
+    const data = localStorage.getItem('buscoruna_stop_names');
+    return data ? JSON.parse(data) : {};
+  },
+  getStopName: (stopId: number, officialName?: string): string => {
+    const names = storage.getStopNames();
+    return names[String(stopId)] || officialName || '';
+  },
+  setStopName: (stopId: number, name: string) => {
+    const names = storage.getStopNames();
+    const trimmed = name.trim();
+    if (trimmed) {
+      names[String(stopId)] = trimmed;
+    } else {
+      delete names[String(stopId)];
+    }
+    localStorage.setItem('buscoruna_stop_names', JSON.stringify(names));
+    window.dispatchEvent(new CustomEvent('stop-names-updated'));
+  },
+  removeStopName: (stopId: number) => {
+    storage.setStopName(stopId, '');
+  },
+
   // Check if a planner route is in favorites
   // Comprobar si una ruta del planificador ya está en favoritos
   isFavoritePlannerRoute: (origin: any, destination: any): boolean => {

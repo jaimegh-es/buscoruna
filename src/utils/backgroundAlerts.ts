@@ -1,0 +1,238 @@
+// Background bus-arrival alerts using Capacitor Local Notifications.
+// A native Android AlarmManager-based schedule checks the bus ETA in the
+// background and fires a notification when the bus is within the user's
+// chosen lead time (minutes before arrival).
+//
+// Avisos de llegada en segundo plano usando Local Notifications de Capacitor.
+// Una alarma nativa de Android comprueba el tiempo del bus en segundo plano y
+// dispara una notificación cuando queda el tiempo de antelación elegido.
+
+import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
+import { Preferences } from '@capacitor/preferences';
+import { tracking, type TrackingInfo } from './tracking';
+
+export interface BackgroundAlertConfig {
+    enabled: boolean;
+    /** Minutes before the bus arrives to fire the alert (0 = on arrival). */
+    leadMinutes: number;
+    /** Polling interval in seconds for the background check (default 60). */
+    intervalSeconds: number;
+}
+
+const CONFIG_KEY = 'buscoruna_bg_alert_config';
+const STATE_KEY = 'buscoruna_bg_alert_state';
+
+export const DEFAULT_BG_CONFIG: BackgroundAlertConfig = {
+    enabled: false,
+    leadMinutes: 2,
+    intervalSeconds: 60,
+};
+
+export function isNativePlatform(): boolean {
+    return Capacitor.isNativePlatform();
+}
+
+export async function getBgConfig(): Promise<BackgroundAlertConfig> {
+    const { value } = await Preferences.get({ key: CONFIG_KEY });
+    if (!value) return { ...DEFAULT_BG_CONFIG };
+    try {
+        return { ...DEFAULT_BG_CONFIG, ...JSON.parse(value) };
+    } catch {
+        return { ...DEFAULT_BG_CONFIG };
+    }
+}
+
+export async function setBgConfig(config: Partial<BackgroundAlertConfig>): Promise<BackgroundAlertConfig> {
+    const current = await getBgConfig();
+    const next = { ...current, ...config };
+    await Preferences.set({ key: CONFIG_KEY, value: JSON.stringify(next) });
+    return next;
+}
+
+interface BgAlertState {
+    tracking: TrackingInfo | null;
+    triggered: boolean;
+    lastNotifiedEta: number | null;
+}
+
+async function getState(): Promise<BgAlertState> {
+    const { value } = await Preferences.get({ key: STATE_KEY });
+    if (!value) return { tracking: null, triggered: false, lastNotifiedEta: null };
+    try {
+        return JSON.parse(value);
+    } catch {
+        return { tracking: null, triggered: false, lastNotifiedEta: null };
+    }
+}
+
+async function setState(state: BgAlertState) {
+    await Preferences.set({ key: STATE_KEY, value: JSON.stringify(state) });
+}
+
+// ---------------------------------------------------------------------------
+// Permissions
+// ---------------------------------------------------------------------------
+
+export async function requestBgAlertPermission(): Promise<boolean> {
+    if (!isNativePlatform()) return Notification.permission === 'granted';
+    const status = await LocalNotifications.requestPermissions();
+    return status.display === 'granted';
+}
+
+export async function checkBgAlertPermission(): Promise<boolean> {
+    if (!isNativePlatform()) return Notification.permission === 'granted';
+    const status = await LocalNotifications.checkPermissions();
+    return status.display === 'granted';
+}
+
+// ---------------------------------------------------------------------------
+// Schedule the native background check
+// ---------------------------------------------------------------------------
+
+const BG_TASK_ID = 'buscoruna-arrival-check';
+
+/**
+ * Arm (or disarm) the native periodic background check.
+ * The schedule persists across reboots until cancelled.
+ */
+export async function scheduleBackgroundCheck(config?: BackgroundAlertConfig) {
+    if (!isNativePlatform()) return;
+    const cfg = config ?? (await getBgConfig());
+
+    // Cancel any existing schedule first.
+    await LocalNotifications.cancel({
+        notifications: [{ id: 424242, schedule: { at: new Date() } } as any],
+    }).catch(() => { /* ignore if not scheduled */ });
+
+    if (!cfg.enabled) return;
+
+    await LocalNotifications.schedule({
+        notifications: [
+            {
+                id: 424242,
+                title: 'Coruña Bus',
+                body: '...',
+                schedule: {
+                    // Repeating interval cannot be shorter than one minute
+                    every: 'minute' as any,
+                    interval: Math.max(1, Math.round(cfg.intervalSeconds / 60)) as any,
+                    allowWhileIdle: true,
+                },
+                actionTypeId: '',
+                extra: { backgroundTask: BG_TASK_ID },
+                // Never actually shown; the runner replaces/cancels it and fires
+                // the real ETA notification instead.
+            },
+        ],
+    });
+}
+
+export async function cancelBackgroundCheck() {
+    if (!isNativePlatform()) return;
+    await setBgConfig({ enabled: false });
+    await LocalNotifications.cancel({
+        notifications: [{ id: 424242, schedule: { at: new Date() } } as any],
+    }).catch(() => { /* ignore */ });
+}
+
+// ---------------------------------------------------------------------------
+// Shared check used by BOTH the foreground JS interval and (on native) the
+// background task handler. Reads tracking info from Preferences (native) or
+// localStorage (web), queries the stop arrivals API, and returns notification
+// payload if the bus is within the lead window.
+// ---------------------------------------------------------------------------
+
+export interface ArrivalCheckResult {
+    shouldNotify: boolean;
+    title: string;
+    body: string;
+    etaMinutes: number;
+}
+
+export async function checkArrival(
+    info: TrackingInfo,
+    fetchArrivals: (stopId: number) => Promise<any>,
+    lang: 'es' | 'en',
+): Promise<ArrivalCheckResult> {
+    const cfg = await getBgConfig();
+    const state = await getState();
+    const notFound: ArrivalCheckResult = { shouldNotify: false, title: '', body: '', etaMinutes: -1 };
+
+    try {
+        const data = await fetchArrivals(info.originStopId);
+        if (!data || data.resultado !== 'OK' || !data.buses || !Array.isArray(data.buses.lineas)) {
+            return notFound;
+        }
+        const lineInfo = data.buses.lineas.find(
+            (bl: any) => bl.linea.toString() === info.lineId.toString(),
+        );
+        if (!lineInfo || !Array.isArray(lineInfo.buses)) return notFound;
+
+        const bus = lineInfo.buses.find(
+            (b: any) => b.bus && b.bus.toString() === info.busId.toString(),
+        );
+        if (!bus) return notFound; // bus passed or no longer tracked
+
+        const waitTime = typeof bus.tiempo === 'number' ? bus.tiempo : parseInt(bus.tiempo);
+        if (isNaN(waitTime)) return notFound;
+
+        if (state.triggered) return notFound;
+
+        // Fire when remaining time drops to or below the configured lead time.
+        if (waitTime <= cfg.leadMinutes) {
+            const title = lang === 'en' ? '🚌 Your bus is arriving!' : '🚌 ¡Tu autobús está llegando!';
+            const body = lang === 'en'
+                ? `Bus ${info.busId} arrives at your stop in ${waitTime} min.`
+                : `El bus ${info.busId} llega a tu parada en ${waitTime} min.`;
+
+            // Mark triggered so we don't spam every interval.
+            await setState({ ...state, triggered: true, lastNotifiedEta: waitTime });
+
+            return { shouldNotify: true, title, body, etaMinutes: waitTime };
+        }
+        return notFound;
+    } catch (err) {
+        console.warn('[BackgroundAlerts] check failed', err);
+        return notFound;
+    }
+}
+
+/** Reset the triggered flag whenever a new journey starts. */
+export async function resetAlertState(info: TrackingInfo | null) {
+    await setState({ tracking: info, triggered: false, lastNotifiedEta: null });
+}
+
+// ---------------------------------------------------------------------------
+// Foreground-only: fast in-app interval that supplements the native schedule
+// when the app is open, so alerts feel instant while using the app.
+// ---------------------------------------------------------------------------
+
+let fgInterval: any = null;
+
+export async function startForegroundChecker(
+    fetchArrivals: (stopId: number) => Promise<any>,
+    notify: (title: string, body: string) => void,
+) {
+    stopForegroundChecker();
+    const cfg = await getBgConfig();
+    if (!cfg.enabled) return;
+
+    const run = async () => {
+        const info = isNativePlatform() ? (await getState()).tracking : tracking.get();
+        if (!info) return;
+        const lang = (localStorage.getItem('buscoruna_lang') === 'en' ? 'en' : 'es') as 'es' | 'en';
+        const result = await checkArrival(info, fetchArrivals, lang);
+        if (result.shouldNotify) notify(result.title, result.body);
+    };
+
+    await run();
+    fgInterval = setInterval(run, Math.max(15, cfg.intervalSeconds) * 1000);
+}
+
+export function stopForegroundChecker() {
+    if (fgInterval) {
+        clearInterval(fgInterval);
+        fgInterval = null;
+    }
+}

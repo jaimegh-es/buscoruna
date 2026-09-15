@@ -1,0 +1,19 @@
+{
+  "appId": "com.corunabus.app",
+  "appName": "Coruña Bus",
+  "webDir": "dist/client",
+  "server": {
+    "androidScheme": "https",
+    "url": "http://localhost:4321",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_icon",
+      "iconColor": "#f44336"
+    }
+  }
+}

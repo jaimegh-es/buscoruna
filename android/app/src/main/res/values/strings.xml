@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Coruña Bus</string>
+    <string name="title_activity_main">Coruña Bus</string>
+    <string name="package_name">com.corunabus.app</string>
+    <string name="custom_url_scheme">com.corunabus.app</string>
+</resources>

@@ -8,6 +8,12 @@ const CONCURRENCY_LIMIT = 3;
 const MAX_RETRIES = 2;
 const RETRY_BASE_DELAY = 1500;
 
+// Client-side fetch timeout: a request to the proxy must never hang forever.
+// The proxy aborts itself at ~10s, so anything still open past this is a
+// stalled connection. Aborts fail fast (no retry, no circuit-breaker), and the
+// next scheduled refresh simply tries again.
+const REQUEST_TIMEOUT_MS = 15000;
+
 // Global API circuit breaker: after a server failure (5xx / 429 / network error)
 // all API calls are blocked to avoid saturating the server. The upstream
 // rate-limits hard (1 req/s, 4/min, it answers 429 with an HTML body), so 429s
@@ -33,8 +39,12 @@ let lastRequestAt = 0;
 try {
   const saved = JSON.parse(sessionStorage.getItem(RATE_BUCKET_KEY) || 'null');
   if (saved && typeof saved.tokens === 'number' && typeof saved.at === 'number') {
-    rateTokens = Math.min(RATE_BUCKET_CAPACITY, saved.tokens);
-    lastRateRefill = saved.at;
+    rateTokens = Math.min(RATE_BUCKET_CAPACITY, Math.max(0, saved.tokens));
+    // A stored refill timestamp in the future (device clock moved backwards,
+    // NTP sync, manual clock change...) would starve the bucket forever: the
+    // tokens would never refill and every request would hang. Clamp it so the
+    // limiter always stays live.
+    lastRateRefill = Math.min(saved.at, Date.now());
   }
 } catch {
   // ignore corrupted bucket state, start fresh
@@ -50,6 +60,13 @@ function persistRateBucket() {
 
 function refillRateTokens() {
   const now = Date.now();
+  if (now < lastRateRefill) {
+    // Clock moved backwards: correct the refill anchor so the bucket never
+    // waits on a future timestamp (that state makes tokens 0 forever).
+    lastRateRefill = now;
+    persistRateBucket();
+    return;
+  }
   const gained = Math.floor((now - lastRateRefill) / RATE_REFILL_INTERVAL_MS);
   if (gained > 0) {
     rateTokens = Math.min(RATE_BUCKET_CAPACITY, rateTokens + gained);
@@ -58,9 +75,15 @@ function refillRateTokens() {
   }
 }
 
+// Absolute cap for waiting on a rate token. Even in pathological bucket states
+// a caller must never be blocked forever: the upstream throttle tolerates an
+// occasional extra request far better than a frozen UI.
+const PACE_MAX_WAIT_MS = 120000;
+
 // Wait until a request token is available and the minimum 1s spacing since the
 // last upstream call is satisfied. Consumes exactly one token.
 async function paceRequest() {
+  const deadline = Date.now() + PACE_MAX_WAIT_MS;
   while (true) {
     refillRateTokens();
     if (rateTokens >= 1) {
@@ -69,6 +92,13 @@ async function paceRequest() {
       const wait = RATE_MIN_SPACING_MS - (Date.now() - lastRequestAt);
       if (wait > 0) await sleep(wait);
       lastRequestAt = Date.now();
+      return;
+    }
+    if (Date.now() >= deadline) {
+      // Safety valve: borrow a token instead of hanging the caller indefinitely.
+      rateTokens = 0;
+      lastRequestAt = Date.now();
+      persistRateBucket();
       return;
     }
     await sleep(500);
@@ -137,13 +167,19 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function fetchWithTimeout(url: string): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
 async function fetchWithRetry(url: string): Promise<any> {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       // Every physical request to the upstream consumes a rate token (retries
       // included) - this is what keeps us under the 4/min budget proactively.
       await paceRequest();
-      const response = await fetch(url);
+      const response = await fetchWithTimeout(url);
 
       if (response.status === 429) {
         // The upstream rate-limits (1 req/s, 4/min) and retrying only makes it
@@ -213,9 +249,49 @@ export async function getQuery(func: number, dato: string) {
   }
 }
 
+// --- Stop arrivals cache -----------------------------------------------------
+// The stop page and the live tracking bar ask for the same arrival data, so a
+// short-lived cache lets the tracking ETA appear instantly after a stop page
+// fetch (or a recent refresh) without spending an extra upstream request.
+// In-flight requests are also deduplicated: concurrent callers for the same
+// stop share a single upstream call.
+const ARRIVALS_CACHE_TTL_MS = 20000;
+const arrivalsCache = new Map<string, { at: number; data: any }>();
+const arrivalsInflight = new Map<string, Promise<any>>();
+
+function getStopArrivalsCached(stopId: number, force: boolean = false): Promise<any> {
+  const key = stopId.toString();
+
+  if (!force) {
+    const cached = arrivalsCache.get(key);
+    if (cached && Date.now() - cached.at < ARRIVALS_CACHE_TTL_MS) {
+      return Promise.resolve(cached.data);
+    }
+  }
+
+  const flightKey = `${key}:${force ? 'f' : 'c'}`;
+  const existing = arrivalsInflight.get(flightKey);
+  if (existing) return existing;
+
+  const p = getQuery(0, key)
+    .then((data) => {
+      if (data && data.resultado) {
+        arrivalsCache.set(key, { at: Date.now(), data });
+      }
+      return data;
+    })
+    .finally(() => {
+      arrivalsInflight.delete(flightKey);
+    });
+
+  arrivalsInflight.set(flightKey, p);
+  return p;
+}
+
 export const API = {
-  // Real-time arrivals for a stop
-  getStopArrivals: (stopId: number) => getQuery(0, stopId.toString()),
+  // Real-time arrivals for a stop (cached ~20s; pass `true` to force a refresh)
+  getStopArrivals: (stopId: number, force: boolean = false) =>
+    getStopArrivalsCached(stopId, force),
 
   // List of lines (basic info)
   getLines: () => getQuery(1, '1'),

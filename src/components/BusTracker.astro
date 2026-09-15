@@ -362,8 +362,16 @@ const t = getTranslations(lang);
     private LINE_MAP_CACHE_KEY = 'buscoruna_line_map';
     // Mapping bus number -> line id, learned from previous detections. Lets
     // re-detecting the same bus cost 0-1 requests instead of a full scan.
+    // Stored in localStorage (survives reloads) with a long TTL: over time the
+    // app "knows" most bus numbers and detection becomes instant.
     private BUS_LINE_CACHE_KEY = 'buscoruna_bus_line';
-    private BUS_LINE_CACHE_MS = 3600000;
+    private BUS_LINE_CACHE_MS = 24 * 60 * 60 * 1000;
+    // lineId -> last time we successfully fetched its live map. Candidate lines
+    // are scanned most-recently-active first, which usually means they are still
+    // in the map cache and cost 0 requests.
+    private LINE_RECENCY_KEY = 'buscoruna_line_recency';
+    private LINE_RECENCY_MAX = 100;
+    private scanAbort = false;
 
     connectedCallback() {
       this.catalog = storage.getCatalog();
@@ -381,9 +389,13 @@ const t = getTranslations(lang);
       tabs.forEach(btn => {
         btn.addEventListener('click', () => {
           this.mode = btn.getAttribute('data-mode') as 'number' | 'location';
+          // Cancel a scan that may still be running in the other pane so the
+          // user is never locked behind it.
+          this.scanAbort = true;
           tabs.forEach(b => b.classList.toggle('active', b === btn));
           (this.querySelector('#tracker-pane-number') as HTMLElement).classList.toggle('active', this.mode === 'number');
           (this.querySelector('#tracker-pane-location') as HTMLElement).classList.toggle('active', this.mode === 'location');
+          this.setScanButton(false);
           this.showStatus('');
           this.showResult('');
         });
@@ -394,10 +406,22 @@ const t = getTranslations(lang);
       const input = this.querySelector('#tracker-bus-number') as HTMLInputElement;
       const btn = this.querySelector('#tracker-number-btn') as HTMLButtonElement;
 
-      const run = () => this.searchByNumber(input.value.trim());
+      const run = () => {
+        if (this.scanning) {
+          // Already scanning: pressing the button again cancels the search so
+          // the user is never stuck watching a long scan.
+          // Ya está escaneando: volver a pulsar cancela la búsqueda.
+          this.scanAbort = true;
+          return;
+        }
+        this.searchByNumber(input.value.trim());
+      };
       btn.addEventListener('click', run);
       input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') run();
+        if (e.key === 'Enter') {
+          if (this.scanning) this.scanAbort = true;
+          else this.searchByNumber(input.value.trim());
+        }
       });
     }
 
@@ -411,16 +435,28 @@ const t = getTranslations(lang);
       this.showStatus(`<div class="loading">${t.trackerScanning}</div>`);
       this.showResult('');
       this.scanning = true;
+      this.scanAbort = false;
+      this.setScanButton(true);
       try {
         const found = await this.scanLines(busNumber);
-        if (found) {
+        if (this.scanAbort) {
+          this.showStatus('');
+          this.showResult('');
+        } else if (found) {
           this.showDetected(found);
         } else {
           this.showResult(`<div class="tracker-error">${t.trackerNotFound}</div>`);
         }
       } finally {
         this.scanning = false;
+        this.scanAbort = false;
+        this.setScanButton(false);
       }
+    }
+
+    setScanButton(scanning: boolean) {
+      const btn = this.querySelector('#tracker-number-btn') as HTMLButtonElement;
+      if (btn) btn.textContent = scanning ? t.trackerCancel : t.trackerDetectBtn;
     }
 
     async searchByLocation() {
@@ -467,7 +503,11 @@ const t = getTranslations(lang);
 
       // Check the lines that serve stops near the user first: the bus is very
       // likely close to them, so we often find it before touching most lines.
+      // In number mode, additionally put the most-recently-active lines first
+      // (they are usually still in the map cache, so checking them costs 0
+      // requests and finds the bus much sooner than a big scan).
       const orderedIds = this.orderLinesByProximity(lineIds);
+      const scanOrder = busNumber ? this.orderLinesByActivity(orderedIds) : orderedIds;
 
       // Number mode: if we already learned which line this bus number runs on,
       // just re-check that single line (fresh or cached) instead of rescanning.
@@ -475,15 +515,21 @@ const t = getTranslations(lang);
         const knownLineId = this.getBusLineCache(busNumber);
         if (knownLineId) {
           const knownHit = await this.tryLine(knownLineId, busNumber);
-          if (knownHit) return { bus: knownHit.bus, line: knownHit.line };
+          if (knownHit) {
+            if (this.scanAbort) return null;
+            return { bus: knownHit.bus, line: knownHit.line };
+          }
         }
 
         // Scan in small batches and stop as soon as the bus is found, so we
-        // never spend API budget on lines that come after the hit.
+        // never spend API budget on lines that come after the hit. BATCH matches
+        // the upstream token bucket capacity, so the first wave is instant.
         const acc: any[] = [];
-        const BATCH = 3;
-        for (let i = 0; i < orderedIds.length; i += BATCH) {
-          const entries = await this.fetchBusEntries(orderedIds.slice(i, i + BATCH));
+        const BATCH = 4;
+        for (let i = 0; i < scanOrder.length; i += BATCH) {
+          if (this.scanAbort) return null;
+          const entries = await this.fetchBusEntries(scanOrder.slice(i, i + BATCH));
+          if (this.scanAbort) return null;
           acc.push(...entries);
           const hit = acc.find(e => e.bus.bus && e.bus.bus.toString() === busNumber);
           if (hit) {
@@ -496,7 +542,7 @@ const t = getTranslations(lang);
 
       // Location mode: nearest bus over the full candidate set (reuse a recent
       // scan while the user keeps interacting with the detection).
-      const cacheKey = orderedIds.slice().sort((a: number, b: number) => a - b).join(',');
+      const cacheKey = scanOrder.slice().sort((a: number, b: number) => a - b).join(',');
       let entries: any[] = this.scanCache &&
         Date.now() - this.scanCache.at < this.SCAN_CACHE_MS &&
         this.scanCache.key === cacheKey
@@ -504,7 +550,7 @@ const t = getTranslations(lang);
         : [];
 
       if (entries.length === 0) {
-        entries = await this.fetchBusEntries(orderedIds);
+        entries = await this.fetchBusEntries(scanOrder);
         this.scanCache = { at: Date.now(), key: cacheKey, entries };
       }
 
@@ -550,7 +596,7 @@ const t = getTranslations(lang);
 
     getBusLineCache(busNumber: string): number | null {
       try {
-        const raw = sessionStorage.getItem(`${this.BUS_LINE_CACHE_KEY}_${busNumber}`);
+        const raw = localStorage.getItem(`${this.BUS_LINE_CACHE_KEY}_${busNumber}`);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         if (!parsed || typeof parsed.lineId !== 'number' || typeof parsed.at !== 'number') return null;
@@ -563,10 +609,39 @@ const t = getTranslations(lang);
 
     setBusLineCache(busNumber: string, lineId: number) {
       try {
-        sessionStorage.setItem(`${this.BUS_LINE_CACHE_KEY}_${busNumber}`, JSON.stringify({ lineId, at: Date.now() }));
+        localStorage.setItem(`${this.BUS_LINE_CACHE_KEY}_${busNumber}`, JSON.stringify({ lineId, at: Date.now() }));
       } catch {
         // ignore
       }
+    }
+
+    // --- Recent line activity -------------------------------------------------
+    getLineRecency(): Record<string, number> {
+      try {
+        const raw = localStorage.getItem(this.LINE_RECENCY_KEY);
+        return raw ? JSON.parse(raw) : {};
+      } catch {
+        return {};
+      }
+    }
+
+    recordLineActivity(lineId: number) {
+      try {
+        const rec = this.getLineRecency();
+        rec[lineId.toString()] = Date.now();
+        const keys = Object.keys(rec).sort((a, b) => rec[b] - rec[a]);
+        while (keys.length > this.LINE_RECENCY_MAX) delete rec[keys.pop()!];
+        localStorage.setItem(this.LINE_RECENCY_KEY, JSON.stringify(rec));
+      } catch {
+        // ignore
+      }
+    }
+
+    // Most recently active lines first (recency stored in localStorage so it
+    // survives reloads).
+    orderLinesByActivity(ids: number[]): number[] {
+      const rec = this.getLineRecency();
+      return [...ids].sort((a, b) => (rec[b] || 0) - (rec[a] || 0));
     }
 
     // Fetch bus positions for a set of lines in parallel (the API queue keeps
@@ -600,6 +675,7 @@ const t = getTranslations(lang);
           }
 
           if (!data || data.resultado !== 'OK' || !data.mapas || !data.mapas[0] || !Array.isArray(data.mapas[0].buses)) return [] as any[];
+          this.recordLineActivity(line.id);
           const entries: any[] = [];
           for (const dir of data.mapas[0].buses) {
             for (const b of dir.buses || []) {

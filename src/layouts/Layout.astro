@@ -239,7 +239,8 @@ const { title } = Astro.props;
                                 <input type="checkbox" id="settings-enable-eta-alert" />
                             </label>
                             <p class="setting-desc">{t.settingsEtaDesc}</p>
-                            <p class="setting-warn">{t.settingsEtaWarn}</p>
+                            <p class="setting-warn" id="settings-eta-warn-web">{t.settingsEtaWarn}</p>
+                            <p class="setting-desc" id="settings-eta-warn-native" style="display:none">{t.settingsEtaNativeDesc}</p>
                             
                             <div class="setting-sub-option" id="eta-alert-threshold-group">
                                 <label for="settings-eta-threshold">{t.settingsEtaMinutes}</label>
@@ -249,6 +250,7 @@ const { title } = Astro.props;
                                     <option value="2">{t.settingsEtaMinutes2}</option>
                                     <option value="3">{t.settingsEtaMinutes3}</option>
                                     <option value="5">{t.settingsEtaMinutes5}</option>
+                                    <option value="10">{t.settingsEtaMinutes10}</option>
                                 </select>
                             </div>
                         </div>
@@ -1219,38 +1221,32 @@ const { title } = Astro.props;
     import { API, isApiLoading, isApiCooldownActive } from "../services/api";
     import { storage } from "../utils/storage";
     import { getTranslations } from "../utils/i18n";
+    import { inAppAlert } from "../utils/inAppAlert";
+    import {
+        isNativePlatform,
+        getBgConfig,
+        setBgConfig,
+        requestBgAlertPermission,
+        checkBgAlertPermission,
+        startForegroundChecker,
+        stopForegroundChecker,
+        resetAlertState,
+    } from "../utils/backgroundAlerts";
+    import { checkForUpdate } from "../utils/autoUpdate";
+    import { notify } from "../utils/notify";
+    import { LocalNotifications } from "@capacitor/local-notifications";
 
     const lang = document.documentElement.getAttribute('data-lang') || 'es';
     const t = getTranslations(lang);
 
     // Helper function to send notifications on both desktop and mobile (Android/Chrome ready)
     // Función auxiliar para enviar notificaciones en escritorio y móvil (lista para Android/Chrome)
-    async function sendNotification(title: string, options: NotificationOptions = {}) {
-        if (Notification.permission !== "granted") return;
-
-        if ("serviceWorker" in navigator) {
-            try {
-                // Use a timeout so we don't block forever if the SW fails to register
-                // Usar un timeout para no bloquearse si el SW no se registra
-                const reg = await Promise.race([
-                    navigator.serviceWorker.ready,
-                    new Promise<ServiceWorkerRegistration>((_, reject) =>
-                        setTimeout(() => reject(new Error("SW timeout")), 5000)
-                    ),
-                ]);
-                reg.showNotification(title, options);
-                return;
-            } catch (err) {
-                console.warn("SW notification unavailable, using fallback", err);
-            }
-        }
-
-        // Fallback: window Notification (works on desktop, may fail on Android standalone PWA)
-        try {
-            new Notification(title, options);
-        } catch (e) {
-            console.error("Notification constructor failed", e);
-        }
+    // Unified notification sender — native Android tray on Capacitor,
+    // Service Worker / window.Notification on web.
+    // Emisor unificado — bandeja nativa de Android en Capacitor,
+    // Service Worker / window.Notification en web.
+    async function sendNotification(title: string, options: any = {}) {
+        await notify(title, options.body || '', { silent: !!options.silent });
     }
 
     // Show persistent background tracking notification
@@ -1258,6 +1254,24 @@ const { title } = Astro.props;
     function showBackgroundNotification() {
         const title = lang === 'en' ? 'Coruña Bus - Active tracking' : 'Coruña Bus - Seguimiento activo';
         const bodyText = lang === 'en' ? 'The app will stay active in the background to alert you about your stops.' : 'La app se mantendrá activa en segundo plano para avisarte de tus paradas.';
+        if (isNativePlatform()) {
+            // Persistent, silent native notification (id 424243, tagged for later dismissal)
+            // Notificación nativa persistente y silenciosa (id 424243, marcada para poder cerrarla)
+            LocalNotifications.schedule({
+                notifications: [{
+                    id: 424243,
+                    title,
+                    body: bodyText,
+                    channelId: 'buscoruna-alerts',
+                    schedule: { at: new Date(Date.now() + 50) },
+                    ongoing: true,
+                    silent: true,
+                    actionTypeId: '',
+                    extra: { source: 'buscoruna-bg' },
+                } as any],
+            }).catch(() => {});
+            return;
+        }
         sendNotification(title, {
             body: bodyText,
             tag: "tracking-bg",
@@ -1271,6 +1285,17 @@ const { title } = Astro.props;
     // Close persistent background tracking notification
     // Cerrar la notificación de seguimiento en segundo plano
     function closeBackgroundNotification() {
+        if (isNativePlatform()) {
+            // Dismiss the persistent tracking notification on native
+            // Descartar la notificación persistente en nativo
+            LocalNotifications.getDeliveredNotifications().then((res: any) => {
+                const ids = (res.notifications || [])
+                    .filter((n: any) => n.extra?.source === 'buscoruna-bg')
+                    .map((n: any) => n.id);
+                if (ids.length) LocalNotifications.removeDeliveredNotifications({ notifications: ids });
+            }).catch(() => {});
+            return;
+        }
         if ("serviceWorker" in navigator && Notification.permission === "granted") {
             navigator.serviceWorker.ready.then((registration) => {
                 registration.getNotifications({ tag: "tracking-bg" }).then((notifications) => {
@@ -1298,6 +1323,10 @@ const { title } = Astro.props;
     // Initialize state
     checkInitialLoading();
 
+    // Check for app updates (native build only)
+    // Comprobar actualizaciones de la app (solo build nativo)
+    checkForUpdate();
+
     function updateLastRefreshTime() {
         const el = document.getElementById("last-update");
         if (el) {
@@ -1323,6 +1352,13 @@ const { title } = Astro.props;
     // Tracking logic
     let trackingInterval: any = null;
     let isUpdating = false;
+    // Bumped every time tracking is stopped. In-flight updates snapshot the
+    // value when they start and discard their results if it changed meanwhile,
+    // so "stop tracking" takes effect instantly instead of after the query.
+    let trackingGeneration = 0;
+    // Hard cap for a single UI update. Even if some awaited promise stalls, the
+    // tracking loop and the "stop tracking" button must never lock up.
+    const MAX_TRACKING_UPDATE_MS = 30000;
 
     // Cache + throttle for the expensive func=2 (full line info) ETA fallback.
     let lastLineInfoCheck = 0;
@@ -1344,6 +1380,7 @@ const { title } = Astro.props;
         }
 
         isUpdating = true;
+        const gen = trackingGeneration;
         bar.style.display = "block";
         document.getElementById("track-bus-id")!.textContent = info.busId;
 
@@ -1381,13 +1418,22 @@ const { title } = Astro.props;
         }
 
         // Recalculate ETA
+        // Watchdog: force-release isUpdating if this update ever runs past the
+        // cap, so "stop tracking" and future refreshes can't be blocked forever.
+        const watchdog = setTimeout(() => {
+            isUpdating = false;
+        }, MAX_TRACKING_UPDATE_MS);
         try {
             // Check ETA alert for the boarding/origin stop if enabled and not already triggered
             // Comprobar la alerta de ETA para la parada de origen si está activa y aún no se ha disparado
             const etaAlertEnabled = localStorage.getItem('buscoruna_eta_alert_enabled') === 'true';
             const etaAlertTriggered = localStorage.getItem('buscoruna_eta_alert_triggered') === 'true';
 
-            if (etaAlertEnabled && !etaAlertTriggered && info.originStopId) {
+            // The boarding-alert look-up and the destination ETA reply can run in
+            // parallel: awaiting them sequentially would double the perceived
+            // latency of the tracking bar.
+            const originAlertCheck = (async () => {
+                if (!(etaAlertEnabled && !etaAlertTriggered && info.originStopId)) return;
                 try {
                     const originData = await API.getStopArrivals(info.originStopId);
                     if (originData && originData.resultado === "OK" && originData.buses && Array.isArray(originData.buses.lineas)) {
@@ -1402,7 +1448,7 @@ const { title } = Astro.props;
                                 let waitTime = typeof b.tiempo === "number" ? b.tiempo : parseInt(b.tiempo);
                                 if (!isNaN(waitTime)) {
                                     const threshold = parseInt(localStorage.getItem('buscoruna_eta_alert_threshold') || '0');
-                                    if (waitTime <= threshold) {
+                                    if (waitTime <= threshold && gen === trackingGeneration && tracking.get()) {
                                         // Trigger arrival alert!
                                         // Disparar aviso de llegada
                                         localStorage.setItem('buscoruna_eta_alert_triggered', 'true');
@@ -1420,10 +1466,12 @@ const { title } = Astro.props;
                                             badge: "/logo.png"
                                         });
 
-                                        // Play sound and vibration
+                                        // Play sound and vibration FIRST, before any UI, so the user hears it immediately.
+                                        // Reproducir sonido y vibración PRIMERO, antes de cualquier UI, para escucharlo al instante.
                                         if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
                                         try {
                                             const context = new (window.AudioContext || (window as any).webkitAudioContext)();
+                                            if (context.state === 'suspended') await context.resume();
                                             const osc = context.createOscillator();
                                             osc.type = "sine";
                                             osc.frequency.setValueAtTime(523.25, context.currentTime); // C5 note
@@ -1432,11 +1480,12 @@ const { title } = Astro.props;
                                             osc.stop(context.currentTime + 0.6);
                                         } catch (e) {}
 
-                                        // Show custom in-app banner alert if user is looking at screen
+                                        // Non-blocking in-app banner (replaces blocking alert() which delayed the sound).
+                                        // Banner no bloqueante (sustituye al alert() bloqueante que retrasaba el sonido).
                                         const alertText = lang === 'en'
                                             ? `🔔 Arrival alert! Your bus (Bus ${info.busId}) will arrive in ${waitTime} min.`
                                             : `🔔 ¡Aviso de llegada! Tu autobús (Bus ${info.busId}) llegará en ${waitTime} min.`;
-                                        alert(alertText);
+                                        inAppAlert(alertText, { durationMs: 10000 });
                                     }
                                 }
                             }
@@ -1445,10 +1494,15 @@ const { title } = Astro.props;
                 } catch (etaErr) {
                     console.warn("Failed to check boarding ETA alert", etaErr);
                 }
-            }
+            })();
 
             // Step 1: Try getting arrivals at the destination stop
             const data = await API.getStopArrivals(info.destinationStopId);
+            await originAlertCheck;
+
+            // The user may have stopped tracking while we were waiting: bail out
+            // without touching the UI.
+            if (gen !== trackingGeneration || !tracking.get()) return;
             let busFoundAtStop = false;
             let targetBus: any = null;
 
@@ -1586,6 +1640,9 @@ const { title } = Astro.props;
                     }
                 }
 
+                // Tracking may have been stopped while the fallback was running.
+                if (gen !== trackingGeneration || !tracking.get()) return;
+
                 if (foundInLine) {
                     const estimatedMins = Math.max(
                         1,
@@ -1607,10 +1664,11 @@ const { title } = Astro.props;
             document.getElementById("track-status")!.textContent =
                 t.trackingConnectionError;
         } finally {
+            clearTimeout(watchdog);
             isUpdating = false;
         }
 
-        if (!trackingInterval) {
+        if (!trackingInterval && tracking.get()) {
             trackingInterval = setInterval(updateTrackingUI, 60000);
         }
     }
@@ -1631,6 +1689,15 @@ const { title } = Astro.props;
     });
 
     document.getElementById("stop-tracking")?.addEventListener("click", () => {
+        // Take effect immediately: bump the generation so any in-flight update
+        // discards its results, hide the bar and kill the poller right away.
+        trackingGeneration++;
+        const bar = document.getElementById("tracking-bar");
+        if (bar) bar.style.display = "none";
+        if (trackingInterval) {
+            clearInterval(trackingInterval);
+            trackingInterval = null;
+        }
         tracking.clear();
     });
 
@@ -1794,30 +1861,35 @@ const { title } = Astro.props;
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
-    // Resolve the stop immediately before the destination stop in the route
-    // Obtener la parada inmediatamente anterior a la parada de destino en la ruta
-    function getPreviousStop(lineId: number, originId: number, destId: number, catalog: any) {
+    // Resolve the stop immediately before the destination stop in the route.
+    // The destination alone disambiguates the direction: among the routes that
+    // contain it, pick the one where it sits closest to the end (that is the
+    // direction the bus is travelling in) and return its predecessor.
+    // Obtener la parada inmediatamente anterior a la parada de destino en la
+    // ruta. El destino basta para saber el sentido: de las rutas que lo
+    // contienen, elige la que lo tenga más cerca del final (el sentido real
+    // del bus) y devuelve la parada anterior.
+    function getPreviousStop(lineId: number, destId: number, catalog: any) {
         const line = catalog.actualizacion.lineas.find(
             (l: any) => l.id.toString() === lineId.toString()
         );
         if (!line || !Array.isArray(line.rutas)) return null;
-        
-        const sOriginId = originId.toString();
+
         const sDestId = destId.toString();
-        
+
+        let bestStopId: any = null;
+        let bestScore = Infinity;
         for (const route of line.rutas) {
             if (!Array.isArray(route.paradas)) continue;
-            const oIdx = route.paradas.findIndex((p: any) => p.toString() === sOriginId);
             const dIdx = route.paradas.findIndex((p: any) => p.toString() === sDestId);
-            
-            if (oIdx !== -1 && dIdx !== -1 && oIdx < dIdx) {
-                const prevStopId = route.paradas[dIdx - 1];
-                if (prevStopId) {
-                    return catalog.paradas[prevStopId];
-                }
+            if (dIdx <= 0) continue;
+            const score = route.paradas.length - dIdx; // lower = dest nearer the end
+            if (score < bestScore) {
+                bestScore = score;
+                bestStopId = route.paradas[dIdx - 1];
             }
         }
-        return null;
+        return bestStopId ? catalog.paradas[bestStopId] : null;
     }
 
     // Main interval check function to check GPS location against route stops
@@ -1838,27 +1910,41 @@ const { title } = Astro.props;
 
         const destStop = catalog.paradas[info.destinationStopId];
         const originStop = catalog.paradas[info.originStopId];
-        if (!destStop || !originStop) return;
+        if (!destStop) return;
 
-        const prevStop = getPreviousStop(info.lineId, info.originStopId, info.destinationStopId, catalog);
-        if (!prevStop) return;
+        // Only useful while the user is riding towards a real destination. The
+        // "waiting at the stop" case (origin == destination, arrival alarm) must
+        // not fire the get-off alert.
+        const isRiding = info.originStopId.toString() !== info.destinationStopId.toString();
+        if (!isRiding) return;
+
+        const prevStop = getPreviousStop(info.lineId, info.destinationStopId, catalog);
 
         navigator.geolocation.getCurrentPosition((position) => {
             const userLat = position.coords.latitude;
             const userLon = position.coords.longitude;
 
-            const distToPrev = getDistance(userLat, userLon, prevStop.posy, prevStop.posx);
             const distToDest = getDistance(userLat, userLon, destStop.posy, destStop.posx);
-            const distPrevToDest = getDistance(prevStop.posy, prevStop.posx, destStop.posy, destStop.posx);
 
-            console.log(`[GPS Alert] distToPrev: ${distToPrev.toFixed(1)}m, distToDest: ${distToDest.toFixed(1)}m, distPrevToDest: ${distPrevToDest.toFixed(1)}m`);
+            let atPreviousStop = false;
+            let passedPreviousStop = false;
+            let distPrevToDest = Infinity;
+            if (prevStop) {
+                const distToPrev = getDistance(userLat, userLon, prevStop.posy, prevStop.posx);
+                distPrevToDest = getDistance(prevStop.posy, prevStop.posx, destStop.posy, destStop.posx);
 
-            // Check if we are at the previous stop (< 100m) or already closer to destination than previous stop (passed it)
-            // Comprobar si estamos en la parada anterior (< 100m) o si ya estamos más cerca del destino que la parada anterior (la hemos pasado)
-            const atPreviousStop = distToPrev < 100;
-            const passedPreviousStop = distToDest < Math.min(300, distPrevToDest * 0.85);
+                // At the previous stop (< 120m) or already closer to destination
+                // than the previous stop (we passed it).
+                atPreviousStop = distToPrev < 120;
+                passedPreviousStop = distToDest < Math.min(350, distPrevToDest * 0.85);
+            }
+            // Fallback: if the route couldn't be resolved, still warn when the
+            // user is physically close to the destination stop.
+            const approachingDest = distToDest < 150;
 
-            if (atPreviousStop || passedPreviousStop) {
+            console.log(`[GPS Alert] distToDest: ${distToDest.toFixed(1)}m, atPrev: ${atPreviousStop}, passedPrev: ${passedPreviousStop}`);
+
+            if (atPreviousStop || passedPreviousStop || approachingDest) {
                 // Trigger warning!
                 // Activar aviso
                 localStorage.setItem('buscoruna_gps_alert_triggered', 'true');
@@ -2008,7 +2094,7 @@ const { title } = Astro.props;
 
     function startGPSMonitor() {
         if (gpsInterval) clearInterval(gpsInterval);
-        gpsInterval = setInterval(checkGPSAlert, 15000); // Check location every 15s
+        gpsInterval = setInterval(checkGPSAlert, 10000); // Check location every 10s
         checkGPSAlert();
     }
 
@@ -2047,7 +2133,7 @@ const { title } = Astro.props;
     
     // Open settings button in header
     // Abrir modal de ajustes al pulsar el botón del header
-    const openSettings = () => {
+    const openSettings = async () => {
         const gpsAlertInput = document.getElementById("settings-enable-gps-alert") as HTMLInputElement;
         const etaAlertInput = document.getElementById("settings-enable-eta-alert") as HTMLInputElement;
         const etaThresholdSelect = document.getElementById("settings-eta-threshold") as HTMLSelectElement;
@@ -2055,10 +2141,22 @@ const { title } = Astro.props;
         const langSelect = document.getElementById("settings-lang-select") as HTMLSelectElement;
         
         if (gpsAlertInput) gpsAlertInput.checked = localStorage.getItem('buscoruna_gps_alert_enabled') === 'true';
-        if (etaAlertInput) etaAlertInput.checked = localStorage.getItem('buscoruna_eta_alert_enabled') === 'true';
-        if (etaThresholdSelect) etaThresholdSelect.value = localStorage.getItem('buscoruna_eta_alert_threshold') || '0';
+
+        // On native, the background alert replaces the web-only ETA flag
+        // En nativo, el aviso en segundo plano sustituye al flag solo-web
+        const bgCfg = await getBgConfig();
+        const native = isNativePlatform();
+        if (etaAlertInput) etaAlertInput.checked = native ? bgCfg.enabled : localStorage.getItem('buscoruna_eta_alert_enabled') === 'true';
+        if (etaThresholdSelect) etaThresholdSelect.value = localStorage.getItem('buscoruna_eta_alert_threshold') || (native ? String(bgCfg.leadMinutes) : '0');
         if (keepAwakeInput) keepAwakeInput.checked = localStorage.getItem('buscoruna_bg_keep_awake') === 'true';
         if (langSelect) langSelect.value = document.documentElement.getAttribute('data-lang') || 'es';
+
+        // Show the appropriate warning depending on platform
+        // Mostrar la advertencia adecuada según la plataforma
+        const warnWeb = document.getElementById('settings-eta-warn-web');
+        const warnNative = document.getElementById('settings-eta-warn-native');
+        if (warnWeb) warnWeb.style.display = native ? 'none' : '';
+        if (warnNative) warnNative.style.display = native ? '' : 'none';
         
         if (settingsModal) {
             settingsModal.style.display = "flex";
@@ -2111,7 +2209,7 @@ const { title } = Astro.props;
 
     // Save settings button
     // Guardar ajustes seleccionados por el usuario
-    document.getElementById("btn-save-settings")?.addEventListener("click", () => {
+    document.getElementById("btn-save-settings")?.addEventListener("click", async () => {
         const gpsAlertInput = document.getElementById("settings-enable-gps-alert") as HTMLInputElement;
         const etaAlertInput = document.getElementById("settings-enable-eta-alert") as HTMLInputElement;
         const etaThresholdSelect = document.getElementById("settings-eta-threshold") as HTMLSelectElement;
@@ -2132,10 +2230,48 @@ const { title } = Astro.props;
         localStorage.setItem('buscoruna_lang', selectedLang);
         document.cookie = "buscoruna_lang=" + selectedLang + ";path=/;max-age=" + (60 * 60 * 24 * 365);
 
+        // Sync the native background alert with the ETA setting + lead minutes
+        // Sincronizar el aviso nativo en segundo plano con el ajuste ETA y los minutos de antelación
+        const leadMinutes = parseInt(etaThreshold, 10) || 0;
+        await setBgConfig({ enabled: etaAlertInput?.checked ?? false, leadMinutes });
+        if (etaAlertInput?.checked) {
+            const granted = await requestBgAlertPermission();
+            if (granted) {
+                startForegroundChecker(
+                    (stopId) => API.getStopArrivals(stopId),
+                    (title, body) => {
+                        inAppAlert(`${title} ${body}`, { durationMs: 10000 });
+                        if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+                    },
+                );
+            }
+        } else {
+            stopForegroundChecker();
+        }
+
         // Ask for browser notification permissions if any alert checked
         if (gpsAlertInput?.checked || etaAlertInput?.checked || keepAwakeInput?.checked) {
             if (Notification.permission === "default") {
                 Notification.requestPermission();
+            }
+        }
+
+        // The GPS get-off alert needs the geolocation permission: prompt for it
+        // now so it doesn't silently fail later while riding.
+        // La alerta GPS de bajada necesita permiso de geolocalización: pídelo
+        // ahora para que no falle en silencio al ir en el autobús.
+        if (gpsAlertInput?.checked) {
+            try {
+                const perms = (navigator as any).permissions;
+                if (perms?.query) {
+                    perms.query({ name: 'geolocation' }).then((s: any) => {
+                        if (s.state === 'prompt') navigator.geolocation.getCurrentPosition(() => {});
+                    }).catch(() => {});
+                } else if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(() => {});
+                }
+            } catch (e) {
+                console.warn("Could not request geolocation permission", e);
             }
         }
 
@@ -2163,10 +2299,26 @@ const { title } = Astro.props;
 
     // Reset alert trigger flags on new tracking/journey configuration
     // Reiniciar los avisos cuando cambia o finaliza el seguimiento
-    window.addEventListener("tracking-updated", (e: any) => {
+    window.addEventListener("tracking-updated", async (e: any) => {
         localStorage.removeItem('buscoruna_gps_alert_triggered');
         localStorage.removeItem('buscoruna_eta_alert_triggered');
-        
+
+        // Reset background-alert state and restart the foreground checker
+        // Reiniciar el estado de aviso en segundo plano y relanzar el comprobador
+        await resetAlertState(e.detail ?? null);
+        const cfg = await getBgConfig();
+        if (e.detail && cfg.enabled && (isNativePlatform() || await checkBgAlertPermission())) {
+            startForegroundChecker(
+                (stopId) => API.getStopArrivals(stopId),
+                (title, body) => {
+                    inAppAlert(`${title} ${body}`, { durationMs: 10000 });
+                    if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+                },
+            );
+        } else {
+            stopForegroundChecker();
+        }
+
         if (e.detail) {
             applySettings();
         } else {

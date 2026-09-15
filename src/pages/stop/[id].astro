@@ -74,6 +74,7 @@ const t = getTranslations(lang);
 
   <script>
     import { storage } from '../../utils/storage';
+    import { inAppAlert } from '../../utils/inAppAlert';
     import { API, isApiCooldownActive } from '../../services/api';
     import { tracking } from '../../utils/tracking';
     import { createIcons, Star, Navigation, Map, LocateFixed, Bell } from 'lucide';
@@ -516,9 +517,12 @@ const t = getTranslations(lang);
                 Notification.requestPermission();
               }
               
-              alert(lang === 'en' 
+              // Non-blocking banner so it doesn't freeze the UI
+              // Banner no bloqueante para no congelar la interfaz
+              inAppAlert(lang === 'en' 
                 ? `🔔 Arrival alert activated! We will notify you when bus ${busId} is at ${thresholdText} from this stop.` 
-                : `🔔 ¡Aviso de llegada activado! Te avisaremos cuando el autobús ${busId} esté a ${thresholdText} de esta parada.`);
+                : `🔔 ¡Aviso de llegada activado! Te avisaremos cuando el autobús ${busId} esté a ${thresholdText} de esta parada.`,
+                { durationMs: 8000 });
             });
           });
 
@@ -585,8 +589,7 @@ const t = getTranslations(lang);
         arrivalTime: null
       });
 
-      document.getElementById('destination-modal')!.style.display = 'none';
-      alert(lang === 'en' ? 'Tracking started! We will notify you when you arrive at your destination.' : '¡Seguimiento iniciado! Te avisaremos cuando llegues a tu destino.');
+      document.getElementById('destination-modal')!.style.display = 'none';              inAppAlert(lang === 'en' ? 'Tracking started! We will notify you when you arrive at your destination.' : '¡Seguimiento iniciado! Te avisaremos cuando llegues a tu destino.');
     }
 
     function updateFavoriteUI() {
