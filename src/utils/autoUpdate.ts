@@ -131,37 +131,53 @@ export async function downloadAndInstall(
         // Ruta nativa: DownloadManager del sistema + abrir el URI local
         await downloader.downloadApk({ url: apkUrl });
 
-        // Wait for the download completion event (max 10 min, matching the plugin)
-        // Esperar el evento de descarga completada (máx 10 min, igual que el plugin)
-        const uri = await new Promise<string>((resolve, reject) => {
+        // Wait for the download completion event (max 10 min, matching the plugin).
+        // The native side opens the package installer itself (including the
+        // "install unknown apps" permission redirect) — no web anchor needed.
+        //
+        // Esperar el evento de descarga completada (máx 10 min, igual que el plugin).
+        // El lado nativo abre el instalador él mismo (incluida la redirección al
+        // permiso de "instalar apps desconocidas") — no hace falta anchor web.
+        await new Promise<void>((resolve, reject) => {
             const timeout = setTimeout(() => {
                 cleanup();
                 reject(new Error('Download timed out'));
             }, 10 * 60 * 1000);
-            let doneListener: any, failListener: any;
+            let doneListener: any, failListener: any, permListener: any;
             const cleanup = () => {
                 clearTimeout(timeout);
                 doneListener?.remove?.();
                 failListener?.remove?.();
+                permListener?.remove?.();
             };
-            doneListener = downloader.addListener('downloadDone', (data: any) => {
+            doneListener = downloader.addListener('downloadDone', () => {
+                onProgress(100);
                 cleanup();
-                resolve(data?.uri || '');
+                resolve();
             });
             failListener = downloader.addListener('downloadFailed', () => {
                 cleanup();
                 reject(new Error('Download failed'));
             });
+            // The user must grant "install unknown apps" first; the native side
+            // already opened the settings screen. Treat it as a soft-success:
+            // the APK is downloaded and the user can tap update again after
+            // granting.
+            //
+            // El usuario debe dar antes "instalar apps desconocidas"; el lado
+            // nativo ya abrió los ajustes. Lo tratamos como éxito blando: el APK
+            // está descargado y el usuario puede pulsar actualizar tras dar permiso.
+            permListener = downloader.addListener('installPermissionNeeded', () => {
+                onProgress(100);
+                cleanup();
+                resolve();
+            });
+            // Live progress from the native poller (bytes/total)
+            // Progreso en vivo desde el poller nativo (bytes/total)
+            downloader.addListener('downloadProgress', (p: any) => {
+                if (p && typeof p.percent === 'number') onProgress(p.percent);
+            });
         });
-
-        // Hand the downloaded file to Android's package installer
-        // Entregar el archivo descargado al instalador de paquetes de Android
-        const anchor = document.createElement('a');
-        anchor.href = uri;
-        anchor.download = 'coruna-bus-update.apk';
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
         return;
     }
 

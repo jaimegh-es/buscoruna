@@ -16,8 +16,24 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        // Fixed keystore committed to the repo: same signature locally and on
+        // GitHub Actions, so in-app auto-updates pass the signature check.
+        // Keystore fijo en el repo: la misma firma en local y en GitHub Actions,
+        // para que las auto-actualizaciones pasen el chequeo de firma.
+        appUpdate {
+            storeFile file('corunabus-debug.keystore')
+            storePassword 'corunabus'
+            keyAlias 'corunabus'
+            keyPassword 'corunabus'
+        }
+    }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.appUpdate
+        }
         release {
+            signingConfig signingConfigs.appUpdate
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
