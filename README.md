@@ -64,3 +64,5 @@ Este proyecto está optimizado para ejecutarse en el edge de Cloudflare:
 **Aviso Legal:** Coruña Bus es una aplicación independiente de carácter informativo. No tiene relación oficial con la Compañía de Tranvías de La Coruña ni con el Ayuntamiento de A Coruña. Los datos se ofrecen "tal cual" para facilitar la movilidad urbana.
 
 Desarrollado con ❤️ para los ciudadanos de A Coruña.
+
+<!-- build counter bump -->
