@@ -8,7 +8,6 @@
 // Android. También expone una comprobación manual para la interfaz de ajustes.
 
 import { Capacitor } from '@capacitor/core';
-import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 
 // Repo releases endpoint (update if the repo moves)
 // Endpoint de releases (actualizar si cambia el repo)
@@ -114,63 +113,69 @@ export async function autoCheckOnOpen() {
 }
 
 /**
- * Download the APK (with progress) and hand it to the Android installer.
- * Descarga el APK (con progreso) y lo entrega al instalador de Android.
+ * Download the APK natively (Android DownloadManager — no CORS, progress in
+ * the system notification shade) and open the local file with the package
+ * installer.
+ *
+ * Descarga el APK de forma nativa (DownloadManager de Android — sin CORS,
+ * progreso en la barra del sistema) y abre el archivo local con el
+ * instalador de paquetes.
  */
 export async function downloadAndInstall(
     apkUrl: string,
     onProgress: (percent: number) => void,
 ): Promise<void> {
-    const res = await fetch(apkUrl);
-    if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+    const downloader = (Capacitor as any).Plugins?.UpdateDownloader;
+    if (downloader?.downloadApk) {
+        // Native path: system DownloadManager + open local URI
+        // Ruta nativa: DownloadManager del sistema + abrir el URI local
+        await downloader.downloadApk({ url: apkUrl });
 
-    const total = parseInt(res.headers.get('content-length') || '0', 10);
-    const reader = res.body?.getReader();
-    if (!reader) throw new Error('No response body');
+        // Wait for the download completion event (max 10 min, matching the plugin)
+        // Esperar el evento de descarga completada (máx 10 min, igual que el plugin)
+        const uri = await new Promise<string>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                cleanup();
+                reject(new Error('Download timed out'));
+            }, 10 * 60 * 1000);
+            let doneListener: any, failListener: any;
+            const cleanup = () => {
+                clearTimeout(timeout);
+                doneListener?.remove?.();
+                failListener?.remove?.();
+            };
+            doneListener = downloader.addListener('downloadDone', (data: any) => {
+                cleanup();
+                resolve(data?.uri || '');
+            });
+            failListener = downloader.addListener('downloadFailed', () => {
+                cleanup();
+                reject(new Error('Download failed'));
+            });
+        });
 
-    const chunks: Uint8Array[] = [];
-    let received = 0;
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        received += value.length;
-        if (total > 0) onProgress(Math.round((received / total) * 100));
+        // Hand the downloaded file to Android's package installer
+        // Entregar el archivo descargado al instalador de paquetes de Android
+        const anchor = document.createElement('a');
+        anchor.href = uri;
+        anchor.download = 'coruna-bus-update.apk';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        return;
     }
 
-    const blob = new Blob(chunks as BlobPart[], { type: 'application/vnd.android.package-archive' });
-    const base64 = await blobToBase64(blob);
-
-    // Write to external Documents dir so the installer can read it
-    // Guardar en Documents externo para que el instalador pueda leerlo
-    await Filesystem.writeFile({
-        path: 'coruna-bus-update.apk',
-        data: base64,
-        directory: Directory.Documents,
-        encoding: Encoding.UTF8,
-        recursive: true,
-    });
-
-    const { uri } = await Filesystem.getUri({ path: 'coruna-bus-update.apk', directory: Directory.Documents });
-
-    // Hand the file to Android's package installer
-    // Entregar el archivo al instalador de paquetes de Android
-    const anchor = document.createElement('a');
-    anchor.href = uri;
-    anchor.download = 'coruna-bus-update.apk';
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-}
-
-function blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            const result = reader.result as string;
-            resolve(result.substring(result.indexOf(',') + 1));
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
+    // Web fallback: plain fetch + anchor (no CORS on github desktop works via redirect)
+    // Fallback web: fetch normal + anchor
+    const res = await fetch(apkUrl);
+    if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'coruna-bus-update.apk';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
 }

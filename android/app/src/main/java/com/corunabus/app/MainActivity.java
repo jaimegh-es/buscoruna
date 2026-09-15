@@ -8,6 +8,14 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        // Native APK downloader (system DownloadManager) for in-app updates
+        // Descargador nativo de APKs (DownloadManager del sistema) para las actualizaciones
+        registerPlugin(UpdateDownloaderPlugin.class);
+    }
+
+    @Override
     public void onStart() {
         super.onStart();
         // Append a marker to the WebView User-Agent so the API proxy can
