@@ -267,7 +267,24 @@ const { title } = Astro.props;
                         </div>
                     </div>
 
-                    <!-- Setting 4: Language Selection -->
+                    <!-- Setting 4: App Update (native only) -->
+                    <!-- Ajuste 4: Actualización de la app (solo nativo) -->
+                    <div class="setting-item" id="settings-update-item" style="display:none">
+                        <div class="setting-info">
+                            <label class="setting-title">
+                                <span>{t.settingsUpdateTitle}</span>
+                            </label>
+                            <p class="setting-desc">{t.settingsUpdateDesc}</p>
+                            <div id="settings-update-status" class="update-status" style="display:none"></div>
+                            <div class="update-progress-wrap" id="update-progress-wrap" style="display:none">
+                                <div class="update-progress-bar"><div id="update-progress-fill"></div></div>
+                                <small id="update-progress-text">0%</small>
+                            </div>
+                            <button type="button" id="btn-check-update" class="btn-secondary update-btn">{t.settingsUpdateCheck}</button>
+                        </div>
+                    </div>
+
+                    <!-- Setting 5: Language Selection -->
                     <div class="setting-item">
                         <div class="setting-info">
                             <label class="setting-title" for="settings-lang-select">
@@ -288,6 +305,25 @@ const { title } = Astro.props;
         </div>
 
 
+
+        <!-- Changelog Modal (shown once per version) -->
+        <!-- Modal de novedades (se muestra una vez por versión) -->
+        <div id="changelog-modal" class="modal-overlay" style="display: none;">
+            <div class="modal-content settings-modal-content changelog-content">
+                <div class="modal-header">
+                    <h3 id="changelog-title">{t.changelogTitle}</h3>
+                    <button type="button" id="changelog-close" class="close-btn">
+                        <Icon name="x" size={24} />
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <ul id="changelog-items" class="changelog-list"></ul>
+                </div>
+                <div class="settings-actions">
+                    <button type="button" id="changelog-ok" class="btn-primary">{t.changelogOk}</button>
+                </div>
+            </div>
+        </div>
 
         <!-- Global Destination Modal (Fallback) -->
         <div
@@ -977,6 +1013,70 @@ const { title } = Astro.props;
         font-weight: 500;
     }
 
+    .update-status {
+        font-size: 0.8rem;
+        margin-top: 8px;
+        color: var(--text);
+    }
+
+    .update-btn {
+        margin-top: 10px;
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+        background: transparent;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+
+    .update-progress-wrap {
+        margin-top: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .update-progress-bar {
+        flex: 1;
+        height: 8px;
+        background: #eee;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .update-progress-bar > div {
+        height: 100%;
+        width: 0%;
+        background: var(--primary);
+        transition: width 0.2s ease;
+    }
+
+    #update-progress-text {
+        min-width: 34px;
+        text-align: right;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    .changelog-content {
+        max-width: 420px;
+    }
+
+    .changelog-list {
+        margin: 0.75rem 0 0;
+        padding-left: 1.2rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+    }
+
+    .changelog-list li {
+        font-size: 0.9rem;
+        line-height: 1.45;
+        color: var(--text);
+    }
+
     .setting-sub-option {
         margin-top: 8px;
         display: flex;
@@ -1232,7 +1332,9 @@ const { title } = Astro.props;
         stopForegroundChecker,
         resetAlertState,
     } from "../utils/backgroundAlerts";
-    import { checkForUpdate } from "../utils/autoUpdate";
+    import { checkForUpdate as checkUpdateInfo, downloadAndInstall, autoCheckOnOpen, type UpdateInfo } from "../utils/autoUpdate";
+    import { getChangelogFor, hasSeenChangelog, markChangelogSeen } from "../utils/changelog";
+    import { Capacitor } from "@capacitor/core";
     import { notify } from "../utils/notify";
     import { LocalNotifications } from "@capacitor/local-notifications";
 
@@ -1325,7 +1427,41 @@ const { title } = Astro.props;
 
     // Check for app updates (native build only)
     // Comprobar actualizaciones de la app (solo build nativo)
-    checkForUpdate();
+    autoCheckOnOpen();
+
+    // Show the changelog once per new app version (native build only)
+    // Mostrar el changelog una vez por versión nueva (solo build nativo)
+    (async () => {
+        try {
+            if (!isNativePlatform()) return;
+            const App = (Capacitor as any).Plugins?.App;
+            if (!App?.getInfo) return;
+            const info = await App.getInfo();
+            const entry = getChangelogFor(info.version);
+            if (!entry || hasSeenChangelog(info.version)) return;
+
+            const modal = document.getElementById('changelog-modal');
+            const titleEl = document.getElementById('changelog-title');
+            const listEl = document.getElementById('changelog-items');
+            if (!modal || !listEl) return;
+
+            titleEl && (titleEl.textContent = `${t.changelogTitle} · v${entry.version}`);
+            listEl.innerHTML = entry.items.map(i => `<li>${i}</li>`).join('');
+            modal.style.display = 'flex';
+
+            const close = () => {
+                modal.style.display = 'none';
+                markChangelogSeen(info.version);
+            };
+            document.getElementById('changelog-ok')?.addEventListener('click', close);
+            document.getElementById('changelog-close')?.addEventListener('click', close);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) close();
+            });
+        } catch (e) {
+            console.warn('[Changelog] failed to show', e);
+        }
+    })();
 
     function updateLastRefreshTime() {
         const el = document.getElementById("last-update");
@@ -2207,6 +2343,83 @@ const { title } = Astro.props;
         }
     });
 
+    // App update UI (settings modal, native only)
+    // Interfaz de actualización de la app (modal de ajustes, solo nativo)
+    const updateItem = document.getElementById('settings-update-item');
+    if (updateItem && isNativePlatform()) {
+        updateItem.style.display = '';
+    } else if (updateItem) {
+        // On web, show a note instead of the checker
+        // En web, mostrar una nota en lugar del comprobador
+        updateItem.style.display = '';
+        const statusEl = document.getElementById('settings-update-status');
+        if (statusEl) {
+            statusEl.style.display = '';
+            statusEl.textContent = t.settingsUpdateWebNote;
+        }
+        const checkBtn = document.getElementById('btn-check-update');
+        if (checkBtn) checkBtn.style.display = 'none';
+    }
+
+    let lastUpdateInfo: UpdateInfo | null = null;
+
+    document.getElementById('btn-check-update')?.addEventListener('click', async () => {
+        const statusEl = document.getElementById('settings-update-status')!;
+        const btn = document.getElementById('btn-check-update') as HTMLButtonElement;
+        const progWrap = document.getElementById('update-progress-wrap')!;
+        const progFill = document.getElementById('update-progress-fill')!;
+        const progText = document.getElementById('update-progress-text')!;
+
+        btn.disabled = true;
+        btn.textContent = t.settingsUpdateChecking;
+        statusEl.style.display = '';
+        progWrap.style.display = 'none';
+
+        try {
+            const info = await checkUpdateInfo();
+            lastUpdateInfo = info;
+            if (!info.available) {
+                statusEl.textContent = t.settingsUpdateUpToDate;
+                btn.disabled = false;
+                btn.textContent = t.settingsUpdateCheck;
+                return;
+            }
+
+            statusEl.textContent = t.settingsUpdateAvailable.replace('{v}', info.versionName);
+
+            // Turn the check button into the download button
+            // Convertir el botón de comprobar en botón de descarga
+            btn.disabled = false;
+            btn.textContent = t.settingsUpdateDownload;
+            btn.onclick = async () => {
+                if (!lastUpdateInfo?.apkUrl) return;
+                btn.disabled = true;
+                progWrap.style.display = 'flex';
+                progFill.style.width = '0%';
+                progText.textContent = '0%';
+                try {
+                    await downloadAndInstall(lastUpdateInfo.apkUrl, (pct) => {
+                        progFill.style.width = `${pct}%`;
+                        progText.textContent = `${pct}%`;
+                        if (pct >= 100) {
+                            statusEl.textContent = t.settingsUpdateInstalling;
+                        }
+                    });
+                } catch (err) {
+                    console.error('[AutoUpdate] install failed', err);
+                    statusEl.textContent = t.settingsUpdateError;
+                    btn.disabled = false;
+                    btn.textContent = t.settingsUpdateCheck;
+                }
+            };
+        } catch (err) {
+            console.error('[AutoUpdate] check failed', err);
+            statusEl.textContent = t.settingsUpdateError;
+            btn.disabled = false;
+            btn.textContent = t.settingsUpdateCheck;
+        }
+    });
+
     // Save settings button
     // Guardar ajustes seleccionados por el usuario
     document.getElementById("btn-save-settings")?.addEventListener("click", async () => {
@@ -2249,10 +2462,21 @@ const { title } = Astro.props;
             stopForegroundChecker();
         }
 
-        // Ask for browser notification permissions if any alert checked
+        // Ask for browser notification permissions if any alert checked.
+        // Guarded: `Notification` doesn't exist in the native WebView and a
+        // ReferenceError here would kill the handler before closing the modal
+        // (making it look like settings "don't save").
+        // Pedir permisos de notificación del navegador si hay alertas activas.
+        // Protegido: `Notification` no existe en el WebView nativo y un
+        // ReferenceError aquí mataría el handler antes de cerrar el modal
+        // (pareciendo que los ajustes "no se guardan").
         if (gpsAlertInput?.checked || etaAlertInput?.checked || keepAwakeInput?.checked) {
-            if (Notification.permission === "default") {
-                Notification.requestPermission();
+            try {
+                if (typeof Notification !== "undefined" && Notification.permission === "default") {
+                    Notification.requestPermission();
+                }
+            } catch (e) {
+                console.warn("Notification permission check unavailable", e);
             }
         }
 
@@ -2277,6 +2501,10 @@ const { title } = Astro.props;
 
         applySettings();
         closeSettings();
+
+        // Visible confirmation that settings were saved
+        // Confirmación visible de que los ajustes se guardaron
+        inAppAlert(lang === 'en' ? '✅ Settings saved' : '✅ Ajustes guardados', { durationMs: 3000 });
 
         if (selectedLang !== oldLang) {
             window.location.reload();

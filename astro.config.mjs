@@ -10,6 +10,20 @@ import cloudflare from '@astrojs/cloudflare';
 export default defineConfig({
   output: 'server',
   vite: {
+    // Capacitor plugins use the native bridge at runtime and must not be
+    // pre-bundled by Vite's dep optimizer (stale cache after plugin changes
+    // breaks the whole app).
+    // Los plugins de Capacitor usan el bridge nativo y Vite no debe
+    // pre-bundlearlos (un caché obsoleto tras cambiar plugins rompe la app).
+    optimizeDeps: {
+      exclude: [
+        '@capacitor/core',
+        '@capacitor/local-notifications',
+        '@capacitor/preferences',
+        '@capacitor/filesystem',
+        '@capacitor/app',
+      ],
+    },
     plugins: [
       VitePWA({
         registerType: 'autoUpdate',

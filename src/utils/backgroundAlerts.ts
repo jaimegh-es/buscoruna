@@ -116,7 +116,6 @@ export async function scheduleBackgroundCheck(config?: BackgroundAlertConfig) {
                 schedule: {
                     // Repeating interval cannot be shorter than one minute
                     every: 'minute' as any,
-                    interval: Math.max(1, Math.round(cfg.intervalSeconds / 60)) as any,
                     allowWhileIdle: true,
                 },
                 actionTypeId: '',

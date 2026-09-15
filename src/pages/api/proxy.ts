@@ -1,5 +1,88 @@
 import type { APIRoute } from 'astro';
 
+// Shared edge cache for per-line live map data (func=99). Bus positions are
+// used for *detection* only, so a few minutes of staleness is fine. Caching
+// here means every user's scans warm the cache for everyone: the upstream
+// rate limit (1 req/s, 4/min) is spent once per line per 5 min globally,
+// instead of once per user per scan.
+//
+// Caché compartida en el edge para los mapas de línea en vivo (func=99).
+// Las posiciones de bus se usan para *detectar*, así que unos minutos de
+// antigüedad son aceptables. Cachear aquí hace que el escaneo de cada usuario
+// caliente la caché para todos: el límite de peticiones upstream se gasta una
+// vez por línea cada 5 min globalmente, en vez de una por usuario y escaneo.
+const LINE_MAP_CACHE_TTL = 300; // seconds
+const lineMapInFlight = new Map<string, Promise<{ body: string; status: number }>>();
+
+async function getUpstreamWithSharedCache(targetUrl: string, cacheable: boolean, buildResponse: (body: string, status: number) => Response): Promise<Response> {
+  if (!cacheable) {
+    const res = await fetchUpstream(targetUrl);
+    return buildResponse(res.body, res.status);
+  }
+
+  const cacheKey = new Request(`https://shared-cache.buscoruna.internal/${targetUrl}`);
+
+  try {
+    const cache = (globalThis as any).caches?.default;
+    if (cache) {
+      const hit = await cache.match(cacheKey);
+      if (hit) {
+        const body = await hit.text();
+        return buildResponse(body, 200);
+      }
+    }
+  } catch {
+    // Cache API unavailable (local dev) - fall through to direct fetch
+    // Cache API no disponible (dev local) - continuar con fetch directo
+  }
+
+  // Single-flight: concurrent requests for the same line share one upstream fetch
+  // Single-flight: peticiones concurrentes de la misma línea comparten un fetch
+  let inFlight = lineMapInFlight.get(targetUrl);
+  if (!inFlight) {
+    const promise: Promise<{ body: string; status: number }> = (async () => {
+      const res = await fetchUpstream(targetUrl);
+      if (res.status >= 200 && res.status < 400 && res.body.trimStart().startsWith('{')) {
+        try {
+          const cache = (globalThis as any).caches?.default;
+          if (cache) {
+            await cache.put(cacheKey, new Response(res.body, {
+              headers: { 'Content-Type': 'application/json', 'Cache-Control': `max-age=${LINE_MAP_CACHE_TTL}` },
+            }));
+          }
+        } catch {
+          // ignore cache write failures
+        }
+      }
+      lineMapInFlight.delete(targetUrl);
+      return res;
+    })();
+    inFlight = promise;
+    lineMapInFlight.set(targetUrl, promise);
+  }
+
+  const res = await inFlight;
+  return buildResponse(res.body, res.status);
+}
+
+async function fetchUpstream(targetUrl: string): Promise<{ body: string; status: number }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+  const response = await fetch(targetUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      'Referer': 'https://itranvias.com/',
+    },
+    signal: controller.signal,
+  });
+
+  clearTimeout(timeoutId);
+  const status = response.status;
+  const body = await response.text();
+  return { body, status };
+}
+
 export const GET: APIRoute = async ({ request }) => {
   const origin = request.headers.get('origin');
   const referer = request.headers.get('referer');
@@ -25,9 +108,16 @@ export const GET: APIRoute = async ({ request }) => {
   const isAllowedOrigin = isAllowed(origin);
   const isAllowedReferer = isAllowed(referer);
 
+  // The native Android app (Capacitor WebView) does not send Origin or Referer
+  // headers. Identify it by its custom User-Agent marker instead of blocking it.
+  // La app nativa Android (WebView de Capacitor) no envía Origin ni Referer.
+  // Se identifica por su User-Agent propio en lugar de bloquearla.
+  const userAgent = request.headers.get('user-agent') || '';
+  const isNativeApp = userAgent.includes('CorunaBusNative');
+
   // If we are in the same domain, sometimes headers might be missing depending on the browser/navigation.
   // But for an API proxy, we expect at least one to be present if it's from a web app.
-  if (!isAllowedOrigin && !isAllowedReferer) {
+  if (!isAllowedOrigin && !isAllowedReferer && !isNativeApp) {
     // Basic check for direct access if no headers at all (can happen in some server-side or CLI tools, 
     // but here we want to protect it. However, if it's a GET, we might want to be careful).
     // Let's keep it strict but ensure we didn't miss anything.
@@ -71,32 +161,19 @@ export const GET: APIRoute = async ({ request }) => {
   }
   
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
-    const response = await fetch(targetUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Referer': 'https://itranvias.com/',
-      },
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-
+    const func = url.searchParams.get('func');
+    const cacheable = type === 'itranvias' && func === '99';
+    const result = await getUpstreamWithSharedCache(targetUrl, cacheable, (raw, upstreamStatus) => {
     // The upstream is aggressively rate-limited (1 req/s, 4/min; it answers 429
     // with an HTML body). Always read the raw body first - JSON.parse on an HTML
     // error page would crash the proxy - and mirror the upstream status so the
     // client can honor the cooldown with a proper Retry-After.
-    const upstreamStatus = response.status;
-    const raw = await response.text();
-
     let data: any;
     try {
       data = JSON.parse(raw);
     } catch {
       const isRateLimit = upstreamStatus === 429;
-      const retryAfter = response.headers.get('retry-after') || (isRateLimit ? '60' : '');
+      const retryAfter = isRateLimit ? '60' : '';
       return new Response(
         JSON.stringify({
           error: isRateLimit ? 'rate_limited' : 'upstream_unavailable',
@@ -120,6 +197,8 @@ export const GET: APIRoute = async ({ request }) => {
         'Access-Control-Allow-Origin': origin || (referer ? new URL(referer).origin : '*'),
       }
     });
+    });
+    return result;
   } catch (error) {
     console.error('Proxy error:', error);
     return new Response(JSON.stringify({ error: 'Failed to fetch from target' }), { status: 500 });
