@@ -23,11 +23,16 @@ import {
   Maximize2,
   Minimize2,
   Camera,
-  Download
+  Download,
+  ChevronDown,
+  Minus,
+  Briefcase,
+  Clock,
+  Trash2
 } from '@lucide/astro';
 
 interface Props {
-  name: 'refresh' | 'edit' | 'settings' | 'search' | 'stop' | 'bus' | 'star' | 'heart' | 'map' | 'x' | 'chevron-right' | 'chevron-left' | 'location' | 'star-outline' | 'heart-outline' | 'shield' | 'ban' | 'menu' | 'share' | 'plus' | 'home' | 'maximize' | 'minimize' | 'street-view' | 'navigation' | 'download';
+  name: 'refresh' | 'edit' | 'settings' | 'search' | 'stop' | 'bus' | 'star' | 'heart' | 'map' | 'x' | 'chevron-right' | 'chevron-left' | 'chevron-down' | 'location' | 'star-outline' | 'heart-outline' | 'shield' | 'ban' | 'menu' | 'share' | 'plus' | 'minus' | 'home' | 'briefcase' | 'clock' | 'trash' | 'maximize' | 'minimize' | 'street-view' | 'navigation' | 'download';
   class?: string;
   size?: number;
 }
@@ -47,6 +52,7 @@ const iconMap = {
   x: X,
   'chevron-right': ChevronRight,
   'chevron-left': ChevronLeft,
+  'chevron-down': ChevronDown,
   location: LocateFixed,
   'star-outline': Star,
   'heart-outline': Heart,
@@ -55,7 +61,11 @@ const iconMap = {
   menu: Menu,
   share: Share,
   plus: Plus,
+  minus: Minus,
   home: Home,
+  briefcase: Briefcase,
+  clock: Clock,
+  trash: Trash2,
   maximize: Maximize2,
   minimize: Minimize2,
   'street-view': Camera,

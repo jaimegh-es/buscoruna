@@ -304,15 +304,40 @@ const { title } = Astro.props;
                                 <span>{t.settingsLocationsTitle}</span>
                             </label>
                             <p class="setting-desc">{t.settingsLocationsDesc}</p>
-                            <div style="margin-top: 0.6rem;">
-                                <label for="settings-active-location" style="font-size: 0.85rem; font-weight: 600; color: var(--text); display: block; margin-bottom: 0.35rem;">{t.settingsActiveLocation}</label>
+                            
+                            <div style="margin-top: 0.75rem;">
+                                <label for="settings-active-location" style="font-size: 0.85rem; font-weight: 700; color: var(--text); display: block; margin-bottom: 0.35rem;">{t.settingsActiveLocation}</label>
                                 <div style="display: flex; gap: 0.5rem; align-items: center;">
-                                    <select id="settings-active-location" style="flex: 1; padding: 0.6rem; border-radius: 8px; border: 1px solid #ddd; background: var(--card-bg); color: var(--text); font-size: 0.95rem;">
+                                    <select id="settings-active-location" style="flex: 1; padding: 0.65rem; border-radius: 10px; border: 1.5px solid #e2e8f0; background: var(--card-bg); color: var(--text); font-size: 0.95rem; font-weight: 600;">
                                     </select>
-                                    <button type="button" id="settings-btn-add-location" class="btn-secondary" style="width: auto; padding: 0.6rem 0.85rem; font-size: 0.85rem; white-space: nowrap;">
+                                    <button type="button" id="settings-btn-add-location" class="btn-secondary" style="width: auto; padding: 0.65rem 0.95rem; font-size: 0.85rem; font-weight: 700; white-space: nowrap; border-radius: 10px;">
                                         {t.settingsAddLocationBtn}
                                     </button>
                                 </div>
+                            </div>
+
+                            <div id="settings-locations-list" style="margin-top: 0.85rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Setting 3.6: Data Migration & Backup (PWA to APK / Backup) -->
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <label class="setting-title">
+                                <span>{t.migrationTitle}</span>
+                            </label>
+                            <p class="setting-desc">{t.migrationDesc}</p>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem;">
+                                <button type="button" id="btn-export-data" class="btn-secondary" style="flex: 1; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.6rem 0.9rem; font-size: 0.88rem; font-weight: 700; border-radius: 10px; white-space: nowrap;">
+                                    <Icon name="share" size={16} />
+                                    <span>{t.migrationExportBtn}</span>
+                                </button>
+                                <button type="button" id="btn-import-data" class="btn-secondary" style="flex: 1; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.6rem 0.9rem; font-size: 0.88rem; font-weight: 700; border-radius: 10px; white-space: nowrap;">
+                                    <Icon name="download" size={16} />
+                                    <span>{t.migrationImportBtn}</span>
+                                </button>
+                                <input type="file" id="input-import-file" accept=".json,application/json" style="display:none;" />
                             </div>
                         </div>
                     </div>
@@ -343,21 +368,64 @@ const { title } = Astro.props;
                                 <small id="update-progress-text">0%</small>
                             </div>
                             <button type="button" id="btn-check-update" class="btn-secondary update-btn">{t.settingsUpdateCheck}</button>
+
+                            <!-- Obtainium Updater Option -->
+                            <div class="obtainium-box" style="margin-top: 1.15rem; padding-top: 0.95rem; border-top: 1px dashed #e2e8f0;">
+                                <label class="setting-title" style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem;">
+                                    <span>{t.obtainiumTitle}</span>
+                                </label>
+                                <p class="setting-desc" style="margin-bottom: 0.75rem;">{t.obtainiumDesc}</p>
+                                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                    <a href="obtainium://app/https://github.com/jaimegh-es/buscoruna" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.9rem; font-size: 0.85rem; font-weight: 700; border-radius: 10px;">
+                                        <Icon name="download" size={16} />
+                                        <span>{t.obtainiumAddBtn}</span>
+                                    </a>
+                                    <a href="https://github.com/ImranR98/Obtainium/releases/latest" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.9rem; font-size: 0.85rem; font-weight: 600; border-radius: 10px;">
+                                        <span>{t.obtainiumDownloadBtn}</span>
+                                    </a>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Android App Download Item (shown when on web/PWA on Android) -->
-                    <!-- Descarga de App Android (mostrado en web/PWA en Android) -->
-                    <div class="setting-item" id="settings-android-download-item" style="display:none">
+                    <!-- Android App Download Item (shown when on web/PWA) -->
+                    <!-- Descarga de App Android (mostrado en web/PWA) -->
+                    <div class="setting-item" id="settings-android-download-item">
                         <div class="setting-info">
                             <label class="setting-title">
                                 <span>{t.downloadAndroidTitle}</span>
                             </label>
                             <p class="setting-desc">{t.downloadAndroidDesc}</p>
-                            <a href="https://github.com/jaimegh-es/buscoruna/releases/latest/download/app-debug.apk" id="settings-download-apk-btn" class="btn-primary update-btn" download="coruna-bus.apk" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:0.5rem; margin-top:0.6rem; width:100%;">
+
+                            <!-- Play Store Notice -->
+                            <div class="play-store-notice" style="margin-top: 0.65rem; margin-bottom: 0.75rem; background: #f0fdf4; border: 1.5px solid #bbf7d0; padding: 0.75rem 0.9rem; border-radius: 12px; display: flex; align-items: flex-start; gap: 0.6rem;">
+                                <div style="font-size: 0.86rem; color: #166534;">
+                                    <strong>{t.playStoreComingSoon}</strong>
+                                    <p style="margin: 0.2rem 0 0; font-size: 0.78rem; opacity: 0.9; line-height: 1.35;">{t.playStoreComingSoonDesc}</p>
+                                </div>
+                            </div>
+
+                            <a href="https://github.com/jaimegh-es/buscoruna/releases/latest/download/app-debug.apk" id="settings-download-apk-btn" class="btn-primary update-btn" download="coruna-bus.apk" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:0.5rem; width:100%; min-height:48px; border-radius:12px; font-weight:700;">
                                 <Icon name="download" size={18} />
                                 <span>{t.downloadAndroidBtn}</span>
                             </a>
+                            
+                            <!-- Obtainium Option in Web Settings -->
+                            <div class="obtainium-box" style="margin-top: 1rem; padding-top: 0.85rem; border-top: 1px dashed #e2e8f0;">
+                                <label class="setting-title" style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.35rem; display: block;">
+                                    <span>{t.obtainiumTitle}</span>
+                                </label>
+                                <p class="setting-desc" style="margin-bottom: 0.65rem;">{t.obtainiumDesc}</p>
+                                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                    <a href="obtainium://app/https://github.com/jaimegh-es/buscoruna" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.9rem; font-size: 0.85rem; font-weight: 700; border-radius: 10px;">
+                                        <Icon name="download" size={16} />
+                                        <span>{t.obtainiumAddBtn}</span>
+                                    </a>
+                                    <a href="https://github.com/ImranR98/Obtainium/releases/latest" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.9rem; font-size: 0.85rem; font-weight: 600; border-radius: 10px;">
+                                        <span>{t.obtainiumDownloadBtn}</span>
+                                    </a>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -2431,16 +2499,7 @@ const { title } = Astro.props;
         if (keepAwakeInput) keepAwakeInput.checked = localStorage.getItem('buscoruna_bg_keep_awake') === 'true';
         if (langSelect) langSelect.value = document.documentElement.getAttribute('data-lang') || 'es';
 
-        // Populate active location selector in settings
-        const activeLocSelect = document.getElementById("settings-active-location") as HTMLSelectElement;
-        if (activeLocSelect) {
-            const locs = storage.getUserLocations();
-            const activeId = storage.getActiveLocationId();
-            activeLocSelect.innerHTML = locs.map(l => {
-                const icon = l.icon === 'home' ? '🏠' : (l.icon === 'briefcase' ? '💼' : '📍');
-                return `<option value="${l.id}" ${l.id === activeId ? 'selected' : ''}>${icon} ${l.name}</option>`;
-            }).join('');
-        }
+        renderLocationsSettingsUI();
 
         // Show the appropriate warning depending on platform
         // Mostrar la advertencia adecuada según la plataforma
@@ -2454,22 +2513,155 @@ const { title } = Astro.props;
         }
     };
 
+    function renderLocationsSettingsUI() {
+        const activeLocSelect = document.getElementById("settings-active-location") as HTMLSelectElement;
+        const listContainer = document.getElementById("settings-locations-list");
+        const locs = storage.getUserLocations();
+        const activeId = storage.getActiveLocationId();
+
+        if (activeLocSelect) {
+            activeLocSelect.innerHTML = locs.map(l => {
+                const icon = l.icon === 'home' || l.id === 'casa' ? '🏠' : (l.icon === 'briefcase' || l.id === 'trabajo' ? '💼' : '📍');
+                return `<option value="${l.id}" ${l.id === activeId ? 'selected' : ''}>${icon} ${l.name}</option>`;
+            }).join('');
+        }
+
+        if (listContainer) {
+            listContainer.innerHTML = locs.map(l => {
+                const isDefault = l.id === 'casa' || l.id === 'trabajo';
+                const hasGps = typeof l.lat === 'number' && typeof l.lon === 'number';
+                const gpsBadge = hasGps 
+                    ? `<span style="font-size:0.75rem; background:#dcfce7; color:#15803d; font-weight:700; padding:2px 8px; border-radius:6px;">📍 ${t.locGpsSaved}</span>`
+                    : `<span style="font-size:0.75rem; background:#f1f5f9; color:#64748b; font-weight:600; padding:2px 8px; border-radius:6px;">${t.locGpsNone}</span>`;
+                
+                return `
+                    <div style="display:flex; align-items:center; justify-content:space-between; background:var(--card-bg, #f8fafc); border:1.5px solid #e2e8f0; padding:0.65rem 0.85rem; border-radius:12px; gap:0.5rem;">
+                        <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
+                            <strong style="font-size:0.95rem; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${l.name}</strong>
+                            <div>${gpsBadge}</div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
+                            <button type="button" class="btn-secondary btn-set-gps" data-id="${l.id}" style="padding:0.45rem 0.65rem; font-size:0.8rem; font-weight:700; border-radius:8px; white-space:nowrap;">
+                                ${t.locGpsSet}
+                            </button>
+                            ${hasGps ? `
+                                <button type="button" class="btn-secondary btn-clear-gps" data-id="${l.id}" style="padding:0.45rem 0.6rem; font-size:0.8rem; color:#ef4444; border-color:#fee2e2; background:#fff5f5; border-radius:8px;" title="${t.locGpsClear}">
+                                    ✕
+                                </button>
+                            ` : ''}
+                            ${!isDefault ? `
+                                <button type="button" class="btn-secondary btn-del-loc" data-id="${l.id}" style="padding:0.45rem 0.6rem; font-size:0.8rem; color:#ef4444; border-color:#fee2e2; background:#fff5f5; border-radius:8px;" title="Borrar">
+                                    🗑️
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            listContainer.querySelectorAll('.btn-set-gps').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.getAttribute('data-id');
+                    if (!id) return;
+                    if (navigator.geolocation) {
+                        btn.textContent = '...';
+                        navigator.geolocation.getCurrentPosition((pos) => {
+                            storage.updateUserLocation(id, { lat: pos.coords.latitude, lon: pos.coords.longitude });
+                            renderLocationsSettingsUI();
+                            inAppAlert(t.locGpsSuccess, { durationMs: 4000 });
+                        }, () => {
+                            inAppAlert(lang === 'en' ? 'Could not obtain GPS position' : 'No se pudo obtener la posición GPS', { durationMs: 4000 });
+                            renderLocationsSettingsUI();
+                        }, { enableHighAccuracy: true, timeout: 10000 });
+                    }
+                });
+            });
+
+            listContainer.querySelectorAll('.btn-clear-gps').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.getAttribute('data-id');
+                    if (id) {
+                        storage.updateUserLocation(id, { lat: null, lon: null });
+                        renderLocationsSettingsUI();
+                    }
+                });
+            });
+
+            listContainer.querySelectorAll('.btn-del-loc').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.getAttribute('data-id');
+                    if (id) {
+                        storage.removeUserLocation(id);
+                        renderLocationsSettingsUI();
+                    }
+                });
+            });
+        }
+    }
+
     document.getElementById("settings-btn-add-location")?.addEventListener("click", () => {
         const name = prompt(t.settingsLocationPrompt);
         if (name && name.trim()) {
             const newLoc = storage.addUserLocation(name.trim());
             storage.setActiveLocationId(newLoc.id);
-            const activeLocSelect = document.getElementById("settings-active-location") as HTMLSelectElement;
-            if (activeLocSelect) {
-                const locs = storage.getUserLocations();
-                activeLocSelect.innerHTML = locs.map(l => {
-                    const icon = l.icon === 'home' ? '🏠' : (l.icon === 'briefcase' ? '💼' : '📍');
-                    return `<option value="${l.id}" ${l.id === newLoc.id ? 'selected' : ''}>${icon} ${l.name}</option>`;
-                }).join('');
-                activeLocSelect.value = newLoc.id;
-            }
+            renderLocationsSettingsUI();
         }
     });
+
+    // Data Migration & Backup
+    document.getElementById("btn-export-data")?.addEventListener("click", async () => {
+        const dump = storage.exportAllUserData();
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(dump);
+            }
+        } catch {}
+
+        try {
+            const blob = new Blob([dump], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `corunabus-backup-${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch {}
+
+        inAppAlert(t.migrationCopied, { durationMs: 6000 });
+    });
+
+    document.getElementById("btn-import-data")?.addEventListener("click", () => {
+        const fileInput = document.getElementById("input-import-file") as HTMLInputElement;
+        if (fileInput) {
+            fileInput.value = '';
+            fileInput.click();
+        }
+    });
+
+    document.getElementById("input-import-file")?.addEventListener("change", (e: any) => {
+        const file = e.target?.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const text = event.target?.result as string;
+                if (text && storage.importUserData(text)) {
+                    inAppAlert(t.migrationSuccess, { durationMs: 4000 });
+                    renderLocationsSettingsUI();
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    inAppAlert(t.migrationError, { durationMs: 4000 });
+                }
+            };
+            reader.readAsText(file);
+        }
+    });
+
+    // Auto-detect location from GPS on startup
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((pos) => {
+            storage.autoSelectLocationFromGPS(pos.coords.latitude, pos.coords.longitude);
+        }, () => {}, { timeout: 6000, maximumAge: 60000 });
+    }
 
     const closeSettings = () => {
         if (settingsModal) {
@@ -2532,10 +2724,12 @@ const { title } = Astro.props;
         if (webTrackingHint) webTrackingHint.style.display = 'none';
         if (footerApkCard) footerApkCard.style.display = 'none';
     } else {
-        // On Web: show web background notice in settings and hint in tracking bar
-        // En Web: mostrar aviso de limitaciones de segundo plano y enlace a la app
+        // On Web / PWA: Show Android download, Play Store coming soon, and Obtainium options
+        if (updateItem) updateItem.style.display = 'none';
+        if (androidDownloadItem) androidDownloadItem.style.display = '';
         if (webBgNotice) webBgNotice.style.display = 'flex';
         if (webTrackingHint) webTrackingHint.style.display = 'block';
+        if (footerApkCard) footerApkCard.style.display = 'flex';
 
         getLatestApkUrl().then((apkUrl) => {
             const settingsNoticeBtn = document.getElementById('settings-web-notice-apk-btn') as HTMLAnchorElement | null;
@@ -2547,27 +2741,6 @@ const { title } = Astro.props;
             const footerBtn = document.getElementById('footer-download-apk-btn') as HTMLAnchorElement | null;
             if (footerBtn) footerBtn.href = apkUrl;
         }).catch(() => {});
-
-        if (isAndroidDevice) {
-            // On Android Web / PWA: Show download app cards & buttons
-            if (updateItem) updateItem.style.display = 'none';
-            if (androidDownloadItem) androidDownloadItem.style.display = '';
-            if (footerApkCard) footerApkCard.style.display = 'flex';
-        } else {
-            // On non-Android Web: show informational note
-            if (updateItem) {
-                updateItem.style.display = '';
-                const statusEl = document.getElementById('settings-update-status');
-                if (statusEl) {
-                    statusEl.style.display = '';
-                    statusEl.textContent = t.settingsUpdateWebNote;
-                }
-                const checkBtn = document.getElementById('btn-check-update');
-                if (checkBtn) checkBtn.style.display = 'none';
-            }
-            if (androidDownloadItem) androidDownloadItem.style.display = 'none';
-            if (footerApkCard) footerApkCard.style.display = 'none';
-        }
     }
 
     let lastUpdateInfo: UpdateInfo | null = null;

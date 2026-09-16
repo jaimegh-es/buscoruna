@@ -101,9 +101,13 @@ public class BackgroundTrackerService extends Service implements LocationListene
         }
 
         if (ACTION_START.equals(intent.getAction())) {
-            busId = intent.getStringExtra("busId") != null ? intent.getStringExtra("busId") : "";
+            String newBusId = intent.getStringExtra("busId") != null ? intent.getStringExtra("busId") : "";
+            int newOriginStopId = intent.getIntExtra("originStopId", 0);
+            boolean isSameSession = isRunning && !busId.isEmpty() && busId.equalsIgnoreCase(newBusId) && originStopId == newOriginStopId;
+
+            busId = newBusId;
             lineId = intent.getStringExtra("lineId") != null ? intent.getStringExtra("lineId") : "";
-            originStopId = intent.getIntExtra("originStopId", 0);
+            originStopId = newOriginStopId;
             originStopName = intent.getStringExtra("originStopName") != null ? intent.getStringExtra("originStopName") : "";
             destinationStopId = intent.getIntExtra("destinationStopId", 0);
             destinationStopName = intent.getStringExtra("destinationStopName") != null ? intent.getStringExtra("destinationStopName") : "";
@@ -118,14 +122,18 @@ public class BackgroundTrackerService extends Service implements LocationListene
             gpsAlertEnabled = intent.getBooleanExtra("gpsAlertEnabled", true);
             lang = intent.getStringExtra("lang") != null ? intent.getStringExtra("lang") : "es";
 
-            etaTriggered = false;
-            gpsTriggered = false;
-            lastEta = -1;
-            lastDestEta = -1;
+            if (!isSameSession) {
+                etaTriggered = false;
+                gpsTriggered = false;
+                lastEta = -1;
+                lastDestEta = -1;
 
-            startForegroundServiceNotification();
-            startPollingLoop();
-            startLocationListener();
+                startForegroundServiceNotification();
+                startPollingLoop();
+                startLocationListener();
+            } else {
+                updateForegroundNotification();
+            }
         }
 
         return START_STICKY;

@@ -119,7 +119,7 @@ export const storage = {
   // ---------------------------------------------------------------------------
   // User Locations & Stop Walking Times (Tiempos de desplazamiento por parada)
   // ---------------------------------------------------------------------------
-  getUserLocations: (): Array<{ id: string; name: string; icon: string }> => {
+  getUserLocations: (): Array<{ id: string; name: string; icon: string; lat?: number; lon?: number; radiusMeters?: number }> => {
     const raw = localStorage.getItem('buscoruna_user_locations');
     if (raw) {
       try {
@@ -133,18 +133,42 @@ export const storage = {
     ];
   },
 
-  setUserLocations: (locations: Array<{ id: string; name: string; icon: string }>) => {
+  setUserLocations: (locations: Array<{ id: string; name: string; icon: string; lat?: number; lon?: number; radiusMeters?: number }>) => {
     localStorage.setItem('buscoruna_user_locations', JSON.stringify(locations));
     window.dispatchEvent(new CustomEvent('user-locations-updated'));
   },
 
-  addUserLocation: (name: string, icon = 'map-pin'): { id: string; name: string; icon: string } => {
+  addUserLocation: (name: string, icon = 'map-pin', lat?: number, lon?: number): { id: string; name: string; icon: string; lat?: number; lon?: number } => {
     const locs = storage.getUserLocations();
     const id = 'loc_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
-    const newLoc = { id, name: name.trim(), icon };
+    const newLoc: { id: string; name: string; icon: string; lat?: number; lon?: number } = { id, name: name.trim(), icon };
+    if (lat !== undefined && lon !== undefined) {
+      newLoc.lat = lat;
+      newLoc.lon = lon;
+    }
     locs.push(newLoc);
     storage.setUserLocations(locs);
     return newLoc;
+  },
+
+  updateUserLocation: (id: string, updates: Partial<{ name: string; icon: string; lat: number | null; lon: number | null }>) => {
+    const locs = storage.getUserLocations();
+    const index = locs.findIndex(l => l.id === id);
+    if (index !== -1) {
+      const loc = { ...locs[index] };
+      if (updates.name !== undefined) loc.name = updates.name.trim();
+      if (updates.icon !== undefined) loc.icon = updates.icon;
+      if (updates.lat !== undefined) {
+        if (updates.lat === null) delete loc.lat;
+        else loc.lat = updates.lat;
+      }
+      if (updates.lon !== undefined) {
+        if (updates.lon === null) delete loc.lon;
+        else loc.lon = updates.lon;
+      }
+      locs[index] = loc;
+      storage.setUserLocations(locs);
+    }
   },
 
   removeUserLocation: (id: string) => {
@@ -167,10 +191,51 @@ export const storage = {
     window.dispatchEvent(new CustomEvent('active-location-changed', { detail: id }));
   },
 
-  getActiveLocation: (): { id: string; name: string; icon: string } => {
+  getActiveLocation: (): { id: string; name: string; icon: string; lat?: number; lon?: number } => {
     const activeId = storage.getActiveLocationId();
     const locs = storage.getUserLocations();
     return locs.find(l => l.id === activeId) || locs[0] || { id: 'casa', name: 'Casa', icon: 'home' };
+  },
+
+  // Auto-detect if user is close to one of their configured locations
+  autoSelectLocationFromGPS: (lat: number, lon: number): { id: string; name: string } | null => {
+    if (typeof lat !== 'number' || typeof lon !== 'number') return null;
+    const locs = storage.getUserLocations();
+    
+    // Find closest location with coordinates within 300m
+    let closestLoc: any = null;
+    let minDistance = Infinity;
+
+    for (const loc of locs) {
+      if (typeof loc.lat === 'number' && typeof loc.lon === 'number') {
+        // Haversine distance in meters
+        const R = 6371e3;
+        const φ1 = (lat * Math.PI) / 180;
+        const φ2 = (loc.lat * Math.PI) / 180;
+        const Δφ = ((loc.lat - lat) * Math.PI) / 180;
+        const Δλ = ((loc.lon - lon) * Math.PI) / 180;
+
+        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                  Math.cos(φ1) * Math.cos(φ2) *
+                  Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distance = R * c;
+
+        const radius = loc.radiusMeters || 300;
+        if (distance <= radius && distance < minDistance) {
+          minDistance = distance;
+          closestLoc = loc;
+        }
+      }
+    }
+
+    if (closestLoc) {
+      if (storage.getActiveLocationId() !== closestLoc.id) {
+        storage.setActiveLocationId(closestLoc.id);
+      }
+      return closestLoc;
+    }
+    return null;
   },
 
   // Walking times map: { [stopId]: { [locationId]: minutes } }
@@ -214,6 +279,63 @@ export const storage = {
       return data[String(stopId)] || {};
     } catch {
       return {};
+    }
+  },
+
+  // ---------------------------------------------------------------------------
+  // Data Backup & Migration (Exportar / Importar entre PWA y APK)
+  // ---------------------------------------------------------------------------
+  exportAllUserData: (): string => {
+    const keys = [
+      'favorites',
+      'favorite_routes',
+      'favorite_planner_routes',
+      'buscoruna_stop_names',
+      'buscoruna_user_locations',
+      'buscoruna_stop_walk_times',
+      'buscoruna_active_location_id',
+      'buscoruna_gps_alert_enabled',
+      'buscoruna_eta_alert_enabled',
+      'buscoruna_eta_alert_threshold',
+      'buscoruna_bg_notification_enabled',
+      'buscoruna_lang',
+      'buscoruna_news_images'
+    ];
+    const dump: Record<string, string> = {};
+    for (const k of keys) {
+      const v = localStorage.getItem(k);
+      if (v !== null) dump[k] = v;
+    }
+    return JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), data: dump }, null, 2);
+  },
+
+  importUserData: (jsonString: string): boolean => {
+    try {
+      const parsed = JSON.parse(jsonString);
+      const data = parsed.data || parsed;
+      if (typeof data !== 'object' || data === null) return false;
+
+      let importedCount = 0;
+      for (const [k, v] of Object.entries(data)) {
+        if (typeof v === 'string') {
+          localStorage.setItem(k, v);
+          importedCount++;
+        } else if (typeof v === 'object' || typeof v === 'number' || typeof v === 'boolean') {
+          localStorage.setItem(k, JSON.stringify(v));
+          importedCount++;
+        }
+      }
+
+      if (importedCount > 0) {
+        window.dispatchEvent(new CustomEvent('user-locations-updated'));
+        window.dispatchEvent(new CustomEvent('stop-names-updated'));
+        window.dispatchEvent(new CustomEvent('catalog-loaded'));
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Import failed', err);
+      return false;
     }
   }
 };

@@ -80,39 +80,38 @@ export async function checkForUpdate(): Promise<UpdateInfo> {
     }
 }
 
+let inMemoryLastCheck = 0;
+
 /**
- * Automatic daily check on app open: shows a banner when a new version
- * exists. Tap it to download & install.
- *
- * Comprobación automática diaria al abrir la app: muestra un banner cuando
- * hay versión nueva. Al pulsarlo descarga e instala.
+ * Check for updates every time app opens (with a 30s session throttle).
+ * Comprobación automática cada vez que se entra a la app.
  */
 export async function autoCheckOnOpen() {
     if (!Capacitor.isNativePlatform()) return;
 
-    // Only check once per day
-    // Comprobar solo una vez al día
-    const last = parseInt(localStorage.getItem(LAST_CHECK_KEY) || '0', 10);
-    if (Date.now() - last < 24 * 60 * 60 * 1000) return;
+    // Small throttle (30s) to avoid double calls if navigating quickly
+    if (Date.now() - inMemoryLastCheck < 30 * 1000) return;
+    inMemoryLastCheck = Date.now();
 
     const info = await checkForUpdate();
-    localStorage.setItem(LAST_CHECK_KEY, Date.now().toString());
     if (!info.available) return;
 
     const lang = (document.documentElement.getAttribute('data-lang') || 'es');
     const message = lang === 'en'
-        ? '🔄 New version available. Tap here to update.'
-        : '🔄 Hay una versión nueva disponible. Pulsa aquí para actualizar.';
+        ? 'New version available. Tap here to update.'
+        : 'Hay una versión nueva disponible. Pulsa aquí para actualizar.';
 
     // Lazy import avoids a circular dependency with inAppAlert
     const { inAppAlert } = await import('./inAppAlert');
     inAppAlert(message, {
-        durationMs: 20000,
+        durationMs: 25000,
         onClick: () => downloadAndInstall(info.apkUrl!, () => {}),
     });
 }
 
 export const LATEST_APK_URL = `https://github.com/${REPO}/releases/latest/download/app-debug.apk`;
+export const OBTAINIUM_APP_URL = `obtainium://app/https://github.com/${REPO}`;
+export const OBTAINIUM_DOWNLOAD_URL = 'https://github.com/ImranR98/Obtainium/releases/latest';
 
 export async function getLatestApkUrl(): Promise<string> {
     try {

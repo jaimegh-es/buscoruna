@@ -43,40 +43,6 @@ const t = getTranslations(lang);
       </div>
     </div>
 
-    <div id="walk-times-card" class="card walk-times-card">
-      <div class="walk-card-header" id="toggle-walk-card">
-        <div class="walk-card-title-wrap">
-          <span class="walk-card-icon">🚶</span>
-          <div>
-            <h4>{t.walkTimesTitle}</h4>
-            <p class="text-muted small">{t.walkTimesDesc}</p>
-          </div>
-        </div>
-        <span class="walk-card-caret" id="walk-card-caret">▾</span>
-      </div>
-      <div class="walk-card-body" id="walk-card-body">
-        <div class="walk-loc-selector">
-          <span class="walk-loc-label">{t.walkTimeActiveLabel}</span>
-          <div class="walk-loc-pills" id="walk-loc-pills"></div>
-          <button type="button" class="btn-add-loc-pill" id="btn-add-loc-pill" title={t.settingsAddLocationBtn}>+ {lang === 'en' ? 'Add place' : 'Añadir lugar'}</button>
-        </div>
-
-        <div class="walk-time-row" id="walk-time-controls">
-          <div class="walk-time-stepper">
-            <button type="button" class="btn-stepper" id="btn-walk-minus" aria-label="Restar 1 minuto">−</button>
-            <div class="walk-time-display">
-              <span id="walk-time-val">--</span>
-              <small>{t.walkTimeMinutesLabel}</small>
-            </div>
-            <button type="button" class="btn-stepper" id="btn-walk-plus" aria-label="Sumar 1 minuto">+</button>
-          </div>
-          <button type="button" class="btn-clear-walk" id="btn-clear-walk" title="Borrar tiempo" style="display: none;">✕ {lang === 'en' ? 'Clear' : 'Borrar'}</button>
-        </div>
-        
-        <div id="walk-time-hint" class="walk-time-hint"></div>
-      </div>
-    </div>
-
     <div id="eta-container">
       <h3>{t.stopDetailNextBuses}</h3>
       <div id="eta-list" class="grid-list">
@@ -104,6 +70,64 @@ const t = getTranslations(lang);
       <h3>{t.stopDetailPassingLines}</h3>
       <div id="lines-passing" class="flex-wrap gap-1"></div>
     </div>
+
+    <!-- Walking Departure Time Configuration Card (Collapsed by default, moved below lines) -->
+    <div id="walk-times-card" class="card walk-times-card mt-2">
+      <div class="walk-card-header" id="toggle-walk-card">
+        <div class="walk-card-title-wrap">
+          <div>
+            <h4>{t.walkTimesTitle}</h4>
+            <p class="text-muted small">{t.walkTimesDesc}</p>
+          </div>
+        </div>
+        <div class="walk-card-chevron-wrap">
+          <i data-lucide="chevron-down" class="walk-card-chevron" id="walk-card-caret"></i>
+        </div>
+      </div>
+      <div class="walk-card-body" id="walk-card-body" style="display: none;">
+        <div class="walk-loc-section">
+          <div class="walk-loc-header">
+            <span class="walk-loc-label">{t.walkTimeActiveLabel}</span>
+            <button type="button" class="btn-walk-settings" id="btn-walk-settings" title={t.settingsLocationsTitle} aria-label={t.settingsLocationsTitle}>
+              <Icon name="settings" size={18} />
+            </button>
+          </div>
+          <div class="walk-loc-pills" id="walk-loc-pills"></div>
+        </div>
+
+        <div class="walk-time-control-panel">
+          <div class="walk-time-stepper-wrap">
+            <div class="walk-time-stepper">
+              <button type="button" class="btn-stepper" id="btn-walk-minus" aria-label="Restar 1 minuto">
+                <i data-lucide="minus"></i>
+              </button>
+              <div class="walk-time-display">
+                <span id="walk-time-val">--</span>
+                <small>{t.walkTimeMinutesLabel}</small>
+              </div>
+              <button type="button" class="btn-stepper" id="btn-walk-plus" aria-label="Sumar 1 minuto">
+                <i data-lucide="plus"></i>
+              </button>
+            </div>
+            
+            <button type="button" class="btn-clear-walk" id="btn-clear-walk" style="display: none;">
+              <i data-lucide="trash-2"></i>
+              <span>{lang === 'en' ? 'Clear' : 'Borrar'}</span>
+            </button>
+          </div>
+
+          <div class="walk-presets-row">
+            <button type="button" class="btn-preset" data-preset="3">3 min</button>
+            <button type="button" class="btn-preset" data-preset="5">5 min</button>
+            <button type="button" class="btn-preset" data-preset="8">8 min</button>
+            <button type="button" class="btn-preset" data-preset="10">10 min</button>
+            <button type="button" class="btn-preset" data-preset="15">15 min</button>
+          </div>
+        </div>
+        
+        <div id="walk-time-hint" class="walk-time-hint"></div>
+      </div>
+    </div>
   </section>
 
   <script>
@@ -111,7 +135,7 @@ const t = getTranslations(lang);
     import { inAppAlert } from '../../utils/inAppAlert';
     import { API, isApiCooldownActive } from '../../services/api';
     import { tracking } from '../../utils/tracking';
-    import { createIcons, Star, Navigation, Map, LocateFixed, Bell } from 'lucide';
+    import { createIcons, Star, Navigation, Map, LocateFixed, Bell, Home, Briefcase, MapPin, Plus, Minus, Clock, Trash2, ChevronDown, Check, Settings } from 'lucide';
     import { getTranslations } from '../../utils/i18n';
     import { requestBgAlertPermission } from '../../utils/backgroundAlerts';
 
@@ -224,8 +248,7 @@ const t = getTranslations(lang);
       });
     }
 
-    // Render Lucide icons on dynamic elements, including Bell
-    // Renderizar iconos de Lucide en elementos dinámicos, incluyendo Bell
+    // Render Lucide icons on dynamic elements
     function renderIcons() {
       createIcons({
         icons: {
@@ -233,7 +256,17 @@ const t = getTranslations(lang);
           Navigation,
           Map,
           LocateFixed,
-          Bell
+          Bell,
+          Home,
+          Briefcase,
+          MapPin,
+          Plus,
+          Minus,
+          Clock,
+          Trash2,
+          ChevronDown,
+          Check,
+          Settings
         }
       });
     }
@@ -662,15 +695,21 @@ const t = getTranslations(lang);
       const btnPlus = document.getElementById('btn-walk-plus');
       const btnClear = document.getElementById('btn-clear-walk');
       const hint = document.getElementById('walk-time-hint');
-      const btnAddLoc = document.getElementById('btn-add-loc-pill');
+      const btnSettings = document.getElementById('btn-walk-settings');
 
       if (!card || !pillsContainer) return;
 
-      let isExpanded = true;
+      let isExpanded = false;
       toggleHeader?.addEventListener('click', () => {
         isExpanded = !isExpanded;
         if (body) body.style.display = isExpanded ? 'block' : 'none';
-        if (caret) caret.style.transform = isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)';
+        if (caret) caret.classList.toggle('open', isExpanded);
+      });
+
+      btnSettings?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const openSettingsBtn = document.getElementById('open-settings');
+        if (openSettingsBtn) openSettingsBtn.click();
       });
 
       function updateCard() {
@@ -679,15 +718,16 @@ const t = getTranslations(lang);
         const activeLoc = storage.getActiveLocation();
         const currentMins = storage.getStopWalkingTime(stopId, activeLocId);
 
-        // Render location pills
+        // Render location pills with Lucide icons (no emojis)
         pillsContainer.innerHTML = locations.map(loc => {
           const isActive = loc.id === activeLocId;
           const locTime = storage.getStopWalkingTime(stopId, loc.id);
-          const timeBadge = locTime ? ` (${locTime}m)` : '';
-          const iconEmoji = loc.icon === 'home' ? '🏠' : (loc.icon === 'briefcase' ? '💼' : '📍');
+          const timeBadge = locTime ? ` (${locTime} min)` : '';
+          const iconName = loc.icon === 'home' || loc.id === 'casa' ? 'home' : (loc.icon === 'briefcase' || loc.id === 'trabajo' ? 'briefcase' : 'map-pin');
           return `
             <button type="button" class="walk-loc-pill ${isActive ? 'active' : ''}" data-loc-id="${loc.id}">
-              <span>${iconEmoji} ${loc.name}${timeBadge}</span>
+              <i data-lucide="${iconName}"></i>
+              <span>${loc.name}${timeBadge}</span>
             </button>
           `;
         }).join('');
@@ -703,7 +743,7 @@ const t = getTranslations(lang);
           });
         });
 
-        // Update stepper
+        // Update stepper value
         if (timeVal) {
           timeVal.textContent = currentMins ? currentMins.toString() : '--';
         }
@@ -712,19 +752,32 @@ const t = getTranslations(lang);
           btnClear.style.display = currentMins ? 'inline-flex' : 'none';
         }
 
-        // Update hint text
+        // Update hint text (no emojis, clean markdown)
         if (hint) {
           if (currentMins && currentMins > 0) {
             hint.innerHTML = lang === 'en'
-              ? `💡 <strong>Departure alert ready:</strong> When you tap the bell on any bus here, we will notify you <strong>${currentMins} min before</strong> so you can leave <em>${activeLoc.name}</em> on time.`
-              : `💡 <strong>Aviso de salida listo:</strong> Al pulsar la campana en un bus de esta parada, te avisaremos <strong>${currentMins} min antes</strong> para que salgas de <em>${activeLoc.name}</em> a tiempo.`;
+              ? `<strong>Departure alert configured:</strong> When you tap the bell on any bus, we will alert you <strong>${currentMins} min in advance</strong> so you leave <em>${activeLoc.name}</em> on time.`
+              : `<strong>Aviso de salida configurado:</strong> Al activar la campana de aviso en un bus, te avisaremos <strong>${currentMins} min antes</strong> para que salgas de <em>${activeLoc.name}</em> con tiempo.`;
           } else {
             hint.innerHTML = lang === 'en'
-              ? `ℹ️ Set how long it takes you to walk here from <em>${activeLoc.name}</em> so bus arrival alerts tell you exactly when to head out.`
-              : `ℹ️ Indica cuánto tardas caminando desde <em>${activeLoc.name}</em> para que los avisos te indiquen el momento exacto de salir.`;
+              ? `Indicate how many minutes you take to walk to this stop from <em>${activeLoc.name}</em> to receive the departure notification at the right moment.`
+              : `Indica cuántos minutos tardas caminando a esta parada desde <em>${activeLoc.name}</em> para recibir la alerta de salida en el momento exacto.`;
           }
         }
+
+        renderIcons();
       }
+
+      // Presets
+      document.querySelectorAll('.walk-presets-row .btn-preset').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const pVal = parseInt(btn.getAttribute('data-preset') || '5', 10);
+          const activeLocId = storage.getActiveLocationId();
+          storage.setStopWalkingTime(stopId, activeLocId, pVal);
+          updateCard();
+        });
+      });
 
       btnMinus?.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1252,11 +1305,11 @@ const t = getTranslations(lang);
   /* Walking times & departure alert card */
   .walk-times-card {
     margin-bottom: 1.5rem;
-    padding: 1rem 1.25rem;
+    padding: 1.15rem 1.25rem;
     background: #fff;
     border: 1px solid #e2e8f0;
-    border-radius: 14px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.04);
   }
 
   .walk-card-header {
@@ -1265,140 +1318,200 @@ const t = getTranslations(lang);
     justify-content: space-between;
     cursor: pointer;
     user-select: none;
+    padding: 0.15rem 0;
   }
 
   .walk-card-title-wrap {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-  }
-
-  .walk-card-icon {
-    font-size: 1.4rem;
-    background: #eff6ff;
-    padding: 0.35rem 0.5rem;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    flex: 1;
   }
 
   .walk-card-title-wrap h4 {
     margin: 0;
-    font-size: 1rem;
+    font-size: 1.05rem;
     font-weight: 700;
     color: var(--text);
   }
 
   .walk-card-title-wrap p {
-    margin: 0.15rem 0 0;
+    margin: 0.2rem 0 0;
+    font-size: 0.82rem;
+    color: var(--text-muted);
   }
 
-  .walk-card-caret {
-    font-size: 1.2rem;
+  .walk-card-chevron-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     color: var(--text-muted);
-    transition: transform 0.2s;
+    padding: 0.4rem;
+    margin-left: 0.5rem;
+  }
+
+  .walk-card-chevron {
+    width: 22px;
+    height: 22px;
+    transition: transform 0.2s ease;
+  }
+
+  .walk-card-chevron.open {
+    transform: rotate(180deg);
   }
 
   .walk-card-body {
-    margin-top: 1rem;
-    padding-top: 0.85rem;
-    border-top: 1px dashed #e2e8f0;
+    margin-top: 1.25rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid #f1f5f9;
   }
 
-  .walk-loc-selector {
+  .btn-walk-settings {
+    width: 42px;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-walk-settings:active {
+    background: #e2e8f0;
+    color: var(--primary);
+  }
+
+  .btn-walk-settings i {
+    width: 18px;
+    height: 18px;
+  }
+
+  .walk-loc-section {
+    margin-bottom: 1.25rem;
+  }
+
+  .walk-loc-header {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-bottom: 0.85rem;
+    justify-content: space-between;
+    margin-bottom: 0.65rem;
   }
 
   .walk-loc-label {
-    font-size: 0.82rem;
-    font-weight: 600;
+    font-size: 0.85rem;
+    font-weight: 700;
     color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
   }
 
   .walk-loc-pills {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem;
+    gap: 0.6rem;
   }
 
   .walk-loc-pill {
+    min-height: 48px;
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.35rem 0.75rem;
-    border-radius: 20px;
-    border: 1px solid #e2e8f0;
+    gap: 0.5rem;
+    padding: 0.65rem 1.15rem;
+    border-radius: 12px;
+    border: 1.5px solid #e2e8f0;
     background: #f8fafc;
     color: var(--text);
-    font-size: 0.82rem;
+    font-size: 0.95rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.15s;
+    user-select: none;
+  }
+
+  .walk-loc-pill:active {
+    transform: scale(0.97);
   }
 
   .walk-loc-pill.active {
     background: var(--primary);
     color: white;
     border-color: var(--primary);
+    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.25);
+  }
+
+  .walk-loc-pill i {
+    width: 18px;
+    height: 18px;
   }
 
   .btn-add-loc-pill {
+    min-height: 38px;
     display: inline-flex;
     align-items: center;
-    padding: 0.35rem 0.6rem;
-    border-radius: 20px;
+    gap: 0.4rem;
+    padding: 0.4rem 0.85rem;
+    border-radius: 10px;
     border: 1px dashed #cbd5e1;
     background: transparent;
-    color: var(--text-muted);
-    font-size: 0.78rem;
-    font-weight: 600;
+    color: var(--primary);
+    font-size: 0.85rem;
+    font-weight: 700;
     cursor: pointer;
     transition: all 0.15s;
   }
 
-  .btn-add-loc-pill:hover {
-    border-color: var(--primary);
-    color: var(--primary);
+  .btn-add-loc-pill:active {
+    background: #eff6ff;
   }
 
-  .walk-time-row {
+  .walk-time-control-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    margin-bottom: 1rem;
+  }
+
+  .walk-time-stepper-wrap {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
+    gap: 0.85rem;
+    flex-wrap: wrap;
   }
 
   .walk-time-stepper {
     display: inline-flex;
     align-items: center;
     background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 14px;
     overflow: hidden;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
   }
 
   .btn-stepper {
-    width: 42px;
-    height: 42px;
+    width: 54px;
+    height: 54px;
     display: flex;
     align-items: center;
     justify-content: center;
     border: none;
     background: #fff;
-    font-size: 1.3rem;
-    font-weight: 700;
-    color: var(--primary);
+    color: var(--text);
     cursor: pointer;
     transition: background 0.15s;
   }
 
   .btn-stepper:active {
     background: #e2e8f0;
+    color: var(--primary);
+  }
+
+  .btn-stepper i {
+    width: 22px;
+    height: 22px;
   }
 
   .walk-time-display {
@@ -1406,40 +1519,83 @@ const t = getTranslations(lang);
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-width: 110px;
-    padding: 0 0.75rem;
+    min-width: 130px;
+    padding: 0 1rem;
+    user-select: none;
   }
 
   #walk-time-val {
-    font-size: 1.15rem;
+    font-size: 1.5rem;
     font-weight: 800;
     color: var(--text);
+    line-height: 1.1;
   }
 
   .walk-time-display small {
-    font-size: 0.72rem;
+    font-size: 0.78rem;
     color: var(--text-muted);
-    margin-top: -2px;
+    font-weight: 600;
+    margin-top: 2px;
   }
 
   .btn-clear-walk {
-    padding: 0.4rem 0.75rem;
+    min-height: 48px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.65rem 1rem;
     border: 1px solid #fee2e2;
     background: #fff5f5;
     color: #ef4444;
-    border-radius: 8px;
-    font-size: 0.78rem;
+    border-radius: 12px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-clear-walk:active {
+    transform: scale(0.96);
+  }
+
+  .btn-clear-walk i {
+    width: 18px;
+    height: 18px;
+  }
+
+  .walk-presets-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .btn-preset {
+    min-height: 42px;
+    padding: 0.5rem 0.95rem;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: var(--text);
+    font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-preset:active {
+    background: #f1f5f9;
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: scale(0.96);
   }
 
   .walk-time-hint {
-    font-size: 0.8rem;
+    font-size: 0.88rem;
     color: var(--text-muted);
-    line-height: 1.45;
+    line-height: 1.5;
     background: #f8fafc;
-    padding: 0.6rem 0.85rem;
-    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    border-radius: 12px;
     border: 1px solid #e2e8f0;
   }
 </style>
