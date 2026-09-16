@@ -4,7 +4,7 @@
   "webDir": "dist/client",
   "server": {
     "androidScheme": "https",
-    "url": "http://localhost:4321",
+    "url": "https://coruñabus.inled.es",
     "cleartext": true
   },
   "android": {

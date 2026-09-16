@@ -1,7 +1,9 @@
+import { BASE_URL } from './api';
+
 export const Geocoding = {
   search: async (query: string) => {
     // Bias towards A Coruña (lat/lon) but don't hard-filter with bbox
-    const url = `/api/proxy?type=photon&q=${encodeURIComponent(query)}&lat=43.3623&lon=-8.4115&limit=5`;
+    const url = `${BASE_URL}?type=photon&q=${encodeURIComponent(query)}&lat=43.3623&lon=-8.4115&limit=5`;
     const response = await fetch(url);
     if (!response.ok) return [];
     const data = await response.json();
