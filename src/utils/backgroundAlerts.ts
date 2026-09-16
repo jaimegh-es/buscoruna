@@ -25,6 +25,8 @@ export interface BackgroundTrackerPlugin {
         prevLat?: number;
         prevLon?: number;
         leadMinutes?: number;
+        walkMinutes?: number;
+        locationName?: string;
         etaAlertEnabled?: boolean;
         gpsAlertEnabled?: boolean;
         lang?: string;
@@ -271,6 +273,8 @@ export async function startNativeBackgroundTracking(options: {
     prevLat?: number;
     prevLon?: number;
     leadMinutes?: number;
+    walkMinutes?: number;
+    locationName?: string;
     etaAlertEnabled?: boolean;
     gpsAlertEnabled?: boolean;
     lang?: string;

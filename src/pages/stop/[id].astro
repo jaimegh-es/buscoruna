@@ -43,6 +43,40 @@ const t = getTranslations(lang);
       </div>
     </div>
 
+    <div id="walk-times-card" class="card walk-times-card">
+      <div class="walk-card-header" id="toggle-walk-card">
+        <div class="walk-card-title-wrap">
+          <span class="walk-card-icon">🚶</span>
+          <div>
+            <h4>{t.walkTimesTitle}</h4>
+            <p class="text-muted small">{t.walkTimesDesc}</p>
+          </div>
+        </div>
+        <span class="walk-card-caret" id="walk-card-caret">▾</span>
+      </div>
+      <div class="walk-card-body" id="walk-card-body">
+        <div class="walk-loc-selector">
+          <span class="walk-loc-label">{t.walkTimeActiveLabel}</span>
+          <div class="walk-loc-pills" id="walk-loc-pills"></div>
+          <button type="button" class="btn-add-loc-pill" id="btn-add-loc-pill" title={t.settingsAddLocationBtn}>+ {lang === 'en' ? 'Add place' : 'Añadir lugar'}</button>
+        </div>
+
+        <div class="walk-time-row" id="walk-time-controls">
+          <div class="walk-time-stepper">
+            <button type="button" class="btn-stepper" id="btn-walk-minus" aria-label="Restar 1 minuto">−</button>
+            <div class="walk-time-display">
+              <span id="walk-time-val">--</span>
+              <small>{t.walkTimeMinutesLabel}</small>
+            </div>
+            <button type="button" class="btn-stepper" id="btn-walk-plus" aria-label="Sumar 1 minuto">+</button>
+          </div>
+          <button type="button" class="btn-clear-walk" id="btn-clear-walk" title="Borrar tiempo" style="display: none;">✕ {lang === 'en' ? 'Clear' : 'Borrar'}</button>
+        </div>
+        
+        <div id="walk-time-hint" class="walk-time-hint"></div>
+      </div>
+    </div>
+
     <div id="eta-container">
       <h3>{t.stopDetailNextBuses}</h3>
       <div id="eta-list" class="grid-list">
@@ -227,6 +261,7 @@ const t = getTranslations(lang);
       initMap();
       setupMapExpand();
       updateFavoriteUI();
+      initWalkTimesUI();
 
       // If a cooldown is still active (persisted via sessionStorage), wait it out
       if (Date.now() < cooldownUntil) {
@@ -484,8 +519,8 @@ const t = getTranslations(lang);
             });
           });
 
-          // Add bell button listeners (ETA arrival warning at current stop)
-          // Agregar oyentes de eventos a los botones de campana (aviso de llegada en la parada actual)
+          // Add bell button listeners (ETA arrival / departure warning at current stop)
+          // Agregar oyentes de eventos a los botones de campana (aviso de llegada o salida en la parada actual)
           container.querySelectorAll('.btn-bell-subtle, .btn-bell-subtle-small').forEach(btn => {
             btn.addEventListener('click', (e) => {
               e.stopPropagation();
@@ -507,20 +542,28 @@ const t = getTranslations(lang);
                 arrivalTime: null
               });
               
+              const activeLoc = storage.getActiveLocation();
+              const walkTime = storage.getStopWalkingTime(stopId, activeLoc.id);
               const threshold = parseInt(localStorage.getItem('buscoruna_eta_alert_threshold') || '0');
-              const thresholdText = threshold === 0 
-                ? (lang === 'en' ? 'is arriving' : 'está llegando') 
-                : (lang === 'en' ? `${threshold} min or less remain` : `queden ${threshold} min o menos`);
               
               // Request notification permissions immediately if not granted
               requestBgAlertPermission().catch(() => {});
               
-              // Non-blocking banner so it doesn't freeze the UI
-              // Banner no bloqueante para no congelar la interfaz
-              inAppAlert(lang === 'en' 
-                ? `🔔 Arrival alert activated! We will notify you when bus ${busId} is at ${thresholdText} from this stop.` 
-                : `🔔 ¡Aviso de llegada activado! Te avisaremos cuando el autobús ${busId} esté a ${thresholdText} de esta parada.`,
-                { durationMs: 8000 });
+              let noticeMsg = '';
+              if (walkTime && walkTime > 0) {
+                noticeMsg = lang === 'en'
+                  ? `⏰ Departure alert activated! We will notify you ${walkTime} min before so you leave ${activeLoc.name} on time for bus ${busId}.`
+                  : `⏰ ¡Aviso de salida activado! Te avisaremos cuando falten ${walkTime} min para que salgas de ${activeLoc.name} a tiempo para el bus ${busId}.`;
+              } else {
+                const thresholdText = threshold === 0 
+                  ? (lang === 'en' ? 'is arriving' : 'está llegando') 
+                  : (lang === 'en' ? `${threshold} min or less remain` : `queden ${threshold} min o menos`);
+                noticeMsg = lang === 'en' 
+                  ? `🔔 Arrival alert activated! We will notify you when bus ${busId} is at ${thresholdText} from this stop.` 
+                  : `🔔 ¡Aviso de llegada activado! Te avisaremos cuando el autobús ${busId} esté a ${thresholdText} de esta parada.`;
+              }
+              
+              inAppAlert(noticeMsg, { durationMs: 8000 });
             });
           });
 
@@ -606,6 +649,125 @@ const t = getTranslations(lang);
         container.innerHTML = '<i data-lucide="star"></i>';
       }
       renderIcons();
+    }
+
+    function initWalkTimesUI() {
+      const card = document.getElementById('walk-times-card');
+      const toggleHeader = document.getElementById('toggle-walk-card');
+      const body = document.getElementById('walk-card-body');
+      const caret = document.getElementById('walk-card-caret');
+      const pillsContainer = document.getElementById('walk-loc-pills');
+      const timeVal = document.getElementById('walk-time-val');
+      const btnMinus = document.getElementById('btn-walk-minus');
+      const btnPlus = document.getElementById('btn-walk-plus');
+      const btnClear = document.getElementById('btn-clear-walk');
+      const hint = document.getElementById('walk-time-hint');
+      const btnAddLoc = document.getElementById('btn-add-loc-pill');
+
+      if (!card || !pillsContainer) return;
+
+      let isExpanded = true;
+      toggleHeader?.addEventListener('click', () => {
+        isExpanded = !isExpanded;
+        if (body) body.style.display = isExpanded ? 'block' : 'none';
+        if (caret) caret.style.transform = isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)';
+      });
+
+      function updateCard() {
+        const locations = storage.getUserLocations();
+        const activeLocId = storage.getActiveLocationId();
+        const activeLoc = storage.getActiveLocation();
+        const currentMins = storage.getStopWalkingTime(stopId, activeLocId);
+
+        // Render location pills
+        pillsContainer.innerHTML = locations.map(loc => {
+          const isActive = loc.id === activeLocId;
+          const locTime = storage.getStopWalkingTime(stopId, loc.id);
+          const timeBadge = locTime ? ` (${locTime}m)` : '';
+          const iconEmoji = loc.icon === 'home' ? '🏠' : (loc.icon === 'briefcase' ? '💼' : '📍');
+          return `
+            <button type="button" class="walk-loc-pill ${isActive ? 'active' : ''}" data-loc-id="${loc.id}">
+              <span>${iconEmoji} ${loc.name}${timeBadge}</span>
+            </button>
+          `;
+        }).join('');
+
+        pillsContainer.querySelectorAll('.walk-loc-pill').forEach(pill => {
+          pill.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const locId = pill.getAttribute('data-loc-id');
+            if (locId) {
+              storage.setActiveLocationId(locId);
+              updateCard();
+            }
+          });
+        });
+
+        // Update stepper
+        if (timeVal) {
+          timeVal.textContent = currentMins ? currentMins.toString() : '--';
+        }
+
+        if (btnClear) {
+          btnClear.style.display = currentMins ? 'inline-flex' : 'none';
+        }
+
+        // Update hint text
+        if (hint) {
+          if (currentMins && currentMins > 0) {
+            hint.innerHTML = lang === 'en'
+              ? `💡 <strong>Departure alert ready:</strong> When you tap the bell on any bus here, we will notify you <strong>${currentMins} min before</strong> so you can leave <em>${activeLoc.name}</em> on time.`
+              : `💡 <strong>Aviso de salida listo:</strong> Al pulsar la campana en un bus de esta parada, te avisaremos <strong>${currentMins} min antes</strong> para que salgas de <em>${activeLoc.name}</em> a tiempo.`;
+          } else {
+            hint.innerHTML = lang === 'en'
+              ? `ℹ️ Set how long it takes you to walk here from <em>${activeLoc.name}</em> so bus arrival alerts tell you exactly when to head out.`
+              : `ℹ️ Indica cuánto tardas caminando desde <em>${activeLoc.name}</em> para que los avisos te indiquen el momento exacto de salir.`;
+          }
+        }
+      }
+
+      btnMinus?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const activeLocId = storage.getActiveLocationId();
+        const current = storage.getStopWalkingTime(stopId, activeLocId) || 5;
+        const next = Math.max(1, current - 1);
+        storage.setStopWalkingTime(stopId, activeLocId, next);
+        updateCard();
+      });
+
+      btnPlus?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const activeLocId = storage.getActiveLocationId();
+        const current = storage.getStopWalkingTime(stopId, activeLocId) || 4;
+        const next = Math.min(60, current + 1);
+        storage.setStopWalkingTime(stopId, activeLocId, next);
+        updateCard();
+      });
+
+      btnClear?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const activeLocId = storage.getActiveLocationId();
+        storage.setStopWalkingTime(stopId, activeLocId, null);
+        updateCard();
+      });
+
+      btnAddLoc?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const name = prompt(t.settingsLocationPrompt);
+        if (name && name.trim()) {
+          const newLoc = storage.addUserLocation(name.trim());
+          storage.setActiveLocationId(newLoc.id);
+          updateCard();
+        }
+      });
+
+      window.addEventListener('active-location-changed', () => updateCard());
+      window.addEventListener('user-locations-updated', () => updateCard());
+      window.addEventListener('stop-walk-times-updated', (e: any) => {
+        if (e.detail?.stopId === String(stopId)) updateCard();
+      });
+
+      updateCard();
     }
 
     document.getElementById('favorite-btn')?.addEventListener('click', () => {
@@ -1085,5 +1247,199 @@ const t = getTranslations(lang);
     display: flex;
     align-items: center;
     gap: 0.75rem;
+  }
+
+  /* Walking times & departure alert card */
+  .walk-times-card {
+    margin-bottom: 1.5rem;
+    padding: 1rem 1.25rem;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+
+  .walk-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .walk-card-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .walk-card-icon {
+    font-size: 1.4rem;
+    background: #eff6ff;
+    padding: 0.35rem 0.5rem;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .walk-card-title-wrap h4 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .walk-card-title-wrap p {
+    margin: 0.15rem 0 0;
+  }
+
+  .walk-card-caret {
+    font-size: 1.2rem;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+  }
+
+  .walk-card-body {
+    margin-top: 1rem;
+    padding-top: 0.85rem;
+    border-top: 1px dashed #e2e8f0;
+  }
+
+  .walk-loc-selector {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .walk-loc-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  .walk-loc-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .walk-loc-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 20px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: var(--text);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .walk-loc-pill.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+
+  .btn-add-loc-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.6rem;
+    border-radius: 20px;
+    border: 1px dashed #cbd5e1;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-add-loc-pill:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+
+  .walk-time-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .walk-time-stepper {
+    display: inline-flex;
+    align-items: center;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .btn-stepper {
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: #fff;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--primary);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .btn-stepper:active {
+    background: #e2e8f0;
+  }
+
+  .walk-time-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 110px;
+    padding: 0 0.75rem;
+  }
+
+  #walk-time-val {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--text);
+  }
+
+  .walk-time-display small {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: -2px;
+  }
+
+  .btn-clear-walk {
+    padding: 0.4rem 0.75rem;
+    border: 1px solid #fee2e2;
+    background: #fff5f5;
+    color: #ef4444;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .walk-time-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+    background: #f8fafc;
+    padding: 0.6rem 0.85rem;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
   }
 </style>

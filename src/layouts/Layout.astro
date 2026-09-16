@@ -297,6 +297,26 @@ const { title } = Astro.props;
                         </div>
                     </div>
 
+                    <!-- Setting 3.5: User Locations & Walking Times -->
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <label class="setting-title">
+                                <span>{t.settingsLocationsTitle}</span>
+                            </label>
+                            <p class="setting-desc">{t.settingsLocationsDesc}</p>
+                            <div style="margin-top: 0.6rem;">
+                                <label for="settings-active-location" style="font-size: 0.85rem; font-weight: 600; color: var(--text); display: block; margin-bottom: 0.35rem;">{t.settingsActiveLocation}</label>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <select id="settings-active-location" style="flex: 1; padding: 0.6rem; border-radius: 8px; border: 1px solid #ddd; background: var(--card-bg); color: var(--text); font-size: 0.95rem;">
+                                    </select>
+                                    <button type="button" id="settings-btn-add-location" class="btn-secondary" style="width: auto; padding: 0.6rem 0.85rem; font-size: 0.85rem; white-space: nowrap;">
+                                        {t.settingsAddLocationBtn}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Web Background Alert Notice Card (Shown only on web) -->
                     <div id="settings-web-bg-notice" class="web-bg-notice-card" style="display: none;">
                         <div class="web-notice-icon">📱</div>
@@ -2411,6 +2431,17 @@ const { title } = Astro.props;
         if (keepAwakeInput) keepAwakeInput.checked = localStorage.getItem('buscoruna_bg_keep_awake') === 'true';
         if (langSelect) langSelect.value = document.documentElement.getAttribute('data-lang') || 'es';
 
+        // Populate active location selector in settings
+        const activeLocSelect = document.getElementById("settings-active-location") as HTMLSelectElement;
+        if (activeLocSelect) {
+            const locs = storage.getUserLocations();
+            const activeId = storage.getActiveLocationId();
+            activeLocSelect.innerHTML = locs.map(l => {
+                const icon = l.icon === 'home' ? '🏠' : (l.icon === 'briefcase' ? '💼' : '📍');
+                return `<option value="${l.id}" ${l.id === activeId ? 'selected' : ''}>${icon} ${l.name}</option>`;
+            }).join('');
+        }
+
         // Show the appropriate warning depending on platform
         // Mostrar la advertencia adecuada según la plataforma
         const warnWeb = document.getElementById('settings-eta-warn-web');
@@ -2422,6 +2453,23 @@ const { title } = Astro.props;
             settingsModal.style.display = "flex";
         }
     };
+
+    document.getElementById("settings-btn-add-location")?.addEventListener("click", () => {
+        const name = prompt(t.settingsLocationPrompt);
+        if (name && name.trim()) {
+            const newLoc = storage.addUserLocation(name.trim());
+            storage.setActiveLocationId(newLoc.id);
+            const activeLocSelect = document.getElementById("settings-active-location") as HTMLSelectElement;
+            if (activeLocSelect) {
+                const locs = storage.getUserLocations();
+                activeLocSelect.innerHTML = locs.map(l => {
+                    const icon = l.icon === 'home' ? '🏠' : (l.icon === 'briefcase' ? '💼' : '📍');
+                    return `<option value="${l.id}" ${l.id === newLoc.id ? 'selected' : ''}>${icon} ${l.name}</option>`;
+                }).join('');
+                activeLocSelect.value = newLoc.id;
+            }
+        }
+    });
 
     const closeSettings = () => {
         if (settingsModal) {
@@ -2588,6 +2636,7 @@ const { title } = Astro.props;
         const etaAlertInput = document.getElementById("settings-enable-eta-alert") as HTMLInputElement;
         const etaThresholdSelect = document.getElementById("settings-eta-threshold") as HTMLSelectElement;
         const keepAwakeInput = document.getElementById("settings-enable-bg-keep-awake") as HTMLInputElement;
+        const activeLocSelect = document.getElementById("settings-active-location") as HTMLSelectElement;
         const langSelect = document.getElementById("settings-lang-select") as HTMLSelectElement;
 
         const gpsEnabled = gpsAlertInput?.checked ? 'true' : 'false';
@@ -2596,6 +2645,10 @@ const { title } = Astro.props;
         const keepAwakeEnabled = keepAwakeInput?.checked ? 'true' : 'false';
         const selectedLang = langSelect?.value || 'es';
         const oldLang = document.documentElement.getAttribute('data-lang') || 'es';
+
+        if (activeLocSelect && activeLocSelect.value) {
+            storage.setActiveLocationId(activeLocSelect.value);
+        }
 
         localStorage.setItem('buscoruna_gps_alert_enabled', gpsEnabled);
         localStorage.setItem('buscoruna_eta_alert_enabled', etaEnabled);
@@ -2719,6 +2772,10 @@ const { title } = Astro.props;
                 const threshold = parseInt(localStorage.getItem('buscoruna_eta_alert_threshold') || '2', 10);
                 const etaEnabled = localStorage.getItem('buscoruna_eta_alert_enabled') !== 'false';
                 const gpsEnabled = localStorage.getItem('buscoruna_gps_alert_enabled') !== 'false';
+                const walkTime = storage.getStopWalkingTime(info.originStopId);
+                const activeLoc = storage.getActiveLocation();
+                const walkMinutes = walkTime ? walkTime : 0;
+                const locationName = walkMinutes > 0 ? (activeLoc?.name || '') : '';
 
                 startNativeBackgroundTracking({
                     busId: info.busId.toString(),
@@ -2732,6 +2789,8 @@ const { title } = Astro.props;
                     prevLat: prevStop ? parseFloat(prevStop.posy) : 0,
                     prevLon: prevStop ? parseFloat(prevStop.posx) : 0,
                     leadMinutes: threshold,
+                    walkMinutes: walkMinutes,
+                    locationName: locationName,
                     etaAlertEnabled: etaEnabled,
                     gpsAlertEnabled: gpsEnabled,
                     lang: lang
@@ -2758,6 +2817,10 @@ const { title } = Astro.props;
             const threshold = parseInt(localStorage.getItem('buscoruna_eta_alert_threshold') || '2', 10);
             const etaEnabled = localStorage.getItem('buscoruna_eta_alert_enabled') !== 'false';
             const gpsEnabled = localStorage.getItem('buscoruna_gps_alert_enabled') !== 'false';
+            const walkTime = storage.getStopWalkingTime(initialInfo.originStopId);
+            const activeLoc = storage.getActiveLocation();
+            const walkMinutes = walkTime ? walkTime : 0;
+            const locationName = walkMinutes > 0 ? (activeLoc?.name || '') : '';
 
             startNativeBackgroundTracking({
                 busId: initialInfo.busId.toString(),
@@ -2771,6 +2834,8 @@ const { title } = Astro.props;
                 prevLat: prevStop ? parseFloat(prevStop.posy) : 0,
                 prevLon: prevStop ? parseFloat(prevStop.posx) : 0,
                 leadMinutes: threshold,
+                walkMinutes: walkMinutes,
+                locationName: locationName,
                 etaAlertEnabled: etaEnabled,
                 gpsAlertEnabled: gpsEnabled,
                 lang: lang

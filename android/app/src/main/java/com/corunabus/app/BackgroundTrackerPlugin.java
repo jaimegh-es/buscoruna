@@ -48,6 +48,8 @@ public class BackgroundTrackerPlugin extends Plugin {
         intent.putExtra("prevLat", call.getDouble("prevLat", 0.0));
         intent.putExtra("prevLon", call.getDouble("prevLon", 0.0));
         intent.putExtra("leadMinutes", call.getInt("leadMinutes", 2));
+        intent.putExtra("walkMinutes", call.getInt("walkMinutes", 0));
+        intent.putExtra("locationName", call.getString("locationName", ""));
         intent.putExtra("etaAlertEnabled", call.getBoolean("etaAlertEnabled", true));
         intent.putExtra("gpsAlertEnabled", call.getBoolean("gpsAlertEnabled", true));
         intent.putExtra("lang", call.getString("lang", "es"));

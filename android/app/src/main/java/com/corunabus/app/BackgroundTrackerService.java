@@ -39,7 +39,7 @@ public class BackgroundTrackerService extends Service implements LocationListene
     public static final String ACTION_START = "com.corunabus.app.action.START_TRACKING";
     public static final String ACTION_STOP = "com.corunabus.app.action.STOP_TRACKING";
 
-    public static final String CHANNEL_BG_ID = "buscoruna_bg_channel";
+    public static final String CHANNEL_BG_ID = "buscoruna_bg_live_v2";
     public static final String CHANNEL_ALERTS_ID = "buscoruna_alerts_channel";
 
     public static final int NOTIFICATION_ID_SERVICE = 424243;
@@ -59,6 +59,8 @@ public class BackgroundTrackerService extends Service implements LocationListene
     private double prevLat = 0.0;
     private double prevLon = 0.0;
     private int leadMinutes = 2;
+    private int walkMinutes = 0;
+    private String locationName = "";
     private boolean etaAlertEnabled = true;
     private boolean gpsAlertEnabled = true;
     private String lang = "es";
@@ -66,6 +68,7 @@ public class BackgroundTrackerService extends Service implements LocationListene
     private boolean etaTriggered = false;
     private boolean gpsTriggered = false;
     private int lastEta = -1;
+    private int lastDestEta = -1;
 
     private ScheduledExecutorService executor;
     private PowerManager.WakeLock wakeLock;
@@ -109,12 +112,16 @@ public class BackgroundTrackerService extends Service implements LocationListene
             prevLat = intent.getDoubleExtra("prevLat", 0.0);
             prevLon = intent.getDoubleExtra("prevLon", 0.0);
             leadMinutes = intent.getIntExtra("leadMinutes", 2);
+            walkMinutes = intent.getIntExtra("walkMinutes", 0);
+            locationName = intent.getStringExtra("locationName") != null ? intent.getStringExtra("locationName") : "";
             etaAlertEnabled = intent.getBooleanExtra("etaAlertEnabled", true);
             gpsAlertEnabled = intent.getBooleanExtra("gpsAlertEnabled", true);
             lang = intent.getStringExtra("lang") != null ? intent.getStringExtra("lang") : "es";
 
             etaTriggered = false;
             gpsTriggered = false;
+            lastEta = -1;
+            lastDestEta = -1;
 
             startForegroundServiceNotification();
             startPollingLoop();
@@ -126,23 +133,24 @@ public class BackgroundTrackerService extends Service implements LocationListene
 
     private void createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && notificationManager != null) {
-            // Channel 1: Background ongoing service notification (silent/low priority)
+            // Channel 1: Background ongoing service notification (Default priority, visible on lockscreen)
             NotificationChannel bgChannel = new NotificationChannel(
                 CHANNEL_BG_ID,
                 "Coruña Bus · Seguimiento activo",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_DEFAULT
             );
-            bgChannel.setDescription("Servicio en segundo plano para seguimiento en tiempo real del autobús");
+            bgChannel.setDescription("Seguimiento en tiempo real del autobús en pantalla de bloqueo y barra de notificaciones");
             bgChannel.setShowBadge(false);
+            bgChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             notificationManager.createNotificationChannel(bgChannel);
 
-            // Channel 2: High priority alerts channel for arrival and destination warnings
+            // Channel 2: High priority alerts channel for arrival, departure and destination warnings
             NotificationChannel alertsChannel = new NotificationChannel(
                 CHANNEL_ALERTS_ID,
                 "Coruña Bus · Avisos de autobús",
                 NotificationManager.IMPORTANCE_HIGH
             );
-            alertsChannel.setDescription("Avisos de llegada de autobús y aviso de parada de destino");
+            alertsChannel.setDescription("Avisos para salir de casa/trabajo, llegada de autobús y aviso de parada de destino");
             alertsChannel.enableVibration(true);
             alertsChannel.setVibrationPattern(new long[]{0, 400, 200, 400, 200, 400});
             alertsChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
@@ -184,8 +192,6 @@ public class BackgroundTrackerService extends Service implements LocationListene
         }
     }
 
-    private int lastDestEta = -1;
-
     private Notification buildForegroundNotification() {
         Intent openIntent = new Intent(this, MainActivity.class);
         openIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
@@ -201,34 +207,52 @@ public class BackgroundTrackerService extends Service implements LocationListene
             PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0)
         );
 
+        String origInfo = !originStopName.isEmpty() ? originStopName : ("Parada " + originStopId);
+        String destInfo = !destinationStopName.isEmpty() ? destinationStopName : ("Parada " + destinationStopId);
+
         String title;
-        if (destinationStopId > 0 && destinationStopId != originStopId && lastDestEta >= 0) {
-            long etaTimeMs = System.currentTimeMillis() + lastDestEta * 60000L;
-            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
-            String etaClock = sdf.format(new java.util.Date(etaTimeMs));
-            String timeLabel = lastDestEta == 0 ? ("en".equals(lang) ? "Arriving at destination!" : "¡Llegando a destino!") : (lastDestEta + " min (" + etaClock + ")");
-            title = "🚌 Bus " + busId + " → Destino · " + timeLabel;
+        String body;
+
+        if (destinationStopId > 0 && destinationStopId != originStopId) {
+            // Mode: Journey to destination stop
+            if (lastDestEta >= 0) {
+                long etaTimeMs = System.currentTimeMillis() + lastDestEta * 60000L;
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
+                String etaClock = sdf.format(new java.util.Date(etaTimeMs));
+                String timeLabel = lastDestEta == 0
+                    ? ("en".equals(lang) ? "Arriving at destination!" : "¡Llegando a destino!")
+                    : (lastDestEta + " min (" + etaClock + ")");
+                title = "🚌 Bus " + busId + " → Destino · " + timeLabel;
+                body = origInfo + " → " + destInfo + " (Quedan ~" + lastDestEta + " min a destino)";
+            } else if (lastEta >= 0) {
+                long etaTimeMs = System.currentTimeMillis() + lastEta * 60000L;
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
+                String etaClock = sdf.format(new java.util.Date(etaTimeMs));
+                title = "🚌 Bus " + busId + " · En origen en " + lastEta + " min (" + etaClock + ")";
+                body = "Esperando en: " + origInfo + " → Destino: " + destInfo;
+            } else {
+                title = "en".equals(lang) ? ("🚌 Bus " + busId + " → Destination") : ("🚌 Bus " + busId + " → " + destInfo);
+                body = origInfo + " → " + destInfo;
+            }
         } else if (lastEta >= 0) {
+            // Mode: Waiting for bus at origin stop
             long etaTimeMs = System.currentTimeMillis() + lastEta * 60000L;
             java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
             String etaClock = sdf.format(new java.util.Date(etaTimeMs));
             String timeLabel = lastEta == 0 ? ("en".equals(lang) ? "Arriving now" : "¡Llegando ahora!") : (lastEta + " min (" + etaClock + ")");
             title = "🚌 Bus " + busId + " · " + timeLabel;
-        } else {
-            title = "en".equals(lang) ? ("🚌 Bus " + busId + " · Tracking active") : ("🚌 Bus " + busId + " · Seguimiento activo");
-        }
-
-        String body;
-        String origInfo = !originStopName.isEmpty() ? originStopName : ("Parada " + originStopId);
-        String destInfo = !destinationStopName.isEmpty() ? destinationStopName : ("Parada " + destinationStopId);
-        if (destinationStopId > 0 && destinationStopId != originStopId) {
-            if (lastDestEta >= 0) {
-                body = origInfo + " → " + destInfo + ("en".equals(lang) ? " (~" + lastDestEta + " min)" : " (~" + lastDestEta + " min)");
+            if (walkMinutes > 0 && !locationName.isEmpty()) {
+                body = "Parada: " + origInfo + " · Tardas " + walkMinutes + " min desde " + locationName;
             } else {
-                body = origInfo + " → " + destInfo;
+                body = ("en".equals(lang) ? "Waiting at: " : "Esperando en: ") + origInfo;
             }
         } else {
-            body = ("en".equals(lang) ? "Waiting at: " : "Esperando en: ") + origInfo;
+            title = "en".equals(lang) ? ("🚌 Bus " + busId + " · Tracking active") : ("🚌 Bus " + busId + " · Seguimiento activo");
+            if (walkMinutes > 0 && !locationName.isEmpty()) {
+                body = "Parada: " + origInfo + " · Tardas " + walkMinutes + " min desde " + locationName;
+            } else {
+                body = ("en".equals(lang) ? "Waiting at: " : "Esperando en: ") + origInfo;
+            }
         }
 
         String stopLabel = "en".equals(lang) ? "Stop" : "Detener";
@@ -241,10 +265,10 @@ public class BackgroundTrackerService extends Service implements LocationListene
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pOpenIntent)
             .setOngoing(true)
-            .setSilent(true)
             .setOnlyAlertOnce(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, stopLabel, pStopIntent)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .build();
     }
@@ -369,9 +393,16 @@ public class BackgroundTrackerService extends Service implements LocationListene
                                             lastEta = waitTime;
                                             updateForegroundNotification();
 
-                                            if (etaAlertEnabled && !etaTriggered && waitTime <= leadMinutes) {
-                                                etaTriggered = true;
-                                                fireArrivalAlert(waitTime);
+                                            if (etaAlertEnabled && !etaTriggered) {
+                                                int alertThreshold = walkMinutes > 0 ? walkMinutes : leadMinutes;
+                                                if (waitTime <= alertThreshold) {
+                                                    etaTriggered = true;
+                                                    if (walkMinutes > 0 && !locationName.isEmpty()) {
+                                                        fireWalkDepartureAlert(waitTime, walkMinutes, locationName);
+                                                    } else {
+                                                        fireArrivalAlert(waitTime);
+                                                    }
+                                                }
                                             }
                                         }
                                         break;
@@ -412,7 +443,7 @@ public class BackgroundTrackerService extends Service implements LocationListene
                                             if (dTime >= 0) {
                                                 lastDestEta = dTime;
                                                 updateForegroundNotification();
-                                                if (dTime <= 1 && !gpsTriggered) {
+                                                if (dTime <= 2 && !gpsTriggered) {
                                                     gpsTriggered = true;
                                                     fireDestinationAlert();
                                                 }
@@ -429,6 +460,39 @@ public class BackgroundTrackerService extends Service implements LocationListene
                 }
             }
         }
+    }
+
+    private void fireWalkDepartureAlert(int minutesLeft, int walkMins, String locName) {
+        Intent openIntent = new Intent(this, MainActivity.class);
+        openIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent pOpenIntent = PendingIntent.getActivity(
+            this, 4, openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0)
+        );
+
+        String title = "en".equals(lang) ? "⏰ Time to leave for the bus stop!" : "⏰ ¡Hora de salir hacia la parada!";
+        String stopName = !originStopName.isEmpty() ? originStopName : ("Parada " + originStopId);
+        String body = "en".equals(lang)
+            ? ("Bus " + busId + " arrives at " + stopName + " in " + minutesLeft + " min. It takes " + walkMins + " min from " + locName + ". Leave now!")
+            : ("El bus " + busId + " llega a " + stopName + " en " + minutesLeft + " min. Tardas " + walkMins + " min desde " + locName + ". ¡Sal ahora!");
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ALERTS_ID)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentIntent(pOpenIntent)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setVibrate(new long[]{0, 500, 250, 500, 250, 500})
+            .setDefaults(NotificationCompat.DEFAULT_ALL);
+
+        if (notificationManager != null) {
+            notificationManager.notify(NOTIFICATION_ID_ARRIVAL_ALERT, builder.build());
+        }
+        vibrateDevice();
     }
 
     private void fireArrivalAlert(int minutesLeft) {
@@ -454,6 +518,7 @@ public class BackgroundTrackerService extends Service implements LocationListene
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setVibrate(new long[]{0, 400, 200, 400, 200, 400})
             .setDefaults(NotificationCompat.DEFAULT_ALL);
 
