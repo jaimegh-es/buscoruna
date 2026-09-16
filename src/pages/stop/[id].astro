@@ -142,9 +142,13 @@ const t = getTranslations(lang);
     const lang = document.documentElement.getAttribute('data-lang') || 'es';
     const t = getTranslations(lang);
 
-    // Get ID from URL
-    const pathParts = window.location.pathname.split('/');
-    const stopId = parseInt(pathParts[pathParts.length - 1] || pathParts[pathParts.length - 2]);
+    // Get ID from URL or query parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryId = urlParams.get('id') || urlParams.get('stopId');
+    const pathSegments = window.location.pathname.split('/').filter(Boolean);
+    const lastSeg = pathSegments[pathSegments.length - 1] || '';
+    const parsedPathId = parseInt(lastSeg.replace(/\.html?$/, ''), 10);
+    const stopId = !isNaN(parsedPathId) ? parsedPathId : (queryId ? parseInt(queryId, 10) : NaN);
 
     let map: any = null;
     let stopData: any = null;
@@ -154,13 +158,21 @@ const t = getTranslations(lang);
     let userMarker: any = null;
     let watchId: any = null;
     let guidanceLine: any = null;
+    let etaInterval: any = null;
+
+    function findStop(cat: any, id: number | string) {
+      if (!cat || !cat.paradas) return null;
+      if (Array.isArray(cat.paradas)) {
+        return cat.paradas.find((s: any) => String(s.id) === String(id)) || null;
+      }
+      return cat.paradas[id] || cat.paradas[String(id)] || null;
+    }
 
     // Refresh cooldown (protects the upstream API from being hammered)
     const COOLDOWN_MS = 30000;
     const COOLDOWN_KEY = 'buscoruna_eta_cooldown_until';
     let cooldownUntil = parseInt(sessionStorage.getItem(COOLDOWN_KEY) || '0', 10) || 0;
     let cooldownTimer: any = null;
-    let etaInterval: any = null;
     const cooldownBanner = document.getElementById('cooldown-banner');
 
     function isCooldownActive() {
@@ -169,7 +181,7 @@ const t = getTranslations(lang);
 
     function restartEtaRefresh() {
       if (etaInterval) clearInterval(etaInterval);
-      etaInterval = setInterval(fetchETAs, 60000);
+      etaInterval = setInterval(fetchETAs, 30000);
     }
 
     function stopEtaRefresh() {
@@ -281,57 +293,57 @@ const t = getTranslations(lang);
       
       const customNames = storage.getStopNames();
       const alias = customNames[String(stopId)];
-      if (alias) {
-        document.getElementById('display-stop-name')!.textContent = alias;
-      }
 
       setupMapExpand();
       updateFavoriteUI();
       initWalkTimesUI();
 
       const catalog = storage.getCatalog();
-      if (catalog && catalog.paradas) {
-        stopData = catalog.paradas[stopId] || catalog.paradas[String(stopId)];
-        if (stopData) {
-          renderStopInfo();
-          initMap();
-        } else {
-          document.getElementById('display-stop-name')!.textContent = alias || `${lang === 'en' ? 'Stop' : 'Parada'} ${stopId}`;
-        }
+      stopData = findStop(catalog, stopId);
+
+      if (stopData) {
+        renderStopInfo();
+        initMap();
       } else {
         document.getElementById('display-stop-name')!.textContent = alias || `${lang === 'en' ? 'Stop' : 'Parada'} ${stopId}`;
-        window.addEventListener('catalog-loaded', () => {
-          const cat = storage.getCatalog();
-          if (cat && cat.paradas) {
-            stopData = cat.paradas[stopId] || cat.paradas[String(stopId)];
+        
+        // Actively load catalog in background if missing
+        API.getCatalog().then((res: any) => {
+          if (res && (res.resultado === 'OK' || res.iTranvias)) {
+            const raw = res.iTranvias || res;
+            const paradasRecord: any = {};
+            const paradasList = (raw.paradas) || (raw.actualizacion && raw.actualizacion.paradas) || [];
+            paradasList.forEach((s: any) => {
+              if (s && s.id !== undefined) {
+                paradasRecord[s.id] = s;
+                paradasRecord[String(s.id)] = s;
+              }
+            });
+            const newCat = { actualizacion: raw.actualizacion || raw, paradas: paradasRecord };
+            storage.setCatalog(newCat);
+            stopData = findStop(newCat, stopId);
             if (stopData) {
               renderStopInfo();
               initMap();
-              fetchETAs();
             }
+          }
+        }).catch(() => {});
+
+        window.addEventListener('catalog-loaded', () => {
+          const cat = storage.getCatalog();
+          stopData = findStop(cat, stopId);
+          if (stopData) {
+            renderStopInfo();
+            initMap();
           }
         }, { once: true });
       }
 
-      // If a cooldown is still active (persisted via sessionStorage), wait it out
-      if (Date.now() < cooldownUntil) {
-        renderCooldownBanner();
-      } else {
-        fetchETAs();
-        restartEtaRefresh();
-      }
+      fetchETAs();
+      restartEtaRefresh();
 
       window.addEventListener('request-refresh', () => {
-        if (!isCooldownActive()) fetchETAs();
-      });
-
-      // Coordinate with the global API circuit breaker: show the banner and
-      // pause refreshes whenever the breaker opens (from any page).
-      window.addEventListener('api-cooldown-start', () => {
-        if (!isCooldownActive()) startCooldown();
-      });
-      window.addEventListener('api-cooldown-end', () => {
-        if (cooldownUntil > 0) finishCooldown();
+        fetchETAs();
       });
 
       document.getElementById('close-modal')?.addEventListener('click', () => {
