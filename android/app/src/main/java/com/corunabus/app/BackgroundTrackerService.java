@@ -152,9 +152,7 @@ public class BackgroundTrackerService extends Service implements LocationListene
     }
 
     private void startForegroundServiceNotification() {
-        Notification notification = buildForegroundNotification(
-            "en".equals(lang) ? ("Tracking bus " + busId + "...") : ("Siguiendo bus " + busId + "...")
-        );
+        Notification notification = buildForegroundNotification();
 
         boolean hasFineLoc = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
         boolean hasCoarseLoc = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
@@ -186,7 +184,9 @@ public class BackgroundTrackerService extends Service implements LocationListene
         }
     }
 
-    private Notification buildForegroundNotification(String statusText) {
+    private int lastDestEta = -1;
+
+    private Notification buildForegroundNotification() {
         Intent openIntent = new Intent(this, MainActivity.class);
         openIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent pOpenIntent = PendingIntent.getActivity(
@@ -201,24 +201,54 @@ public class BackgroundTrackerService extends Service implements LocationListene
             PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0)
         );
 
-        String title = "en".equals(lang) ? "Coruña Bus · Active tracking" : "Coruña Bus · Seguimiento activo";
+        String title;
+        if (lastEta >= 0) {
+            long etaTimeMs = System.currentTimeMillis() + lastEta * 60000L;
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
+            String etaClock = sdf.format(new java.util.Date(etaTimeMs));
+            String timeLabel = lastEta == 0 ? ("en".equals(lang) ? "Arriving now" : "¡Llegando ahora!") : (lastEta + " min (" + etaClock + ")");
+            title = "🚌 Bus " + busId + " · " + timeLabel;
+        } else {
+            title = "en".equals(lang) ? ("🚌 Bus " + busId + " · Tracking...") : ("🚌 Bus " + busId + " · Buscando llegada...");
+        }
+
+        String body;
+        if (destinationStopId > 0 && destinationStopId != originStopId) {
+            String origInfo = !originStopName.isEmpty() ? originStopName : ("Parada " + originStopId);
+            String destInfo = !destinationStopName.isEmpty() ? destinationStopName : ("Parada " + destinationStopId);
+            if (lastDestEta >= 0) {
+                body = "en".equals(lang)
+                    ? (origInfo + " → " + destInfo + " (Dest ETA: ~" + lastDestEta + " min)")
+                    : (origInfo + " → " + destInfo + " (Llegada destino: ~" + lastDestEta + " min)");
+            } else {
+                body = origInfo + " → " + destInfo;
+            }
+        } else {
+            String stopName = !originStopName.isEmpty() ? originStopName : ("Parada " + originStopId);
+            body = "en".equals(lang) ? ("Waiting at: " + stopName) : ("Esperando en: " + stopName);
+        }
+
         String stopLabel = "en".equals(lang) ? "Stop" : "Detener";
 
         return new NotificationCompat.Builder(this, CHANNEL_BG_ID)
             .setContentTitle(title)
-            .setContentText(statusText)
+            .setContentText(body)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+            .setSubText("Coruña Bus")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pOpenIntent)
             .setOngoing(true)
+            .setSilent(true)
+            .setOnlyAlertOnce(true)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, stopLabel, pStopIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .build();
     }
 
-    private void updateForegroundNotification(String statusText) {
+    private void updateForegroundNotification() {
         if (notificationManager != null && isRunning) {
-            notificationManager.notify(NOTIFICATION_ID_SERVICE, buildForegroundNotification(statusText));
+            notificationManager.notify(NOTIFICATION_ID_SERVICE, buildForegroundNotification());
         }
     }
 
@@ -334,10 +364,7 @@ public class BackgroundTrackerService extends Service implements LocationListene
                                         int waitTime = parseWaitTime(tStr);
                                         if (waitTime >= 0) {
                                             lastEta = waitTime;
-                                            String status = "en".equals(lang)
-                                                ? ("Bus " + busId + " · " + (waitTime == 0 ? "Arriving now" : waitTime + " min away"))
-                                                : ("Bus " + busId + " · " + (waitTime == 0 ? "Llegando ahora" : waitTime + " min"));
-                                            updateForegroundNotification(status);
+                                            updateForegroundNotification();
 
                                             if (etaAlertEnabled && !etaTriggered && waitTime <= leadMinutes) {
                                                 etaTriggered = true;
@@ -357,7 +384,7 @@ public class BackgroundTrackerService extends Service implements LocationListene
         }
 
         // Also check destination stop ETA if destination is set and distinct from origin
-        if (destinationStopId > 0 && destinationStopId != originStopId && !gpsTriggered) {
+        if (destinationStopId > 0 && destinationStopId != originStopId) {
             String destJson = fetchUrl("https://itranvias.com/queryitr_v3.php?func=0&dato=" + destinationStopId);
             if (destJson == null) {
                 destJson = fetchUrl("https://xn--coruabus-g3a.inled.es/api/proxy?func=0&dato=" + destinationStopId);
@@ -379,9 +406,13 @@ public class BackgroundTrackerService extends Service implements LocationListene
                                         JSONObject db = dBusArray.getJSONObject(j);
                                         if (matchesBus(db.opt("bus"), busId)) {
                                             int dTime = parseWaitTime(db.optString("tiempo", ""));
-                                            if (dTime >= 0 && dTime <= 1) {
-                                                gpsTriggered = true;
-                                                fireDestinationAlert();
+                                            if (dTime >= 0) {
+                                                lastDestEta = dTime;
+                                                updateForegroundNotification();
+                                                if (dTime <= 1 && !gpsTriggered) {
+                                                    gpsTriggered = true;
+                                                    fireDestinationAlert();
+                                                }
                                             }
                                             break;
                                         }

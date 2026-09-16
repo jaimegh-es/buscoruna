@@ -209,6 +209,9 @@ const { title } = Astro.props;
                     <Icon name="x" size={20} />
                 </button>
             </div>
+            <div id="web-tracking-hint" class="web-tracking-hint" style="display: none;">
+                <span>{t.webTrackingHint} <a id="track-bar-apk-link" href="#" target="_blank">{t.webTrackingHintLink}</a></span>
+            </div>
         </div>
 
         <!-- GPS Notification Overlay Popup -->
@@ -282,6 +285,16 @@ const { title } = Astro.props;
                                 <input type="checkbox" id="settings-enable-bg-keep-awake" />
                             </label>
                             <p class="setting-desc">{t.settingsBgDesc}</p>
+                        </div>
+                    <!-- Web Background Alert Notice Card (Shown only on web) -->
+                    <div id="settings-web-bg-notice" class="web-bg-notice-card" style="display: none;">
+                        <div class="web-notice-icon">📱</div>
+                        <div class="web-notice-content">
+                            <strong>{t.webTrackingNoticeTitle}</strong>
+                            <p>{t.webTrackingNotice}</p>
+                            <a id="settings-web-notice-apk-btn" href="#" class="btn-notice-apk">
+                                {t.downloadAndroidBtn}
+                            </a>
                         </div>
                     </div>
 
@@ -849,6 +862,70 @@ const { title } = Astro.props;
     .alert-warning-hint {
         color: #94a3b8;
         font-size: 0.65rem;
+    }
+
+    .web-tracking-hint {
+        background: rgba(245, 158, 11, 0.15);
+        border: 1px solid rgba(245, 158, 11, 0.35);
+        border-radius: 8px;
+        padding: 0.45rem 0.65rem;
+        margin-top: 0.45rem;
+        font-size: 0.72rem;
+        color: #fef08a;
+        line-height: 1.35;
+    }
+
+    .web-tracking-hint a {
+        color: #fbbf24;
+        font-weight: 700;
+        text-decoration: underline;
+    }
+
+    .web-bg-notice-card {
+        display: flex;
+        gap: 0.75rem;
+        align-items: flex-start;
+        background: rgba(14, 165, 233, 0.12);
+        border: 1px solid rgba(14, 165, 233, 0.35);
+        border-radius: 12px;
+        padding: 0.85rem;
+        margin-top: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .web-notice-icon {
+        font-size: 1.6rem;
+        flex-shrink: 0;
+        line-height: 1;
+    }
+
+    .web-notice-content {
+        font-size: 0.8rem;
+        color: #e2e8f0;
+    }
+
+    .web-notice-content strong {
+        display: block;
+        color: #38bdf8;
+        margin-bottom: 0.25rem;
+        font-size: 0.85rem;
+    }
+
+    .web-notice-content p {
+        margin: 0 0 0.6rem 0;
+        line-height: 1.35;
+        color: #cbd5e1;
+    }
+
+    .btn-notice-apk {
+        display: inline-block;
+        background: linear-gradient(135deg, #0284c7, #0369a1);
+        color: #fff;
+        padding: 0.4rem 0.75rem;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-decoration: none;
     }
 
     /* GPS Stop Warning Modal Alert Styles */
@@ -2382,6 +2459,8 @@ const { title } = Astro.props;
     // Interfaz de actualización de la app y descarga de APK para Android
     const updateItem = document.getElementById('settings-update-item');
     const androidDownloadItem = document.getElementById('settings-android-download-item');
+    const webBgNotice = document.getElementById('settings-web-bg-notice');
+    const webTrackingHint = document.getElementById('web-tracking-hint');
     const footerApkCard = document.getElementById('android-apk-footer-card');
     const isAndroidDevice = /Android/i.test(navigator.userAgent);
     const isNative = isNativePlatform();
@@ -2389,36 +2468,46 @@ const { title } = Astro.props;
     if (isNative) {
         if (updateItem) updateItem.style.display = '';
         if (androidDownloadItem) androidDownloadItem.style.display = 'none';
+        if (webBgNotice) webBgNotice.style.display = 'none';
+        if (webTrackingHint) webTrackingHint.style.display = 'none';
         if (footerApkCard) footerApkCard.style.display = 'none';
-    } else if (isAndroidDevice) {
-        // On Android Web / PWA: Show download app cards & buttons
-        // En Android Web / PWA: Mostrar tarjetas y botones para descargar la app
-        if (updateItem) updateItem.style.display = 'none';
-        if (androidDownloadItem) androidDownloadItem.style.display = '';
-        if (footerApkCard) footerApkCard.style.display = 'flex';
+    } else {
+        // On Web: show web background notice in settings and hint in tracking bar
+        // En Web: mostrar aviso de limitaciones de segundo plano y enlace a la app
+        if (webBgNotice) webBgNotice.style.display = 'flex';
+        if (webTrackingHint) webTrackingHint.style.display = 'block';
 
-        // Dynamically resolve latest APK download URL
         getLatestApkUrl().then((apkUrl) => {
+            const settingsNoticeBtn = document.getElementById('settings-web-notice-apk-btn') as HTMLAnchorElement | null;
+            if (settingsNoticeBtn) settingsNoticeBtn.href = apkUrl;
+            const trackBarApkLink = document.getElementById('track-bar-apk-link') as HTMLAnchorElement | null;
+            if (trackBarApkLink) trackBarApkLink.href = apkUrl;
             const settingsBtn = document.getElementById('settings-download-apk-btn') as HTMLAnchorElement | null;
             if (settingsBtn) settingsBtn.href = apkUrl;
             const footerBtn = document.getElementById('footer-download-apk-btn') as HTMLAnchorElement | null;
             if (footerBtn) footerBtn.href = apkUrl;
         }).catch(() => {});
-    } else {
-        // On non-Android Web: show informational note
-        // En web no Android: mostrar nota informativa
-        if (updateItem) {
-            updateItem.style.display = '';
-            const statusEl = document.getElementById('settings-update-status');
-            if (statusEl) {
-                statusEl.style.display = '';
-                statusEl.textContent = t.settingsUpdateWebNote;
+
+        if (isAndroidDevice) {
+            // On Android Web / PWA: Show download app cards & buttons
+            if (updateItem) updateItem.style.display = 'none';
+            if (androidDownloadItem) androidDownloadItem.style.display = '';
+            if (footerApkCard) footerApkCard.style.display = 'flex';
+        } else {
+            // On non-Android Web: show informational note
+            if (updateItem) {
+                updateItem.style.display = '';
+                const statusEl = document.getElementById('settings-update-status');
+                if (statusEl) {
+                    statusEl.style.display = '';
+                    statusEl.textContent = t.settingsUpdateWebNote;
+                }
+                const checkBtn = document.getElementById('btn-check-update');
+                if (checkBtn) checkBtn.style.display = 'none';
             }
-            const checkBtn = document.getElementById('btn-check-update');
-            if (checkBtn) checkBtn.style.display = 'none';
+            if (androidDownloadItem) androidDownloadItem.style.display = 'none';
+            if (footerApkCard) footerApkCard.style.display = 'none';
         }
-        if (androidDownloadItem) androidDownloadItem.style.display = 'none';
-        if (footerApkCard) footerApkCard.style.display = 'none';
     }
 
     let lastUpdateInfo: UpdateInfo | null = null;
