@@ -39,6 +39,7 @@ const t = getTranslations(lang);
 	<script>
 	  import { storage } from '../utils/storage';
 	  import { API } from '../services/api';
+	  import { getPosition } from '../utils/geolocation';
 		import { createIcons, MapPin, ChevronRight, LocateFixed, Map, Camera } from 'lucide';
 		import { getTranslations } from '../utils/i18n';
 
@@ -57,23 +58,13 @@ const t = getTranslations(lang);
 
 	    container.innerHTML = `<div class="loading">${t.stopsSearchingLoc}</div>`;
 
-	    if (!navigator.geolocation) {
-	      container.innerHTML = `<p class="error">${t.stopsNoGeolocation}</p>`;
-        showStopsList(currentLat, currentLon); // Fallback to center
-	      return;
+	    const pos = await getPosition();
+	    if (pos) {
+	      currentLat = pos.lat;
+        currentLon = pos.lon;
 	    }
-
-	    navigator.geolocation.getCurrentPosition(async (pos) => {
-	      currentLat = pos.coords.latitude;
-        currentLon = pos.coords.longitude;
-	      initMap(currentLat, currentLon);
-	      showStopsList(currentLat, currentLon);
-	    }, (err) => {
-	      // Default to A Coruña center if GPS fails
-	      initMap(currentLat, currentLon);
-	      showStopsList(currentLat, currentLon);
-	      console.warn('Geolocation failed, using center:', err.message);
-	    }, { enableHighAccuracy: true, timeout: 5000 });
+	    initMap(currentLat, currentLon);
+	    showStopsList(currentLat, currentLon);
 	  }
 
 	  function initMap(lat: number, lon: number) {

@@ -1,0 +1,5 @@
+name = "buscoruna"
+
+[[kv_namespaces]]
+binding = "SESSION"
+id = "64f86e6ca4144818abb6d308747f4c76"

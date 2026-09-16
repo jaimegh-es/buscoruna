@@ -153,6 +153,10 @@ const { title } = Astro.props;
                     <Icon name="download" size={24} class="text-primary" />
                     <p><strong>{t.downloadAndroidTitle}</strong></p>
                     <p style="font-size: 0.85rem; color: #666; margin-top: -0.25rem;">{t.downloadAndroidDesc}</p>
+                    <div class="play-store-notice" style="width: 100%; margin: 0.25rem 0 0.9rem; background: #f0fdf4; border: 1.5px solid #bbf7d0; padding: 0.6rem 0.8rem; border-radius: 10px; text-align: center;">
+                        <strong style="font-size: 0.83rem; color: #166534;">{t.playStoreComingSoon}</strong>
+                        <p style="margin: 0.2rem 0 0; font-size: 0.75rem; color: #166534; opacity: 0.9; line-height: 1.35;">{t.playStoreComingSoonDesc}</p>
+                    </div>
                     <div class="recommendation-actions" style="width: 100%; justify-content: center;">
                         <a
                             href="https://github.com/jaimegh-es/buscoruna/releases/latest/download/app-debug.apk"
@@ -377,7 +381,7 @@ const { title } = Astro.props;
                                 </label>
                                 <p class="setting-desc" style="margin-bottom: 0.75rem;">{t.obtainiumDesc}</p>
                                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                                    <a href="obtainium://app/https://github.com/jaimegh-es/buscoruna" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.9rem; font-size: 0.85rem; font-weight: 700; border-radius: 10px;">
+                                    <a href="obtainium://add/https://github.com/jaimegh-es/buscoruna" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.9rem; font-size: 0.85rem; font-weight: 700; border-radius: 10px;">
                                         <Icon name="download" size={16} />
                                         <span>{t.obtainiumAddBtn}</span>
                                     </a>
@@ -398,14 +402,6 @@ const { title } = Astro.props;
                             </label>
                             <p class="setting-desc">{t.downloadAndroidDesc}</p>
 
-                            <!-- Play Store Notice -->
-                            <div class="play-store-notice" style="margin-top: 0.65rem; margin-bottom: 0.75rem; background: #f0fdf4; border: 1.5px solid #bbf7d0; padding: 0.75rem 0.9rem; border-radius: 12px; display: flex; align-items: flex-start; gap: 0.6rem;">
-                                <div style="font-size: 0.86rem; color: #166534;">
-                                    <strong>{t.playStoreComingSoon}</strong>
-                                    <p style="margin: 0.2rem 0 0; font-size: 0.78rem; opacity: 0.9; line-height: 1.35;">{t.playStoreComingSoonDesc}</p>
-                                </div>
-                            </div>
-
                             <a href="https://github.com/jaimegh-es/buscoruna/releases/latest/download/app-debug.apk" id="settings-download-apk-btn" class="btn-primary update-btn" download="coruna-bus.apk" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:0.5rem; width:100%; min-height:48px; border-radius:12px; font-weight:700;">
                                 <Icon name="download" size={18} />
                                 <span>{t.downloadAndroidBtn}</span>
@@ -418,7 +414,7 @@ const { title } = Astro.props;
                                 </label>
                                 <p class="setting-desc" style="margin-bottom: 0.65rem;">{t.obtainiumDesc}</p>
                                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                                    <a href="obtainium://app/https://github.com/jaimegh-es/buscoruna" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.9rem; font-size: 0.85rem; font-weight: 700; border-radius: 10px;">
+                                    <a href="obtainium://add/https://github.com/jaimegh-es/buscoruna" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.9rem; font-size: 0.85rem; font-weight: 700; border-radius: 10px;">
                                         <Icon name="download" size={16} />
                                         <span>{t.obtainiumAddBtn}</span>
                                     </a>
@@ -1533,6 +1529,7 @@ const { title } = Astro.props;
     import { storage } from "../utils/storage";
     import { getTranslations } from "../utils/i18n";
     import { inAppAlert } from "../utils/inAppAlert";
+    import { getPosition } from "../utils/geolocation";
     import {
         isNativePlatform,
         getBgConfig,
@@ -2269,9 +2266,13 @@ const { title } = Astro.props;
 
         const prevStop = getPreviousStop(info.lineId, info.destinationStopId, catalog);
 
-        navigator.geolocation.getCurrentPosition((position) => {
-            const userLat = position.coords.latitude;
-            const userLon = position.coords.longitude;
+        getPosition().then((position) => {
+            if (!position) {
+                console.warn("[GPS Alert] Geolocation failed");
+                return;
+            }
+            const userLat = position.lat;
+            const userLon = position.lon;
 
             const distToDest = getDistance(userLat, userLon, destStop.posy, destStop.posx);
 
@@ -2338,12 +2339,6 @@ const { title } = Astro.props;
                     badge: "/logo.png"
                 });
             }
-        }, (geoErr) => {
-            console.warn("[GPS Alert] Geolocation failed", geoErr);
-        }, {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0
         });
     }
 
@@ -2564,17 +2559,20 @@ const { title } = Astro.props;
                 btn.addEventListener('click', () => {
                     const id = btn.getAttribute('data-id');
                     if (!id) return;
-                    if (navigator.geolocation) {
-                        btn.textContent = '...';
-                        navigator.geolocation.getCurrentPosition((pos) => {
-                            storage.updateUserLocation(id, { lat: pos.coords.latitude, lon: pos.coords.longitude });
-                            renderLocationsSettingsUI();
-                            inAppAlert(t.locGpsSuccess, { durationMs: 4000 });
-                        }, () => {
-                            inAppAlert(lang === 'en' ? 'Could not obtain GPS position' : 'No se pudo obtener la posición GPS', { durationMs: 4000 });
-                            renderLocationsSettingsUI();
-                        }, { enableHighAccuracy: true, timeout: 10000 });
+                    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+                        inAppAlert(isNativePlatform() ? t.locGpsUnavailableNative : t.locGpsUnavailableWeb, { durationMs: 5000 });
+                        return;
                     }
+                    btn.textContent = '...';
+                    getPosition().then((coords) => {
+                        if (coords) {
+                            storage.updateUserLocation(id, { lat: coords.lat, lon: coords.lon });
+                            inAppAlert(t.locGpsSuccess, { durationMs: 4000 });
+                        } else {
+                            inAppAlert(isNativePlatform() ? t.locGpsFailNative : t.locGpsFailWeb, { durationMs: 6000 });
+                        }
+                        renderLocationsSettingsUI();
+                    });
                 });
             });
 
@@ -2658,11 +2656,9 @@ const { title } = Astro.props;
     });
 
     // Auto-detect location from GPS on startup
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition((pos) => {
-            storage.autoSelectLocationFromGPS(pos.coords.latitude, pos.coords.longitude);
-        }, () => {}, { timeout: 6000, maximumAge: 60000 });
-    }
+    getPosition().then((pos) => {
+        if (pos) storage.autoSelectLocationFromGPS(pos.lat, pos.lon);
+    });
 
     const closeSettings = () => {
         if (settingsModal) {
@@ -2872,7 +2868,7 @@ const { title } = Astro.props;
         // now so it doesn't silently fail later while riding.
         // La alerta GPS de bajada necesita permiso de geolocalización: pídelo
         // ahora para que no falle en silencio al ir en el autobús.
-        if (gpsAlertInput?.checked) {
+        if (gpsAlertInput?.checked && !isNativePlatform()) {
             try {
                 const perms = (navigator as any).permissions;
                 if (perms?.query) {
