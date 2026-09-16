@@ -2710,6 +2710,7 @@ const { title } = Astro.props;
 
         const info = e.detail;
         if (info) {
+            requestBgAlertPermission().catch(() => {});
             if (isNativePlatform()) {
                 const catalog = storage.getCatalog();
                 const destStop = catalog?.paradas ? catalog.paradas[info.destinationStopId] : null;

@@ -202,30 +202,33 @@ public class BackgroundTrackerService extends Service implements LocationListene
         );
 
         String title;
-        if (lastEta >= 0) {
+        if (destinationStopId > 0 && destinationStopId != originStopId && lastDestEta >= 0) {
+            long etaTimeMs = System.currentTimeMillis() + lastDestEta * 60000L;
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
+            String etaClock = sdf.format(new java.util.Date(etaTimeMs));
+            String timeLabel = lastDestEta == 0 ? ("en".equals(lang) ? "Arriving at destination!" : "¡Llegando a destino!") : (lastDestEta + " min (" + etaClock + ")");
+            title = "🚌 Bus " + busId + " → Destino · " + timeLabel;
+        } else if (lastEta >= 0) {
             long etaTimeMs = System.currentTimeMillis() + lastEta * 60000L;
             java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
             String etaClock = sdf.format(new java.util.Date(etaTimeMs));
             String timeLabel = lastEta == 0 ? ("en".equals(lang) ? "Arriving now" : "¡Llegando ahora!") : (lastEta + " min (" + etaClock + ")");
             title = "🚌 Bus " + busId + " · " + timeLabel;
         } else {
-            title = "en".equals(lang) ? ("🚌 Bus " + busId + " · Tracking...") : ("🚌 Bus " + busId + " · Buscando llegada...");
+            title = "en".equals(lang) ? ("🚌 Bus " + busId + " · Tracking active") : ("🚌 Bus " + busId + " · Seguimiento activo");
         }
 
         String body;
+        String origInfo = !originStopName.isEmpty() ? originStopName : ("Parada " + originStopId);
+        String destInfo = !destinationStopName.isEmpty() ? destinationStopName : ("Parada " + destinationStopId);
         if (destinationStopId > 0 && destinationStopId != originStopId) {
-            String origInfo = !originStopName.isEmpty() ? originStopName : ("Parada " + originStopId);
-            String destInfo = !destinationStopName.isEmpty() ? destinationStopName : ("Parada " + destinationStopId);
             if (lastDestEta >= 0) {
-                body = "en".equals(lang)
-                    ? (origInfo + " → " + destInfo + " (Dest ETA: ~" + lastDestEta + " min)")
-                    : (origInfo + " → " + destInfo + " (Llegada destino: ~" + lastDestEta + " min)");
+                body = origInfo + " → " + destInfo + ("en".equals(lang) ? " (~" + lastDestEta + " min)" : " (~" + lastDestEta + " min)");
             } else {
                 body = origInfo + " → " + destInfo;
             }
         } else {
-            String stopName = !originStopName.isEmpty() ? originStopName : ("Parada " + originStopId);
-            body = "en".equals(lang) ? ("Waiting at: " + stopName) : ("Esperando en: " + stopName);
+            body = ("en".equals(lang) ? "Waiting at: " : "Esperando en: ") + origInfo;
         }
 
         String stopLabel = "en".equals(lang) ? "Stop" : "Detener";
@@ -263,7 +266,7 @@ public class BackgroundTrackerService extends Service implements LocationListene
             } catch (Exception e) {
                 Log.e(TAG, "Error during pollEta", e);
             }
-        }, 1, 15, TimeUnit.SECONDS);
+        }, 0, 10, TimeUnit.SECONDS);
     }
 
     private String fetchUrl(String urlString) {

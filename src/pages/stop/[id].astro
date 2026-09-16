@@ -79,6 +79,7 @@ const t = getTranslations(lang);
     import { tracking } from '../../utils/tracking';
     import { createIcons, Star, Navigation, Map, LocateFixed, Bell } from 'lucide';
     import { getTranslations } from '../../utils/i18n';
+    import { requestBgAlertPermission } from '../../utils/backgroundAlerts';
 
     const lang = document.documentElement.getAttribute('data-lang') || 'es';
     const t = getTranslations(lang);
@@ -511,11 +512,8 @@ const t = getTranslations(lang);
                 ? (lang === 'en' ? 'is arriving' : 'está llegando') 
                 : (lang === 'en' ? `${threshold} min or less remain` : `queden ${threshold} min o menos`);
               
-              // Ask for browser notification permissions if not set
-              // Solicitar permisos de notificación si no están concedidos
-              if (Notification.permission === 'default') {
-                Notification.requestPermission();
-              }
+              // Request notification permissions immediately if not granted
+              requestBgAlertPermission().catch(() => {});
               
               // Non-blocking banner so it doesn't freeze the UI
               // Banner no bloqueante para no congelar la interfaz
@@ -580,6 +578,10 @@ const t = getTranslations(lang);
     function startTracking(destStopId: number) {
       if (!pendingTracking) return;
 
+      localStorage.setItem('buscoruna_gps_alert_enabled', 'true');
+      localStorage.setItem('buscoruna_eta_alert_enabled', 'true');
+      requestBgAlertPermission().catch(() => {});
+
       tracking.set({
         busId: pendingTracking.busId,
         lineId: pendingTracking.lineId,
@@ -589,7 +591,8 @@ const t = getTranslations(lang);
         arrivalTime: null
       });
 
-      document.getElementById('destination-modal')!.style.display = 'none';              inAppAlert(lang === 'en' ? 'Tracking started! We will notify you when you arrive at your destination.' : '¡Seguimiento iniciado! Te avisaremos cuando llegues a tu destino.');
+      document.getElementById('destination-modal')!.style.display = 'none';
+      inAppAlert(lang === 'en' ? 'Tracking started! We will notify you when you arrive at your destination.' : '¡Seguimiento iniciado! Te avisaremos cuando llegues a tu destino.');
     }
 
     function updateFavoriteUI() {
