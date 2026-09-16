@@ -8,39 +8,33 @@
     const existing = storage.getCatalog();
     
     // Force refresh if missing or has old structure (paradas as array)
-    const isOldStructure = existing && (Array.isArray(existing.paradas) || !existing.paradas);
+    const isOldStructure = existing && (Array.isArray(existing.paradas) || !existing.paradas || Object.keys(existing.paradas).length === 0);
     
     if (!existing || isOldStructure) {
-      console.log('Loading or refreshing catalog (old structure detected or missing)...');
       try {
         const catalog = await API.getCatalog();
-        if (catalog.resultado === 'OK') {
-          const raw = catalog.iTranvias;
+        if (catalog && (catalog.resultado === 'OK' || catalog.iTranvias)) {
+          const raw = catalog.iTranvias || catalog;
           
-          // Transform paradas array to a Record/Map by ID
           const paradasRecord: any = {};
           let stopCount = 0;
-          if (raw && Array.isArray(raw.paradas)) {
-            raw.paradas.forEach((s: any) => {
+          const paradasList = (raw && Array.isArray(raw.paradas) && raw.paradas) || 
+                              (raw && raw.actualizacion && Array.isArray(raw.actualizacion.paradas) && raw.actualizacion.paradas) || [];
+          
+          paradasList.forEach((s: any) => {
+            if (s && s.id !== undefined) {
               paradasRecord[s.id] = s;
+              paradasRecord[String(s.id)] = s;
               stopCount++;
-            });
-          } else if (raw && raw.actualizacion && Array.isArray(raw.actualizacion.paradas)) {
-            raw.actualizacion.paradas.forEach((s: any) => {
-              paradasRecord[s.id] = s;
-              stopCount++;
-            });
-          }
-
-          console.log(`Parsed ${stopCount} stops from catalog.`);
+            }
+          });
 
           const transformedCatalog = {
-            actualizacion: raw.actualizacion,
+            actualizacion: raw.actualizacion || raw,
             paradas: paradasRecord
           };
 
           storage.setCatalog(transformedCatalog);
-          console.log('Catalog cached successfully.');
           window.dispatchEvent(new CustomEvent('catalog-loaded'));
         }
       } catch (err) {

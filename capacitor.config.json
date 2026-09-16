@@ -4,7 +4,6 @@
   "webDir": "dist/client",
   "server": {
     "androidScheme": "https",
-    "url": "http://localhost:4321",
     "allowNavigation": [
       "xn--coruabus-g3a.inled.es",
       "coruñabus.inled.es",
@@ -24,7 +23,8 @@
       "172.18.0.1",
       "172.16.0.2"
     ],
-    "cleartext": true
+    "cleartext": true,
+    "url": "https://xn--coruabus-g3a.inled.es"
   },
   "android": {
     "allowMixedContent": true
