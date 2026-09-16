@@ -17,14 +17,11 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // Register plugins BEFORE super.onCreate so that Bridge initialization includes them
+        registerPlugin(UpdateDownloaderPlugin.class);
+        registerPlugin(BackgroundTrackerPlugin.class);
         super.onCreate(savedInstanceState);
         WebView.setWebContentsDebuggingEnabled(true);
-        // Native APK downloader (system DownloadManager) for in-app updates
-        // Descargador nativo de APKs (DownloadManager del sistema) para las actualizaciones
-        registerPlugin(UpdateDownloaderPlugin.class);
-        // Native background service for live bus and GPS tracking
-        // Servicio nativo en segundo plano para seguimiento de bus y GPS
-        registerPlugin(BackgroundTrackerPlugin.class);
     }
 
     @Override
