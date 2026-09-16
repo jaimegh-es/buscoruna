@@ -5,6 +5,13 @@
   "server": {
     "androidScheme": "https",
     "url": "https://coruñabus.inled.es",
+    "allowNavigation": [
+      "coruñabus.inled.es",
+      "xn--coruabus-g3a.inled.es",
+      "buscoruna.inled.es",
+      "*.inled.es",
+      "inled.es"
+    ],
     "cleartext": true
   },
   "android": {
