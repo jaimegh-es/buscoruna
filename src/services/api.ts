@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 
-export const PROD_API_HOST = 'https://buscoruna.inled.es';
+export const PROD_API_HOST = 'https://xn--coruabus-g3a.inled.es';
 export const BASE_URL = Capacitor.isNativePlatform() ? `${PROD_API_HOST}/api/proxy` : '/api/proxy';
 
 // Concurrency limit: max simultaneous requests to the upstream API.

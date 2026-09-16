@@ -31,7 +31,9 @@ jobs:
         run: npm run build
 
       - name: Sync Capacitor
-        run: npx cap sync android
+        run: |
+          touch dist/client/index.html
+          npx cap sync android
 
       - name: Set versionCode to GitHub run number (enables auto-update comparison)
         run: |

@@ -4,10 +4,10 @@
   "webDir": "dist/client",
   "server": {
     "androidScheme": "https",
-    "url": "https://buscoruna.inled.es",
+    "url": "https://xn--coruabus-g3a.inled.es",
     "allowNavigation": [
-      "coruñabus.inled.es",
       "xn--coruabus-g3a.inled.es",
+      "coruñabus.inled.es",
       "buscoruna.inled.es",
       "*.inled.es",
       "inled.es"
