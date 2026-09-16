@@ -4,6 +4,8 @@ import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
@@ -16,6 +18,7 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import androidx.core.content.FileProvider;
 import java.io.File;
+import java.util.List;
 
 /**
  * Native APK downloader using Android's DownloadManager.
@@ -28,12 +31,45 @@ import java.io.File;
  * Evita por completo el CORS del WebView: la descarga la hace el propio
  * sistema, con progreso, y luego abre directamente el instalador de paquetes
  * (redirigiendo antes a los ajustes de "instalar apps desconocidas" si aún
- * no se ha dado permiso).
+ * no se ha dado permiso, y reintentando automáticamente al volver).
  */
 @CapacitorPlugin(name = "UpdateDownloader")
 public class UpdateDownloaderPlugin extends Plugin {
 
     private static final String APK_DIR = "CorunaBus";
+    private boolean isWaitingForInstallPermission = false;
+
+    @Override
+    protected void handleOnResume() {
+        super.handleOnResume();
+        if (isWaitingForInstallPermission) {
+            Context ctx = getContext();
+            if (ctx != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (ctx.getPackageManager().canRequestPackageInstalls()) {
+                    isWaitingForInstallPermission = false;
+                    openInstaller();
+                }
+            }
+        }
+    }
+
+    @PluginMethod
+    public void canRequestPackageInstalls(PluginCall call) {
+        JSObject ret = new JSObject();
+        Context ctx = getContext();
+        if (ctx != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            ret.put("value", ctx.getPackageManager().canRequestPackageInstalls());
+        } else {
+            ret.put("value", true);
+        }
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void openDownloadedInstaller(PluginCall call) {
+        openInstaller();
+        call.resolve();
+    }
 
     @PluginMethod
     public void downloadApk(PluginCall call) {
@@ -53,6 +89,9 @@ public class UpdateDownloaderPlugin extends Plugin {
         // Remove any previous update APK so the download starts clean
         // Eliminar cualquier APK anterior para que la descarga empiece limpia
         File destDir = new File(ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), APK_DIR);
+        if (!destDir.exists()) {
+            destDir.mkdirs();
+        }
         File[] old = destDir.listFiles((d, name) -> name.endsWith(".apk"));
         if (old != null) {
             for (File f : old) f.delete();
@@ -138,14 +177,19 @@ public class UpdateDownloaderPlugin extends Plugin {
     /**
      * Open the downloaded APK with the system package installer.
      * If "install unknown apps" permission is missing, redirect the user to
-     * the settings screen; after granting, they can tap the update again.
+     * the settings screen; after granting, returning to the app resumes installation automatically.
      *
      * Abre el APK descargado con el instalador del sistema.
      * Si falta el permiso de "instalar apps desconocidas", redirige al usuario
-     * a la pantalla de ajustes; tras concederlo, puede pulsar actualizar otra vez.
+     * a la pantalla de ajustes; tras concederlo, al volver se reanuda la instalación automáticamente.
      */
     private void openInstaller() {
         Context ctx = getContext();
+        if (ctx == null) {
+            notifyListeners("downloadFailed", new JSObject());
+            return;
+        }
+
         File apk = new File(ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), APK_DIR + "/update.apk");
         if (!apk.exists()) {
             notifyListeners("downloadFailed", new JSObject());
@@ -155,6 +199,7 @@ public class UpdateDownloaderPlugin extends Plugin {
         // Android 8+ requires the "install unknown apps" permission
         // Android 8+ requiere el permiso de "instalar apps desconocidas"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !ctx.getPackageManager().canRequestPackageInstalls()) {
+            isWaitingForInstallPermission = true;
             try {
                 Intent settings = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                         Uri.parse("package:" + ctx.getPackageName()));
@@ -174,21 +219,47 @@ public class UpdateDownloaderPlugin extends Plugin {
         }
 
         Uri apkUri;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            // FileProvider URI: the installer process needs explicit read access
-            // URI del FileProvider: el instalador necesita acceso de lectura explícito
-            apkUri = FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", apk);
-        } else {
-            apkUri = Uri.fromFile(apk);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                // FileProvider URI: the installer process needs explicit read access
+                // URI del FileProvider: el instalador necesita acceso de lectura explícito
+                apkUri = FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", apk);
+            } else {
+                apkUri = Uri.fromFile(apk);
+            }
+        } catch (Exception e) {
+            JSObject err = new JSObject();
+            err.put("error", "FileProvider failed: " + e.getMessage());
+            notifyListeners("downloadFailed", err);
+            return;
         }
 
         Intent install = new Intent(Intent.ACTION_VIEW);
         install.setDataAndType(apkUri, "application/vnd.android.package-archive");
-        install.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        install.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        install.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+
+        // Explicitly grant URI permission to any matching package installer activities
+        try {
+            List<ResolveInfo> resInfoList = ctx.getPackageManager().queryIntentActivities(install, PackageManager.MATCH_DEFAULT_ONLY);
+            for (ResolveInfo resolveInfo : resInfoList) {
+                String packageName = resolveInfo.activityInfo.packageName;
+                ctx.grantUriPermission(packageName, apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            }
+        } catch (Exception ignored) {
+        }
+
         try {
             ctx.startActivity(install);
+            JSObject ret = new JSObject();
+            ret.put("opened", true);
+            notifyListeners("installerOpened", ret);
         } catch (ActivityNotFoundException e) {
-            notifyListeners("downloadFailed", new JSObject());
+            JSObject err = new JSObject();
+            err.put("error", "Installer activity not found");
+            notifyListeners("downloadFailed", err);
         }
     }
 }
+

@@ -22,11 +22,12 @@ import {
   Navigation2,
   Maximize2,
   Minimize2,
-  Camera
+  Camera,
+  Download
 } from '@lucide/astro';
 
 interface Props {
-  name: 'refresh' | 'edit' | 'settings' | 'search' | 'stop' | 'bus' | 'star' | 'heart' | 'map' | 'x' | 'chevron-right' | 'chevron-left' | 'location' | 'star-outline' | 'heart-outline' | 'shield' | 'ban' | 'menu' | 'share' | 'plus' | 'home' | 'maximize' | 'minimize' | 'street-view' | 'navigation';
+  name: 'refresh' | 'edit' | 'settings' | 'search' | 'stop' | 'bus' | 'star' | 'heart' | 'map' | 'x' | 'chevron-right' | 'chevron-left' | 'location' | 'star-outline' | 'heart-outline' | 'shield' | 'ban' | 'menu' | 'share' | 'plus' | 'home' | 'maximize' | 'minimize' | 'street-view' | 'navigation' | 'download';
   class?: string;
   size?: number;
 }
@@ -58,7 +59,8 @@ const iconMap = {
   maximize: Maximize2,
   minimize: Minimize2,
   'street-view': Camera,
-  navigation: Navigation2
+  navigation: Navigation2,
+  download: Download
 };
 
 const SelectedIcon = iconMap[name];

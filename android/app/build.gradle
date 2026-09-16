@@ -26,6 +26,8 @@ android {
             storePassword 'corunabus'
             keyAlias 'corunabus'
             keyPassword 'corunabus'
+            v1SigningEnabled true
+            v2SigningEnabled true
         }
     }
     buildTypes {

@@ -139,6 +139,24 @@ const { title } = Astro.props;
             <slot />
 
             <footer class="global-recommendation">
+                <div id="android-apk-footer-card" class="card recommendation-card android-download-card" style="display: none;">
+                    <Icon name="download" size={24} class="text-primary" />
+                    <p><strong>{t.downloadAndroidTitle}</strong></p>
+                    <p style="font-size: 0.85rem; color: #666; margin-top: -0.25rem;">{t.downloadAndroidDesc}</p>
+                    <div class="recommendation-actions" style="width: 100%; justify-content: center;">
+                        <a
+                            href="https://github.com/jaimegh-es/buscoruna/releases/latest/download/app-debug.apk"
+                            id="footer-download-apk-btn"
+                            class="btn-primary apk-download-link"
+                            download="coruna-bus.apk"
+                            style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; max-width: 280px; padding: 0.65rem 1rem; border-radius: 8px; font-weight: 700;"
+                        >
+                            <Icon name="download" size={18} />
+                            <span>{t.downloadAndroidBtn}</span>
+                        </a>
+                    </div>
+                </div>
+
                 <div class="card recommendation-card">
                     <Icon name="heart" size={20} class="text-primary" />
                     <p>{t.recomendarApp}</p>
@@ -281,6 +299,21 @@ const { title } = Astro.props;
                                 <small id="update-progress-text">0%</small>
                             </div>
                             <button type="button" id="btn-check-update" class="btn-secondary update-btn">{t.settingsUpdateCheck}</button>
+                        </div>
+                    </div>
+
+                    <!-- Android App Download Item (shown when on web/PWA on Android) -->
+                    <!-- Descarga de App Android (mostrado en web/PWA en Android) -->
+                    <div class="setting-item" id="settings-android-download-item" style="display:none">
+                        <div class="setting-info">
+                            <label class="setting-title">
+                                <span>{t.downloadAndroidTitle}</span>
+                            </label>
+                            <p class="setting-desc">{t.downloadAndroidDesc}</p>
+                            <a href="https://github.com/jaimegh-es/buscoruna/releases/latest/download/app-debug.apk" id="settings-download-apk-btn" class="btn-primary update-btn" download="coruna-bus.apk" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:0.5rem; margin-top:0.6rem; width:100%;">
+                                <Icon name="download" size={18} />
+                                <span>{t.downloadAndroidBtn}</span>
+                            </a>
                         </div>
                     </div>
 
@@ -1332,7 +1365,7 @@ const { title } = Astro.props;
         stopForegroundChecker,
         resetAlertState,
     } from "../utils/backgroundAlerts";
-    import { checkForUpdate as checkUpdateInfo, downloadAndInstall, autoCheckOnOpen, type UpdateInfo } from "../utils/autoUpdate";
+    import { checkForUpdate as checkUpdateInfo, downloadAndInstall, autoCheckOnOpen, getLatestApkUrl, type UpdateInfo } from "../utils/autoUpdate";
     import { getChangelogFor, hasSeenChangelog, markChangelogSeen } from "../utils/changelog";
     import { Capacitor } from "@capacitor/core";
     import { notify } from "../utils/notify";
@@ -2343,22 +2376,47 @@ const { title } = Astro.props;
         }
     });
 
-    // App update UI (settings modal, native only)
-    // Interfaz de actualización de la app (modal de ajustes, solo nativo)
+    // App update & Android APK download UI
+    // Interfaz de actualización de la app y descarga de APK para Android
     const updateItem = document.getElementById('settings-update-item');
-    if (updateItem && isNativePlatform()) {
-        updateItem.style.display = '';
-    } else if (updateItem) {
-        // On web, show a note instead of the checker
-        // En web, mostrar una nota en lugar del comprobador
-        updateItem.style.display = '';
-        const statusEl = document.getElementById('settings-update-status');
-        if (statusEl) {
-            statusEl.style.display = '';
-            statusEl.textContent = t.settingsUpdateWebNote;
+    const androidDownloadItem = document.getElementById('settings-android-download-item');
+    const footerApkCard = document.getElementById('android-apk-footer-card');
+    const isAndroidDevice = /Android/i.test(navigator.userAgent);
+    const isNative = isNativePlatform();
+
+    if (isNative) {
+        if (updateItem) updateItem.style.display = '';
+        if (androidDownloadItem) androidDownloadItem.style.display = 'none';
+        if (footerApkCard) footerApkCard.style.display = 'none';
+    } else if (isAndroidDevice) {
+        // On Android Web / PWA: Show download app cards & buttons
+        // En Android Web / PWA: Mostrar tarjetas y botones para descargar la app
+        if (updateItem) updateItem.style.display = 'none';
+        if (androidDownloadItem) androidDownloadItem.style.display = '';
+        if (footerApkCard) footerApkCard.style.display = 'flex';
+
+        // Dynamically resolve latest APK download URL
+        getLatestApkUrl().then((apkUrl) => {
+            const settingsBtn = document.getElementById('settings-download-apk-btn') as HTMLAnchorElement | null;
+            if (settingsBtn) settingsBtn.href = apkUrl;
+            const footerBtn = document.getElementById('footer-download-apk-btn') as HTMLAnchorElement | null;
+            if (footerBtn) footerBtn.href = apkUrl;
+        }).catch(() => {});
+    } else {
+        // On non-Android Web: show informational note
+        // En web no Android: mostrar nota informativa
+        if (updateItem) {
+            updateItem.style.display = '';
+            const statusEl = document.getElementById('settings-update-status');
+            if (statusEl) {
+                statusEl.style.display = '';
+                statusEl.textContent = t.settingsUpdateWebNote;
+            }
+            const checkBtn = document.getElementById('btn-check-update');
+            if (checkBtn) checkBtn.style.display = 'none';
         }
-        const checkBtn = document.getElementById('btn-check-update');
-        if (checkBtn) checkBtn.style.display = 'none';
+        if (androidDownloadItem) androidDownloadItem.style.display = 'none';
+        if (footerApkCard) footerApkCard.style.display = 'none';
     }
 
     let lastUpdateInfo: UpdateInfo | null = null;

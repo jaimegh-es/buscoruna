@@ -112,6 +112,22 @@ export async function autoCheckOnOpen() {
     });
 }
 
+export const LATEST_APK_URL = `https://github.com/${REPO}/releases/latest/download/app-debug.apk`;
+
+export async function getLatestApkUrl(): Promise<string> {
+    try {
+        const res = await fetch(RELEASES_API, { headers: { Accept: 'application/vnd.github+json' } });
+        if (res.ok) {
+            const release = await res.json();
+            const asset = (release.assets || []).find((a: any) => a.name.endsWith('.apk'));
+            if (asset?.browser_download_url) return asset.browser_download_url;
+        }
+    } catch (err) {
+        console.warn('[AutoUpdate] getLatestApkUrl failed', err);
+    }
+    return LATEST_APK_URL;
+}
+
 /**
  * Download the APK natively (Android DownloadManager — no CORS, progress in
  * the system notification shade) and open the local file with the package
@@ -143,14 +159,20 @@ export async function downloadAndInstall(
                 cleanup();
                 reject(new Error('Download timed out'));
             }, 10 * 60 * 1000);
-            let doneListener: any, failListener: any, permListener: any;
+            let doneListener: any, failListener: any, permListener: any, openedListener: any;
             const cleanup = () => {
                 clearTimeout(timeout);
                 doneListener?.remove?.();
                 failListener?.remove?.();
                 permListener?.remove?.();
+                openedListener?.remove?.();
             };
             doneListener = downloader.addListener('downloadDone', () => {
+                onProgress(100);
+                cleanup();
+                resolve();
+            });
+            openedListener = downloader.addListener('installerOpened', () => {
                 onProgress(100);
                 cleanup();
                 resolve();

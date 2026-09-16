@@ -29,6 +29,10 @@ const t = getTranslations(lang);
     <button id="do-install" class="btn-primary install-action-btn">
       {t.installBtn}
     </button>
+
+    <a id="download-apk-action" href="https://github.com/jaimegh-es/buscoruna/releases/latest/download/app-debug.apk" class="btn-secondary install-action-btn" download="coruna-bus.apk" style="display: none; text-align: center; text-decoration: none; padding: 0.65rem 1rem; border-radius: 8px; font-weight: 700;">
+      <Icon name="download" size={16} class="inline-icon" /> {t.downloadAndroidBtn}
+    </a>
   </div>
 </div>
 
@@ -151,9 +155,11 @@ const t = getTranslations(lang);
 
   // Detect platform
   const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+  const isAndroid = /Android/i.test(navigator.userAgent);
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
+  const apkDownloadBtn = document.getElementById('download-apk-action');
 
-  console.log('[PWA] Inicializado', { isIos, isStandalone });
+  console.log('[PWA] Inicializado', { isIos, isAndroid, isStandalone });
 
   function showPopup() {
     const isDebug = window.location.search.includes('debug_pwa');
@@ -171,6 +177,8 @@ const t = getTranslations(lang);
           if (installBtn) installBtn.style.display = 'none';
           if (iosInstructions) iosInstructions.style.display = 'block';
           if (installMsg) installMsg.textContent = lang === 'en' ? 'Add Coruña Bus to your home screen.' : 'Añade Coruña Bus a tu pantalla de inicio.';
+        } else if (isAndroid) {
+          if (apkDownloadBtn) apkDownloadBtn.style.display = 'block';
         } else if (isDebug && !deferredPrompt) {
           if (installBtn) installBtn.textContent = lang === 'en' ? 'Install (Demo)' : 'Instalar (Demo)';
         }
