@@ -9,7 +9,10 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "deploy:web": "npm run build && npx wrangler deploy",
+    "app:local": "bash scripts/build-local.sh",
+    "app:prod": "bash scripts/build-prod.sh"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^13.7.0",

@@ -290,6 +290,8 @@ const t = getTranslations(lang);
 </style>
 
 <script>
+  import { Capacitor } from '@capacitor/core';
+
   const landing = document.getElementById('landing-page');
   const openAppBtns = [
     document.getElementById('open-app-btn'),
@@ -306,8 +308,8 @@ const t = getTranslations(lang);
     if (landing) landing.style.display = 'block';
   }
 
-  // Initial check
-  if (!localStorage.getItem('landing-viewed')) {
+  // Initial check: only show landing on web for first-time visitors, never on native app
+  if (!Capacitor.isNativePlatform() && !localStorage.getItem('landing-viewed')) {
     showLanding();
   }
 
