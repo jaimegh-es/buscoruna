@@ -9,7 +9,21 @@ import cloudflare from '@astrojs/cloudflare';
 // https://astro.build/config
 export default defineConfig({
   output: 'server',
+  devToolbar: {
+    enabled: false,
+  },
   vite: {
+    server: {
+      watch: {
+        ignored: [
+          '**/android/**',
+          '**/dist/**',
+          '**/.git/**',
+          '**/scripts/**',
+          '**/.gradle/**',
+        ],
+      },
+    },
     // Capacitor plugins use the native bridge at runtime and must not be
     // pre-bundled by Vite's dep optimizer (stale cache after plugin changes
     // breaks the whole app).
@@ -22,6 +36,7 @@ export default defineConfig({
         '@capacitor/preferences',
         '@capacitor/filesystem',
         '@capacitor/app',
+        'lucide',
       ],
     },
     plugins: [

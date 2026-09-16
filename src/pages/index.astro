@@ -80,6 +80,7 @@ const t = getTranslations(lang);
         import { tracking } from '../utils/tracking';
         import { createIcons, ChevronRight, Cloud, Sun, CloudRain, CloudLightning, Thermometer, ExternalLink, Image } from 'lucide';
 
+        const lang = document.documentElement.getAttribute('data-lang') || 'es';
         let allNews: any[] = [];
         let newsVisibleCount = 3;
         let showImages = localStorage.getItem('buscoruna_news_images') !== 'false';
@@ -299,8 +300,6 @@ const t = getTranslations(lang);
         }
 
         const initialInfo = tracking.get();
-        // Read selected lang from html attribute
-        const lang = document.documentElement.getAttribute('data-lang') || 'es';
 
         renderFavorites();
         fetchWeather();

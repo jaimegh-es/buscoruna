@@ -143,6 +143,7 @@ const t = getTranslations(lang);
 
 <script>
   import { getTranslations } from '../utils/i18n';
+  import { Capacitor } from '@capacitor/core';
   const lang = document.documentElement.getAttribute('data-lang') || 'es';
   const t = getTranslations(lang);
 
@@ -159,9 +160,8 @@ const t = getTranslations(lang);
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
   const apkDownloadBtn = document.getElementById('download-apk-action');
 
-  console.log('[PWA] Inicializado', { isIos, isAndroid, isStandalone });
-
   function showPopup() {
+    if (Capacitor.isNativePlatform()) return;
     const isDebug = window.location.search.includes('debug_pwa');
     console.log('[PWA] Intentando mostrar popup...', { isDebug });
 
