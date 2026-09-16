@@ -277,24 +277,41 @@ const t = getTranslations(lang);
         return;
       }
 
-      const catalog = storage.getCatalog();
-      if (!catalog) {
-        // Wait for catalog if not ready
-        window.addEventListener('catalog-loaded', () => init());
-        return;
+      document.getElementById('display-stop-id')!.textContent = stopId.toString();
+      
+      const customNames = storage.getStopNames();
+      const alias = customNames[String(stopId)];
+      if (alias) {
+        document.getElementById('display-stop-name')!.textContent = alias;
       }
 
-      stopData = catalog.paradas[stopId];
-      if (!stopData) {
-        document.getElementById('display-stop-name')!.textContent = lang === 'en' ? 'Stop not found' : 'Parada no encontrada';
-        return;
-      }
-
-      renderStopInfo();
-      initMap();
       setupMapExpand();
       updateFavoriteUI();
       initWalkTimesUI();
+
+      const catalog = storage.getCatalog();
+      if (catalog && catalog.paradas) {
+        stopData = catalog.paradas[stopId] || catalog.paradas[String(stopId)];
+        if (stopData) {
+          renderStopInfo();
+          initMap();
+        } else {
+          document.getElementById('display-stop-name')!.textContent = alias || `${lang === 'en' ? 'Stop' : 'Parada'} ${stopId}`;
+        }
+      } else {
+        document.getElementById('display-stop-name')!.textContent = alias || `${lang === 'en' ? 'Stop' : 'Parada'} ${stopId}`;
+        window.addEventListener('catalog-loaded', () => {
+          const cat = storage.getCatalog();
+          if (cat && cat.paradas) {
+            stopData = cat.paradas[stopId] || cat.paradas[String(stopId)];
+            if (stopData) {
+              renderStopInfo();
+              initMap();
+              fetchETAs();
+            }
+          }
+        }, { once: true });
+      }
 
       // If a cooldown is still active (persisted via sessionStorage), wait it out
       if (Date.now() < cooldownUntil) {
@@ -324,20 +341,24 @@ const t = getTranslations(lang);
 
     function renderStopInfo() {
       const catalog = storage.getCatalog();
+      const customNames = storage.getStopNames();
+      const alias = customNames[String(stopId)];
       document.getElementById('display-stop-id')!.textContent = stopId.toString();
-      document.getElementById('display-stop-name')!.textContent = stopData.nombre;
+      document.getElementById('display-stop-name')!.textContent = alias || stopData?.nombre || `${lang === 'en' ? 'Stop' : 'Parada'} ${stopId}`;
       
       const linesContainer = document.getElementById('lines-passing')!;
-      linesContainer.innerHTML = stopData.enlaces.map((lId: any) => {
-        const line = catalog?.actualizacion.lineas.find((cl: any) => cl.id.toString() === lId.toString());
-        const name = line ? line.lin_comer : lId;
-        const color = line ? `#${line.color}` : '#333';
-        return `
-          <a href="/lines?id=${lId}" class="line-tag-large" style="--line-color: ${color}">
-            ${name}
-          </a>
-        `;
-      }).join('');
+      if (stopData && Array.isArray(stopData.enlaces)) {
+        linesContainer.innerHTML = stopData.enlaces.map((lId: any) => {
+          const line = catalog?.actualizacion?.lineas?.find((cl: any) => cl.id.toString() === lId.toString());
+          const name = line ? line.lin_comer : lId;
+          const color = line ? `#${line.color}` : '#333';
+          return `
+            <a href="/lines?id=${lId}" class="line-tag-large" style="--line-color: ${color}">
+              ${name}
+            </a>
+          `;
+        }).join('');
+      }
     }
 
     function initMap() {
@@ -433,15 +454,14 @@ const t = getTranslations(lang);
 
     async function fetchETAs() {
       const container = document.getElementById('eta-list')!;
-      const catalog = storage.getCatalog();
-      if (!catalog) return;
       if (isApiCooldownActive()) return; // global breaker open - fail fast, keep banner
 
       try {
         const data = await API.getStopArrivals(stopId);
+        const catalog = storage.getCatalog();
         if (data.resultado === 'OK' && data.buses && data.buses.lineas && data.buses.lineas.length > 0) {
           container.innerHTML = data.buses.lineas.map((l: any, idx: number) => {
-            const lineData = catalog.actualizacion.lineas.find((cl: any) => cl.id.toString() === l.linea.toString());
+            const lineData = catalog?.actualizacion?.lineas?.find((cl: any) => cl.id.toString() === l.linea.toString());
             const color = lineData ? `#${lineData.color}` : 'var(--primary)';
             const commercialName = lineData ? lineData.lin_comer : l.linea;
             
