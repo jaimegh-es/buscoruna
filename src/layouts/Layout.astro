@@ -415,27 +415,25 @@ const { title } = Astro.props;
         <ProjectDrawer />
 
         <!-- First-time Language Selector Modal -->
-        {showLangSelector && (
-            <div id="first-time-lang-selector-modal" class="modal-overlay" style="display: flex;">
-                <div class="modal-content lang-selector-modal-content">
-                    <div class="lang-selector-header">
-                        <img src="/logo.png" alt="Coruña Bus" class="lang-selector-logo" />
-                        <h3>{t.welcomeSelectorTitle}</h3>
-                        <p>{t.welcomeSelectorSub}</p>
-                    </div>
-                    <div class="lang-selector-options">
-                        <button type="button" class="lang-btn es-btn" data-lang="es">
-                            <span class="flag">🇪🇸</span>
-                            <span class="lang-name">{t.welcomeSelectorEs}</span>
-                        </button>
-                        <button type="button" class="lang-btn en-btn" data-lang="en">
-                            <span class="flag">🇬🇧</span>
-                            <span class="lang-name">{t.welcomeSelectorEn}</span>
-                        </button>
-                    </div>
+        <div id="first-time-lang-selector-modal" class="modal-overlay" style="display: none;">
+            <div class="modal-content lang-selector-modal-content">
+                <div class="lang-selector-header">
+                    <img src="/logo.png" alt="Coruña Bus" class="lang-selector-logo" />
+                    <h3>{t.welcomeSelectorTitle}</h3>
+                    <p>{t.welcomeSelectorSub}</p>
+                </div>
+                <div class="lang-selector-options">
+                    <button type="button" class="lang-btn es-btn" data-lang="es">
+                        <span class="flag">🇪🇸</span>
+                        <span class="lang-name">{t.welcomeSelectorEs}</span>
+                    </button>
+                    <button type="button" class="lang-btn en-btn" data-lang="en">
+                        <span class="flag">🇬🇧</span>
+                        <span class="lang-name">{t.welcomeSelectorEn}</span>
+                    </button>
                 </div>
             </div>
-        )}
+        </div>
     </body>
 </html>
 <style is:global>
@@ -2766,15 +2764,33 @@ const { title } = Astro.props;
         applySettings();
     }
 
+    // Highlight active nav item based on current pathname
+    const currentPath = window.location.pathname;
+    document.querySelectorAll('.bottom-nav .nav-item').forEach(item => {
+        const href = item.getAttribute('href');
+        if (href === currentPath || (href && href !== '/' && currentPath.startsWith(href))) {
+            item.classList.add('active');
+        } else if (href === '/' && (currentPath === '/' || currentPath === '')) {
+            item.classList.add('active');
+        } else {
+            item.classList.remove('active');
+        }
+    });
+
     // First-time language selector UI Events
     const firstTimeLangModal = document.getElementById("first-time-lang-selector-modal");
     if (firstTimeLangModal) {
+        const storedLang = localStorage.getItem("buscoruna_lang") || (document.cookie.match(/buscoruna_lang=([^;]+)/)?.[1]);
+        if (!storedLang) {
+            firstTimeLangModal.style.display = "flex";
+        }
         const langBtns = firstTimeLangModal.querySelectorAll(".lang-btn");
         langBtns.forEach(btn => {
             btn.addEventListener("click", () => {
                 const selectedLang = btn.getAttribute("data-lang") || "es";
                 localStorage.setItem("buscoruna_lang", selectedLang);
                 document.cookie = "buscoruna_lang=" + selectedLang + ";path=/;max-age=" + (60 * 60 * 24 * 365);
+                firstTimeLangModal.style.display = "none";
                 window.location.reload();
             });
         });

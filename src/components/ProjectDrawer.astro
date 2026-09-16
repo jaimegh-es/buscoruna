@@ -212,19 +212,44 @@ const t = getTranslations(lang);
         }
     }
 
-    // Listen for a custom event to open the drawer
-    window.addEventListener('open-project-menu', () => {
-        overlay?.classList.add('active');
+    function openDrawer() {
+        const overlay = document.getElementById('project-menu-overlay');
+        if (overlay) {
+            overlay.style.display = 'flex';
+            overlay.classList.add('active');
+        }
         fetchProjects();
-    });
+    }
 
-    closeBtn?.addEventListener('click', () => {
-        overlay?.classList.remove('active');
-    });
-
-    overlay?.addEventListener('click', (e) => {
-        if (e.target === overlay) {
+    function closeDrawer() {
+        const overlay = document.getElementById('project-menu-overlay');
+        if (overlay) {
             overlay.classList.remove('active');
+            overlay.style.display = 'none';
+        }
+    }
+
+    // Direct global click delegation for the drawer button and close button
+    document.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement | null;
+        if (!target) return;
+        if (target.closest('#project-menu-btn')) {
+            e.preventDefault();
+            e.stopPropagation();
+            openDrawer();
+            return;
+        }
+        if (target.closest('#close-project-menu')) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeDrawer();
+            return;
+        }
+        const overlay = document.getElementById('project-menu-overlay');
+        if (target === overlay) {
+            closeDrawer();
         }
     });
+
+    window.addEventListener('open-project-menu', openDrawer);
 </script>
