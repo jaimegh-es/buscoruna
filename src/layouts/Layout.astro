@@ -1364,6 +1364,8 @@ const { title } = Astro.props;
         startForegroundChecker,
         stopForegroundChecker,
         resetAlertState,
+        startNativeBackgroundTracking,
+        stopNativeBackgroundTracking,
     } from "../utils/backgroundAlerts";
     import { checkForUpdate as checkUpdateInfo, downloadAndInstall, autoCheckOnOpen, getLatestApkUrl, type UpdateInfo } from "../utils/autoUpdate";
     import { getChangelogFor, hasSeenChangelog, markChangelogSeen } from "../utils/changelog";
@@ -1595,7 +1597,7 @@ const { title } = Astro.props;
         try {
             // Check ETA alert for the boarding/origin stop if enabled and not already triggered
             // Comprobar la alerta de ETA para la parada de origen si está activa y aún no se ha disparado
-            const etaAlertEnabled = localStorage.getItem('buscoruna_eta_alert_enabled') === 'true';
+            const etaAlertEnabled = localStorage.getItem('buscoruna_eta_alert_enabled') !== 'false';
             const etaAlertTriggered = localStorage.getItem('buscoruna_eta_alert_triggered') === 'true';
 
             // The boarding-alert look-up and the destination ETA reply can run in
@@ -1616,7 +1618,7 @@ const { title } = Astro.props;
                             if (b) {
                                 let waitTime = typeof b.tiempo === "number" ? b.tiempo : parseInt(b.tiempo);
                                 if (!isNaN(waitTime)) {
-                                    const threshold = parseInt(localStorage.getItem('buscoruna_eta_alert_threshold') || '0');
+                                    const threshold = parseInt(localStorage.getItem('buscoruna_eta_alert_threshold') || '2');
                                     if (waitTime <= threshold && gen === trackingGeneration && tracking.get()) {
                                         // Trigger arrival alert!
                                         // Disparar aviso de llegada
@@ -2280,7 +2282,7 @@ const { title } = Astro.props;
         const info = tracking.get();
         
         // GPS alert warning
-        const gpsEnabled = localStorage.getItem('buscoruna_gps_alert_enabled') === 'true';
+        const gpsEnabled = localStorage.getItem('buscoruna_gps_alert_enabled') !== 'false';
         if (gpsEnabled && info) {
             startGPSMonitor();
         } else {
@@ -2309,14 +2311,14 @@ const { title } = Astro.props;
         const keepAwakeInput = document.getElementById("settings-enable-bg-keep-awake") as HTMLInputElement;
         const langSelect = document.getElementById("settings-lang-select") as HTMLSelectElement;
         
-        if (gpsAlertInput) gpsAlertInput.checked = localStorage.getItem('buscoruna_gps_alert_enabled') === 'true';
+        if (gpsAlertInput) gpsAlertInput.checked = localStorage.getItem('buscoruna_gps_alert_enabled') !== 'false';
 
         // On native, the background alert replaces the web-only ETA flag
         // En nativo, el aviso en segundo plano sustituye al flag solo-web
         const bgCfg = await getBgConfig();
         const native = isNativePlatform();
-        if (etaAlertInput) etaAlertInput.checked = native ? bgCfg.enabled : localStorage.getItem('buscoruna_eta_alert_enabled') === 'true';
-        if (etaThresholdSelect) etaThresholdSelect.value = localStorage.getItem('buscoruna_eta_alert_threshold') || (native ? String(bgCfg.leadMinutes) : '0');
+        if (etaAlertInput) etaAlertInput.checked = native ? bgCfg.enabled : localStorage.getItem('buscoruna_eta_alert_enabled') !== 'false';
+        if (etaThresholdSelect) etaThresholdSelect.value = localStorage.getItem('buscoruna_eta_alert_threshold') || (native ? String(bgCfg.leadMinutes) : '2');
         if (keepAwakeInput) keepAwakeInput.checked = localStorage.getItem('buscoruna_bg_keep_awake') === 'true';
         if (langSelect) langSelect.value = document.documentElement.getAttribute('data-lang') || 'es';
 
@@ -2605,9 +2607,39 @@ const { title } = Astro.props;
             stopForegroundChecker();
         }
 
-        if (e.detail) {
+        const info = e.detail;
+        if (info) {
+            if (isNativePlatform()) {
+                const catalog = storage.getCatalog();
+                const destStop = catalog?.paradas ? catalog.paradas[info.destinationStopId] : null;
+                const originStop = catalog?.paradas ? catalog.paradas[info.originStopId] : null;
+                const prevStop = catalog ? getPreviousStop(info.lineId, info.destinationStopId, catalog) : null;
+                const threshold = parseInt(localStorage.getItem('buscoruna_eta_alert_threshold') || '2', 10);
+                const etaEnabled = localStorage.getItem('buscoruna_eta_alert_enabled') !== 'false';
+                const gpsEnabled = localStorage.getItem('buscoruna_gps_alert_enabled') !== 'false';
+
+                startNativeBackgroundTracking({
+                    busId: info.busId.toString(),
+                    lineId: info.lineId.toString(),
+                    originStopId: info.originStopId,
+                    originStopName: originStop?.nombre || `Parada ${info.originStopId}`,
+                    destinationStopId: info.destinationStopId,
+                    destinationStopName: destStop?.nombre || `Parada ${info.destinationStopId}`,
+                    destLat: destStop ? parseFloat(destStop.posy) : 0,
+                    destLon: destStop ? parseFloat(destStop.posx) : 0,
+                    prevLat: prevStop ? parseFloat(prevStop.posy) : 0,
+                    prevLon: prevStop ? parseFloat(prevStop.posx) : 0,
+                    leadMinutes: threshold,
+                    etaAlertEnabled: etaEnabled,
+                    gpsAlertEnabled: gpsEnabled,
+                    lang: lang
+                });
+            }
             applySettings();
         } else {
+            if (isNativePlatform()) {
+                stopNativeBackgroundTracking();
+            }
             stopGPSMonitor();
             stopSilencePlayback();
         }
@@ -2616,6 +2648,32 @@ const { title } = Astro.props;
     // Initial load setup
     const initialInfo = tracking.get();
     if (initialInfo) {
+        if (isNativePlatform()) {
+            const catalog = storage.getCatalog();
+            const destStop = catalog?.paradas ? catalog.paradas[initialInfo.destinationStopId] : null;
+            const originStop = catalog?.paradas ? catalog.paradas[initialInfo.originStopId] : null;
+            const prevStop = catalog ? getPreviousStop(initialInfo.lineId, initialInfo.destinationStopId, catalog) : null;
+            const threshold = parseInt(localStorage.getItem('buscoruna_eta_alert_threshold') || '2', 10);
+            const etaEnabled = localStorage.getItem('buscoruna_eta_alert_enabled') !== 'false';
+            const gpsEnabled = localStorage.getItem('buscoruna_gps_alert_enabled') !== 'false';
+
+            startNativeBackgroundTracking({
+                busId: initialInfo.busId.toString(),
+                lineId: initialInfo.lineId.toString(),
+                originStopId: initialInfo.originStopId,
+                originStopName: originStop?.nombre || `Parada ${initialInfo.originStopId}`,
+                destinationStopId: initialInfo.destinationStopId,
+                destinationStopName: destStop?.nombre || `Parada ${initialInfo.destinationStopId}`,
+                destLat: destStop ? parseFloat(destStop.posy) : 0,
+                destLon: destStop ? parseFloat(destStop.posx) : 0,
+                prevLat: prevStop ? parseFloat(prevStop.posy) : 0,
+                prevLon: prevStop ? parseFloat(prevStop.posx) : 0,
+                leadMinutes: threshold,
+                etaAlertEnabled: etaEnabled,
+                gpsAlertEnabled: gpsEnabled,
+                lang: lang
+            });
+        }
         applySettings();
     }
 

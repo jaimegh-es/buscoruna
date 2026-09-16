@@ -7,16 +7,39 @@
 // Una alarma nativa de Android comprueba el tiempo del bus en segundo plano y
 // dispara una notificación cuando queda el tiempo de antelación elegido.
 
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Preferences } from '@capacitor/preferences';
 import { tracking, type TrackingInfo } from './tracking';
+
+export interface BackgroundTrackerPlugin {
+    startTracking(options: {
+        busId: string;
+        lineId: string | number;
+        originStopId: number;
+        originStopName?: string;
+        destinationStopId: number;
+        destinationStopName?: string;
+        destLat?: number;
+        destLon?: number;
+        prevLat?: number;
+        prevLon?: number;
+        leadMinutes?: number;
+        etaAlertEnabled?: boolean;
+        gpsAlertEnabled?: boolean;
+        lang?: string;
+    }): Promise<{ success: boolean }>;
+    stopTracking(): Promise<{ success: boolean }>;
+    isTracking(): Promise<{ isTracking: boolean }>;
+}
+
+export const NativeBackgroundTracker = registerPlugin<BackgroundTrackerPlugin>('BackgroundTracker');
 
 export interface BackgroundAlertConfig {
     enabled: boolean;
     /** Minutes before the bus arrives to fire the alert (0 = on arrival). */
     leadMinutes: number;
-    /** Polling interval in seconds for the background check (default 60). */
+    /** Polling interval in seconds for the background check (default 20). */
     intervalSeconds: number;
 }
 
@@ -24,9 +47,9 @@ const CONFIG_KEY = 'buscoruna_bg_alert_config';
 const STATE_KEY = 'buscoruna_bg_alert_state';
 
 export const DEFAULT_BG_CONFIG: BackgroundAlertConfig = {
-    enabled: false,
+    enabled: true,
     leadMinutes: 2,
-    intervalSeconds: 60,
+    intervalSeconds: 20,
 };
 
 export function isNativePlatform(): boolean {
@@ -233,5 +256,38 @@ export function stopForegroundChecker() {
     if (fgInterval) {
         clearInterval(fgInterval);
         fgInterval = null;
+    }
+}
+
+export async function startNativeBackgroundTracking(options: {
+    busId: string;
+    lineId: string | number;
+    originStopId: number;
+    originStopName?: string;
+    destinationStopId: number;
+    destinationStopName?: string;
+    destLat?: number;
+    destLon?: number;
+    prevLat?: number;
+    prevLon?: number;
+    leadMinutes?: number;
+    etaAlertEnabled?: boolean;
+    gpsAlertEnabled?: boolean;
+    lang?: string;
+}) {
+    if (!isNativePlatform()) return;
+    try {
+        await NativeBackgroundTracker.startTracking(options);
+    } catch (e) {
+        console.warn('[BackgroundAlerts] Native tracker start error', e);
+    }
+}
+
+export async function stopNativeBackgroundTracking() {
+    if (!isNativePlatform()) return;
+    try {
+        await NativeBackgroundTracker.stopTracking();
+    } catch (e) {
+        console.warn('[BackgroundAlerts] Native tracker stop error', e);
     }
 }

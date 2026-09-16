@@ -22,6 +22,9 @@ public class MainActivity extends BridgeActivity {
         // Native APK downloader (system DownloadManager) for in-app updates
         // Descargador nativo de APKs (DownloadManager del sistema) para las actualizaciones
         registerPlugin(UpdateDownloaderPlugin.class);
+        // Native background service for live bus and GPS tracking
+        // Servicio nativo en segundo plano para seguimiento de bus y GPS
+        registerPlugin(BackgroundTrackerPlugin.class);
     }
 
     @Override
