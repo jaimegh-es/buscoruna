@@ -85,53 +85,11 @@ async function fetchUpstream(targetUrl: string): Promise<{ body: string; status:
 
 export const GET: APIRoute = async ({ request }) => {
   const origin = request.headers.get('origin');
-  const referer = request.headers.get('referer');
-  
-  const allowedDomains = [
-    'buscoruna.inled.es',
-    'xn--coruabus-g3a.inled.es',
-    'coruñabus.inled.es',
-    'localhost'
-  ];
-
-  const isAllowed = (val: string | null) => {
-    if (!val) return false;
-    try {
-      const url = new URL(val);
-      const hostname = url.hostname;
-      return allowedDomains.includes(hostname) || hostname === 'localhost';
-    } catch {
-      return false;
-    }
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, User-Agent, X-Requested-With',
   };
-
-  const isAllowedOrigin = isAllowed(origin);
-  const isAllowedReferer = isAllowed(referer);
-
-  // The native Android app (Capacitor WebView) does not send Origin or Referer
-  // headers. Identify it by its custom User-Agent marker instead of blocking it.
-  // La app nativa Android (WebView de Capacitor) no envía Origin ni Referer.
-  // Se identifica por su User-Agent propio en lugar de bloquearla.
-  const userAgent = request.headers.get('user-agent') || '';
-  const isNativeApp = userAgent.includes('CorunaBusNative');
-
-  // If we are in the same domain, sometimes headers might be missing depending on the browser/navigation.
-  // But for an API proxy, we expect at least one to be present if it's from a web app.
-  if (!isAllowedOrigin && !isAllowedReferer && !isNativeApp) {
-    // Basic check for direct access if no headers at all (can happen in some server-side or CLI tools, 
-    // but here we want to protect it. However, if it's a GET, we might want to be careful).
-    // Let's keep it strict but ensure we didn't miss anything.
-    return new Response(JSON.stringify({ 
-      error: 'Unauthorized', 
-      debug: { 
-        origin: origin || 'null', 
-        referer: referer ? new URL(referer).hostname : 'null' 
-      } 
-    }), { 
-      status: 403,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
 
   const url = new URL(request.url);
   const type = url.searchParams.get('type') || 'itranvias';
@@ -194,13 +152,33 @@ export const GET: APIRoute = async ({ request }) => {
       status: upstreamStatus >= 400 ? upstreamStatus : 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': origin || (referer ? new URL(referer).origin : '*'),
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': '*',
       }
     });
     });
     return result;
   } catch (error) {
     console.error('Proxy error:', error);
-    return new Response(JSON.stringify({ error: 'Failed to fetch from target' }), { status: 500 });
+    return new Response(JSON.stringify({ error: 'Failed to fetch from target' }), { 
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      }
+    });
   }
+};
+
+export const OPTIONS: APIRoute = async () => {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': '*',
+      'Access-Control-Max-Age': '86400',
+    }
+  });
 };
