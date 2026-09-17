@@ -14,6 +14,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        version: '0.0.3',
+        title: '🛡️ Detección de bloqueos y mejoras',
+        items: [
+            'Detección inteligente de bloqueos de operadoras a Cloudflare durante partidos.',
+            'Información clara y transparente con enlace a comprobador en tiempo real (hayahora.futbol).',
+            'Acceso rápido a Proton VPN gratuita para saltar bloqueos de operadoras.',
+            'Enlace directo a GitHub para auditar el código abierto.',
+        ],
+    },
+    {
         version: '0.0.2',
         title: '🚀 Novedades de esta versión',
         items: [
