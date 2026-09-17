@@ -7,6 +7,7 @@
 // Comprueba GitHub Releases, descarga el APK y lo entrega al instalador de
 // Android. También expone una comprobación manual para la interfaz de ajustes.
 
+import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 
 // Repo releases endpoint (update if the repo moves)
@@ -37,7 +38,7 @@ function parseBuildNumber(tag: string): number {
 async function getNativeBuildNumber(): Promise<number> {
     if (!Capacitor.isNativePlatform()) return -1;
     try {
-        const info = await (Capacitor as any).Plugins.App.getInfo();
+        const info = await App.getInfo();
         return parseInt(info.build, 10) || 0;
     } catch {
         return 0;

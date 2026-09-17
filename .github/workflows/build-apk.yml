@@ -52,6 +52,12 @@ jobs:
         id: version
         run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
+      - name: Set versionName to app version (keeps in-app changelog/version aligned with releases)
+        run: |
+          FILE=android/app/build.gradle
+          sed -i 's/versionName "[^"]*"/versionName "${{ steps.version.outputs.version }}"/' "$FILE"
+          grep versionName "$FILE"
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:

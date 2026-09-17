@@ -1545,6 +1545,7 @@ const { title } = Astro.props;
     import { checkForUpdate as checkUpdateInfo, downloadAndInstall, autoCheckOnOpen, getLatestApkUrl, type UpdateInfo } from "../utils/autoUpdate";
     import { getChangelogFor, hasSeenChangelog, markChangelogSeen } from "../utils/changelog";
     import { Capacitor } from "@capacitor/core";
+    import { App } from "@capacitor/app";
     import { notify } from "../utils/notify";
     import { LocalNotifications } from "@capacitor/local-notifications";
 
@@ -1644,8 +1645,6 @@ const { title } = Astro.props;
     (async () => {
         try {
             if (!isNativePlatform()) return;
-            const App = (Capacitor as any).Plugins?.App;
-            if (!App?.getInfo) return;
             const info = await App.getInfo();
             const entry = getChangelogFor(info.version);
             if (!entry || hasSeenChangelog(info.version)) return;
