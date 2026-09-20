@@ -2,26 +2,39 @@
 
 ![Coruña Bus Banner](https://coruñabus.inled.es/logo.png)
 
-> La web que te ayuda a moverte inteligentmente con los buses de A Coruña.
+> La app de los buses creada por quien usa el bus diariamente. Lo que necesitas, lo tiene
 
-Coruña Bus es una Progressive Web App (PWA) y una app Android nativa diseñada para consultar tiempos de llegada, planear rutas y hacer el seguimiento de los autobuses de A Coruña en tiempo real, con los datos oficiales de iTranvías.
+CoruñaBus es una aplicación para los buses urbanos de La Coruña que desarrollé tras la experiencia con la app oficial (imposible de usar) y la no oficial (BusCoruña, con anuncios por doquier y sin o que necesitaba).  
+Esta aplicación, disponible tanto en web, PWA como en aplicacion nativa para Android (ya que en el bus nadie usa iPhone), ofrece una gran cantidad de funciones para hacer más sencillo el uso de los buses. Listadas a continuación:
 
 ## Funciones
 
-- **Tiempos en tiempo real**: consulta cuánto falta para que llegue tu bus, actualizado directamente con la API de iTranvías.
-- **Planificador de rutas**: encuentra la mejor forma de ir de A a B, con tramos a pie hasta las paradas más cercanas y transbordos entre líneas.
-- **Seguimiento de autobús (Track Bus)**: sube a un bus y activa el seguimiento. La app te dice cuántas paradas faltan y te avisa cuando estás llegando a tu destino.
-- **Avisos de llegada en segundo plano**: elige los minutos de antelación y recibe una notificación cuando tu bus esté a punto de llegar.
-- **Notificaciones nativas**: en la app Android se muestran en la bandeja del sistema incluso con la app en segundo plano; en la web, mediante el Service Worker.
-- **Paradas cercanas por GPS**: detecta tu ubicación para mostrar las paradas más próximas y calcular los tiempos a pie.
-- **Ubicación de casa y lugares**: guarda desde los ajustes tu casa y otros lugares por GPS para fijar de dónde partes.
-- **Favoritos**: guarda tus paradas y rutas habituales con nombres personalizados para acceder a ellas al instante.
-- **Búsqueda rápida**: busca paradas y líneas, también por número de bus, con el catálogo en caché para funcionar sin conexión.
-- **Mapa interactivo**: visualización de paradas y recorridos sobre el mapa (Leaflet), con modo de pantalla completa.
-- **Modo offline**: el catálogo de paradas y líneas queda cacheado, por lo que la búsqueda funciona incluso sin internet.
-- **Multidioma**: interfaz en español (por defecto) e inglés, configurable desde los ajustes.
-- **Actualización integrada**: la app Android se actualiza desde Ajustes y muestra el changelog de cada versión.
-- **Privacidad total**: sin anuncios, sin rastreadores y sin necesidad de crear una cuenta.
+Junto con las funciones habituales de una app de paradas (mostrar tiempos, lineas, paradas, etc...), incluye adicionalmente:  
+
+- **Planificador de rutas**: en el cual indicas de donde a dónde quieres ir, la hora de llegada (o lo dejas en blanco) y te indica qué lineas cojer y que bus concreto, permitiéndote acceder a su parada y añadir un aviso de llegada del bus
+
+- **Avisos llegada de bus**: Te avisa cuando queda X minutos para la llegada de bus a la parada (el tiempo de antelación que hayas configurado) y detecta mediante ubicacion si te encuentras en una de tus ubicaciones preconfiguradas las cuales añaden tiempo extra de antelación que tu hayas establecido según la ubicación (por ejemplo, si estoy en casa tardo 3 minutos en llegar a la parada)
+
+- **Cálculo de hora de llegada a destino + tiempo restante**: Calcula cuanto queda para que llegues al destino y a qué hora llegarás (perfecto para que puedas avisar si llegas tarde, el cálculo es muy bueno)
+
+- **Notificación de avisar de parada**: La aplicación detecta tu ubicación durante el trayecto y emite un sonido para que puedas avisar de parada para que el bus pare y puedas bajarte. Nunca más te olvidarás de avisar.
+
+- **Notificaciones en pantalla de bloqueo**: Para que no tengas que desbloquear el telefono para ver la información
+
+- **Detector de paradas cercanas**: Incluye un buscador de paradas que te muestra automaticamente las paradas cercanas a tu ubicación y te las situúa en un mapa
+
+- **Nombres personalizados para paradas favoritas**: Añade un nombre descriptivo a tus paradas favoritas
+
+- **Presets de cálculo de tiempo**: Calcula cada día el bus que debes cojer con datos reales y sin tener que rellenar el formulario cada vez.
+
+- **Mapa satelital de paradas + Street View**: Para que sepas llegar a una parada qu eno te es conocida
+
+- **Noticias locales + tiempo y temperatura** Para que te entretengas durante el trayecto
+
+- **Actualizador integrado y compatibilidad con Obtainium**: Próximamente en la PLay Store (cuando cumpla 18 años, jeje)
+
+- **Español e inglés**: Para que los extranjeros tengan una app que usar que esté en el idioma internacional y que no sea la incómoda oficial
+---
 
 ## Especificaciones y análisis de la API
 
