@@ -1,6 +1,6 @@
 # Coruña Bus
 
-![Coruña Bus Banner](https://coruñabus.inled.es/logo.png)
+![Coruña Bus Banner](/public/corunabus.svg)
 
 > La app de los buses creada por quien usa el bus diariamente. Lo que necesitas, lo tiene
 
@@ -120,8 +120,6 @@ Con Capacitor se genera el APK de la app; el `server.url` de `capacitor.config.j
 
 ## Aviso legal
 
-Coruña Bus es una aplicación independiente de carácter informativo. No tiene relación oficial con la Compañía de Tranvías de La Coruña ni con el Ayuntamiento de A Coruña. Los datos se ofrecen "tal cual" para facilitar la movilidad urbana.
-
-Desarrollado para los ciudadanos de A Coruña.
-
+Los datos se obtienen a través de un endpoint abierto de los servidores de iTranvías, no se scrapea nada ni se hace nada ilegal. Respetamos el rate limiting de los servidores de iTranvías.  
+No asociado con la Compañía de Tranvías de La Coruña SA ni el Ayuntamiento.  
 <!-- build counter bump -->
