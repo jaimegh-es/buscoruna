@@ -29,7 +29,7 @@ export const storage = {
     const data = localStorage.getItem('favorite_routes');
     return data ? JSON.parse(data) : [];
   },
-  toggleFavoriteRoute: (originId: number, destId: number, lineId: number, lineName: string) => {
+  toggleFavoriteRoute: (originId: number, destId: number, lineId: number, lineName: string, plannerMode?: string, targetTime?: string | null) => {
     const favs = storage.getFavoriteRoutes();
     const routeId = `${originId}-${destId}-${lineId}`;
     const index = favs.findIndex((f: any) => f.routeId === routeId);
@@ -43,6 +43,10 @@ export const storage = {
         destId,
         lineId,
         lineName,
+        // Optional planning metadata saved when the favorite comes from the
+        // planner: the bus to board is chosen live against this goal.
+        plannerMode: plannerMode || 'now',
+        targetTime: targetTime || null,
         createdAt: new Date().toISOString()
       });
     }
@@ -182,19 +186,33 @@ export const storage = {
   getActiveLocationId: (): string => {
     const saved = localStorage.getItem('buscoruna_active_location_id');
     const locs = storage.getUserLocations();
+    // Empty value means the user explicitly deselected the current place.
+    if (saved === '' || saved === 'none') return '';
     if (saved && locs.some(l => l.id === saved)) return saved;
     return locs[0]?.id || 'casa';
   },
 
   setActiveLocationId: (id: string) => {
     localStorage.setItem('buscoruna_active_location_id', id);
+    // A non-empty selection made by the user (or GPS) — record how it came to be
+    // so the walk-times selector can tell geo-detected from manual places.
+    localStorage.setItem('buscoruna_active_location_source', id ? 'manual' : 'none');
     window.dispatchEvent(new CustomEvent('active-location-changed', { detail: id }));
   },
 
-  getActiveLocation: (): { id: string; name: string; icon: string; lat?: number; lon?: number } => {
+  // How the current active location was selected:
+  // 'geo' (auto-detected by geolocation), 'manual' (user picked it) or 'none'.
+  getActiveLocationSource: (): 'geo' | 'manual' | 'none' => {
+    if (!storage.getActiveLocationId()) return 'none';
+    const src = localStorage.getItem('buscoruna_active_location_source') || 'manual';
+    return src === 'geo' ? 'geo' : (src === 'none' ? 'none' : 'manual');
+  },
+
+  getActiveLocation: (): { id: string; name: string; icon: string; lat?: number; lon?: number } | null => {
     const activeId = storage.getActiveLocationId();
+    if (!activeId) return null;
     const locs = storage.getUserLocations();
-    return locs.find(l => l.id === activeId) || locs[0] || { id: 'casa', name: 'Casa', icon: 'home' };
+    return locs.find(l => l.id === activeId) || null;
   },
 
   // Auto-detect if user is close to one of their configured locations
@@ -233,6 +251,8 @@ export const storage = {
       if (storage.getActiveLocationId() !== closestLoc.id) {
         storage.setActiveLocationId(closestLoc.id);
       }
+      // Mark this selection as GPS-detected so the UI can show it.
+      localStorage.setItem('buscoruna_active_location_source', 'geo');
       return closestLoc;
     }
     return null;
@@ -294,6 +314,7 @@ export const storage = {
       'buscoruna_user_locations',
       'buscoruna_stop_walk_times',
       'buscoruna_active_location_id',
+      'buscoruna_active_location_source',
       'buscoruna_gps_alert_enabled',
       'buscoruna_eta_alert_enabled',
       'buscoruna_eta_alert_threshold',

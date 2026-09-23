@@ -8,15 +8,15 @@ const t = getTranslations(lang);
 ---
 
 <Layout title={`${t.appName} | ${t.bottomNavHome}`}>
-    <div class="home-dashboard">
+    <div class="home-dashboard anim-stagger">
         <section class="welcome-section">
             <div class="welcome-header">
                 <div class="welcome-text">
                     <h2>{t.homeHello}</h2>
                     <p>{t.homeWhatToDo}</p>
                 </div>
-                <div id="weather-widget" class="weather-widget loading">
-                    <div class="spinner-small"></div>
+                <div id="weather-widget" class="weather-widget anim-up" style="min-height:72px; padding:0.5rem;">
+                    <div class="skeleton skeleton-card" style="height:60px; width:100%;"></div>
                 </div>
             </div>
         </section>
@@ -47,9 +47,9 @@ const t = getTranslations(lang);
                 <a href="/favorites" class="view-all">{t.homeViewAll}</a>
             </div>
             <div id="favorites-summary" class="favorites-summary">
-                <div class="loading-simple">
-                    <div class="spinner-small"></div>
-                    <span>{t.homeLoadingFavorites}</span>
+                <div class="loading-state">
+                  <div class="loading">{t.homeLoadingFavorites}</div>
+                  <div class="skeleton-stack" aria-hidden="true"><div class="skeleton skeleton-card" style="height:58px"></div><div class="skeleton skeleton-card" style="height:58px"></div><div class="skeleton skeleton-card" style="height:58px"></div></div>
                 </div>
             </div>
         </section>

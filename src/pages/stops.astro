@@ -23,6 +23,12 @@ const t = getTranslations(lang);
 
 	  <div id="nearby-map-wrap" class="nearby-map-wrap">
 	    <div id="nearby-map" style="height: 250px; border-radius: 12px; z-index: 1;"></div>
+    <div id="nearby-map-loading" class="map-loading-overlay" style="display:flex;">
+      <div class="skeleton-stack" aria-hidden="true" style="width:80%; gap:0.6rem;">
+        <div class="skeleton skeleton-card" style="height:100px;"></div>
+        <div class="skeleton skeleton-card" style="height:100px;"></div>
+      </div>
+    </div>
 	    <button id="expand-map-btn" class="map-overlay-btn" title={t.mapExpand}>
 	      <Icon name="maximize" size={18} />
 	    </button>
@@ -32,7 +38,16 @@ const t = getTranslations(lang);
 	  </div>
 
 	  <div id="stops-container">
-	    <div class="loading">{t.stopsLoadingText}</div>
+	    <div class="loading-state">
+	      <div class="loading">${t.stopsSearchingLoc}</div>
+	      <div class="skeleton-stack" aria-hidden="true">
+	        <div class="skeleton skeleton-card"></div>
+	        <div class="skeleton skeleton-card"></div>
+	        <div class="skeleton skeleton-card"></div>
+	        <div class="skeleton skeleton-card"></div>
+	        <div class="skeleton skeleton-card"></div>
+	      </div>
+	    </div>
 	  </div>
 	</section>
 
@@ -56,7 +71,15 @@ const t = getTranslations(lang);
 	    const container = document.getElementById('stops-container');
 	    if (!container) return;
 
-	    container.innerHTML = `<div class="loading">${t.stopsSearchingLoc}</div>`;
+	    const loadingMapEl = document.getElementById('nearby-map-loading');
+	    if (loadingMapEl) loadingMapEl.style.display = 'flex';
+
+	    container.innerHTML = `<div class="loading-state">
+        <div class="loading">${t.stopsSearchingLoc}</div>
+        <div class="skeleton-stack" aria-hidden="true">
+          ${Array(5).fill('').map(() => `<div class="skeleton skeleton-card"></div>`).join('')}
+        </div>
+      </div>`;
 
 	    const pos = await getPosition();
 	    if (pos) {
@@ -68,16 +91,19 @@ const t = getTranslations(lang);
 	  }
 
 	  function initMap(lat: number, lon: number) {
-	    if (!map) {
-	      // @ts-ignore
+      if (!map) {
+        // @ts-ignore
 	      map = L.map('nearby-map').setView([lat, lon], 16);
-	      // @ts-ignore
+        // @ts-ignore
 	      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 	        attribution: '© OSM'
 	      }).addTo(map);
-	    } else {
-	      map.setView([lat, lon], 16);
-	    }
+      } else {
+	        map.setView([lat, lon], 16);
+	      }
+
+	    const loadingEl = document.getElementById('nearby-map-loading');
+	    if (loadingEl) loadingEl.style.display = 'none';
 
 	    if (userMarker) userMarker.remove();
 	    // @ts-ignore
@@ -97,7 +123,12 @@ const t = getTranslations(lang);
       const hint = document.getElementById('search-results-count')!;
 
 	    if (!catalog || !catalog.paradas) {
-	      container.innerHTML = `<p class="loading-small">${t.stopsCatalogLoading}</p>`;
+	      container.innerHTML = `<div class="loading-state">
+        <div class="loading">${t.stopsCatalogLoading}</div>
+        <div class="skeleton-stack" aria-hidden="true">
+          ${Array(5).fill('').map(() => `<div class="skeleton skeleton-card"></div>`).join('')}
+        </div>
+      </div>`;
 	      return;
 	    }
 
@@ -139,7 +170,7 @@ const t = getTranslations(lang);
 	      .slice(0, 20);
 
 container.innerHTML = `
-      <div class="stops-list">
+      <div class="stops-list anim-stagger">
         ${nearby.map((s: any, index) => {
           const hasLines = (Array.isArray(s.enlaces) ? s.enlaces : []).some((lId: any) => !!lineMap[lId]);
           const noLinesClass = hasLines ? '' : 'stop-no-lines';

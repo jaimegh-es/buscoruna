@@ -11,7 +11,14 @@ const t = getTranslations(lang);
 	<section class="favorites-page">
     <h2>{t.favsPageTitle}</h2>
     <div id="favorites-container">
-      <div class="loading">{t.favsLoadingFavs}</div>
+      <div class="loading-state">
+        <div class="loading">{t.favsLoadingFavs}</div>
+        <div class="skeleton-stack" aria-hidden="true">
+          <div class="skeleton skeleton-card" style="height:58px"></div>
+          <div class="skeleton skeleton-card" style="height:58px"></div>
+          <div class="skeleton skeleton-card" style="height:58px"></div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -69,7 +76,7 @@ const t = getTranslations(lang);
         const stopNames = storage.getStopNames();
         html += `
           <h3 class="section-title">${t.favsStops}</h3>
-          <div class="stops-list">
+          <div class="stops-list anim-stagger">
             ${favIds.map(id => {
               const s = catalog.paradas[id];
               if (!s) return '';
@@ -104,20 +111,31 @@ const t = getTranslations(lang);
       if (favRoutes.length > 0) {
         html += `
           <h3 class="section-title mt-2">${t.favsRoutes}</h3>
-          <div class="routes-list">
+          <div class="routes-list anim-stagger">
             ${favRoutes.map(r => {
               const origin = catalog.paradas[r.originId];
               const dest = catalog.paradas[r.destId];
               const line = lines.find((l: any) => l.id === r.lineId);
               const color = line ? `#${line.color}` : 'var(--primary)';
+
+              // The stop view uses these params to highlight today's bus to
+              // board that fulfils the favorite (dest + optional target time).
+              // La vista de parada usa estos parámetros para resaltar hoy el
+              // bus a coger que cumple el favorito (destino + hora opcional).
+              const rParams = new URLSearchParams();
+              rParams.set('dest', String(r.destId));
+              rParams.set('line', String(r.lineId));
+              if (r.plannerMode) rParams.set('mode', r.plannerMode);
+              if (r.targetTime) rParams.set('time', r.targetTime);
+              const rHref = `/stop/${r.originId}?${rParams.toString()}`;
               
               return `
-                <a href="/stop/${r.originId}" class="card route-fav-card favorite-route-link" style="--line-color: ${color}" data-dest="${r.destId}">
+                <a href="${rHref}" class="card route-fav-card favorite-route-link" style="--line-color: ${color}" data-dest="${r.destId}">
                   <div class="route-fav-header">
                     <span class="line-badge-small" style="background-color: ${color}">${r.lineName}</span>
                     <div class="route-fav-text">
                       <strong>${origin?.nombre || (lang === 'en' ? 'Origin' : 'Origen')} &rarr; ${dest?.nombre || (lang === 'en' ? 'Destination' : 'Destino')}</strong>
-                      <small>${lang === 'en' ? 'From stop' : 'Desde parada'} ${r.originId}</small>
+                      <small>${lang === 'en' ? 'From stop' : 'Desde parada'} ${r.originId}${r.plannerMode === 'arrive' && r.targetTime ? ` • 🕒 ${lang === 'en' ? 'Arrive at' : 'Llegar a las'} ${r.targetTime}` : ''}</small>
                     </div>
                   </div>
                   <div class="stop-arrow"><i data-lucide="chevron-right"></i></div>
@@ -133,7 +151,7 @@ const t = getTranslations(lang);
       if (favPlannerRoutes.length > 0) {
         html += `
           <h3 class="section-title mt-2">${t.favsPlanner}</h3>
-          <div class="routes-list">
+          <div class="routes-list anim-stagger">
             ${favPlannerRoutes.map(r => {
               const originName = r.origin.nombre;
               const destName = r.destination.nombre;

@@ -4,6 +4,16 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Crear release (bump de versión + APK)"
+        type: boolean
+        required: false
+        default: false
+      version:
+        description: "Versión exacta opcional (ej: 1.2 o 1.2.0). Vacío = bump de patch."
+        type: string
+        required: false
 
 jobs:
   build:
@@ -13,52 +23,107 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Solo se genera release/APK si el commit contiene "[RELEASE]".
+      #   "[RELEASE]"          -> bump de patch (0.0.3 -> 0.0.4)
+      #   "[RELEASE][1.2]"     -> versión 1.2.0
+      #   "[RELEASE][2.3.4]"   -> versión 2.3.4 exacta
+      # El despliegue web (worker de Cloudflare) es manual y no depende de esto.
+      - name: Detectar release ([RELEASE] en el commit)
+        id: release
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ github.event.inputs.release }}" = "true" ]; then
+              if [ -n "${{ github.event.inputs.version }}" ]; then
+                node .github/scripts/release.mjs set "${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+              else
+                echo "[RELEASE] (manual)" | node .github/scripts/release.mjs detect >> "$GITHUB_OUTPUT"
+              fi
+            else
+              echo "released=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            BEFORE="${{ github.event.before }}"
+            if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+              git log -1 --format=%s | node .github/scripts/release.mjs detect >> "$GITHUB_OUTPUT"
+            else
+              git log --format=%s "$BEFORE..${{ github.sha }}" | node .github/scripts/release.mjs detect >> "$GITHUB_OUTPUT"
+            fi
+          fi
+          cat "$GITHUB_OUTPUT"
+
+      - name: Bump de versión y push (solo en release)
+        if: steps.release.outputs.released == 'true'
+        run: |
+          node .github/scripts/release.mjs apply "${{ steps.release.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "chore(release): v${{ steps.release.outputs.version }} [skip ci]"
+          git push origin HEAD:main
+          git fetch origin
+          git reset --hard origin/main
+          node -p "require('./package.json').version"
 
       - uses: actions/setup-node@v4
+        if: steps.release.outputs.released == 'true'
         with:
           node-version: 22
           cache: npm
 
       - uses: actions/setup-java@v4
+        if: steps.release.outputs.released == 'true'
         with:
           distribution: temurin
           java-version: 21
 
       - name: Install dependencies
+        if: steps.release.outputs.released == 'true'
         run: npm ci
 
       - name: Build web assets
+        if: steps.release.outputs.released == 'true'
         run: npm run build
 
       - name: Sync Capacitor
+        if: steps.release.outputs.released == 'true'
         run: |
           touch dist/client/index.html
           npx cap sync android
 
       - name: Set versionCode to GitHub run number (enables auto-update comparison)
+        if: steps.release.outputs.released == 'true'
         run: |
           FILE=android/app/build.gradle
           sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/" "$FILE"
           grep versionCode "$FILE"
 
       - name: Make gradlew executable
+        if: steps.release.outputs.released == 'true'
         run: chmod +x android/gradlew
 
       - name: Build debug APK
+        if: steps.release.outputs.released == 'true'
         working-directory: android
         run: ./gradlew assembleDebug
 
       - name: Read app version
         id: version
+        if: steps.release.outputs.released == 'true'
         run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
       - name: Set versionName to app version (keeps in-app changelog/version aligned with releases)
+        if: steps.release.outputs.released == 'true'
         run: |
           FILE=android/app/build.gradle
           sed -i 's/versionName "[^"]*"/versionName "${{ steps.version.outputs.version }}"/' "$FILE"
           grep versionName "$FILE"
 
       - name: Upload APK artifact
+        if: steps.release.outputs.released == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: coruna-bus-debug-apk
@@ -69,7 +134,7 @@ jobs:
         # detect and download newer APKs (auto-update).
         # Release etiquetado con la versión; la app consulta este endpoint para
         # detectar y descargar APKs nuevos (auto-actualización).
-        if: github.ref == 'refs/heads/main'
+        if: steps.release.outputs.released == 'true' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}-${{ github.run_number }}

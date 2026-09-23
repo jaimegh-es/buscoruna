@@ -8,8 +8,13 @@ const t = getTranslations(lang);
 ---
 
 <Layout title={`${t.stopDetailTitle} - Coruña Bus`}>
-  <section class="stop-detail-page">
-    <div id="stop-header" class="card">
+  <section class="stop-detail-page anim-stagger">
+    <div id="stop-header" class="card anim-up">
+      <div id="header-loading" class="loading-state" style="padding:0.6rem 0;">
+        <div class="loading">{t.stopDetailLoading}</div>
+        <div class="skeleton-stack" aria-hidden="true"><div class="skeleton skeleton-card" style="height:60px"></div></div>
+      </div>
+      <div id="header-real" style="display:none">
       <div class="header-main">
         <div class="stop-id-badge" id="display-stop-id">...</div>
         <h2 id="display-stop-name">{t.stopDetailLoading}</h2>
@@ -20,10 +25,12 @@ const t = getTranslations(lang);
         </button>
       </div>
       <p id="display-stop-address" class="text-muted"></p>
+      </div>
     </div>
 
-    <div id="stop-map-container" class="map-container">
+    <div id="stop-map-container" class="map-container anim-up">
       <div id="stop-map" style="height: 250px; border-radius: 12px; z-index: 1;"></div>
+      <div id="stop-map-loading" class="map-loading-overlay" style="display:none"><span>Consultando mapa…</span></div>
       <div class="map-actions">
         <button id="expand-stop-map" class="map-btn" title={t.mapExpand}>
           <Icon name="maximize" size={20} />
@@ -45,8 +52,15 @@ const t = getTranslations(lang);
 
     <div id="eta-container">
       <h3>{t.stopDetailNextBuses}</h3>
-      <div id="eta-list" class="grid-list">
-        <div class="loading">{t.stopDetailCheckingTimes}</div>
+      <div id="eta-list" class="grid-list anim-stagger">
+        <div class="loading-state">
+          <div class="loading">{t.stopDetailCheckingTimes}</div>
+          <div class="skeleton-stack" aria-hidden="true">
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -61,6 +75,13 @@ const t = getTranslations(lang);
       <div class="modal-content card">
         <h3>{t.stopDetailWhereTo}</h3>
         <p class="text-muted small">{t.stopDetailSelectDest}</p>
+        <button type="button" id="btn-alert-only" class="alert-only-option">
+          <span class="alert-only-icon"><i data-lucide="bell" style="width: 18px; height: 18px;"></i></span>
+          <span class="alert-only-text">
+            <strong>{t.stopDetailAlertOnly}</strong>
+            <small>{t.stopDetailAlertOnlyDesc}</small>
+          </span>
+        </button>
         <div id="stops-list-modal" class="modal-list"></div>
         <button id="close-modal" class="btn-secondary mt-1">{t.stopDetailCancel}</button>
       </div>
@@ -93,6 +114,7 @@ const t = getTranslations(lang);
             </button>
           </div>
           <div class="walk-loc-pills" id="walk-loc-pills"></div>
+          <div class="walk-loc-status" id="walk-loc-status" style="display: none;"></div>
         </div>
 
         <div class="walk-time-control-panel" id="walk-time-control-panel" style="display: none;">
@@ -134,9 +156,10 @@ const t = getTranslations(lang);
     import { storage } from '../../utils/storage';
     import { inAppAlert } from '../../utils/inAppAlert';
     import { getPosition, isNativePlatform } from '../../utils/geolocation';
+    import { Geolocation } from '@capacitor/geolocation';
     import { API, isApiCooldownActive } from '../../services/api';
     import { tracking } from '../../utils/tracking';
-    import { createIcons, Star, Navigation, Map, LocateFixed, Bell, Home, Briefcase, MapPin, Plus, Minus, Clock, Trash2, ChevronDown, Check, Settings } from 'lucide';
+    import { createIcons, Star, Navigation, Map, LocateFixed, Bell, Home, Briefcase, MapPin, Plus, Minus, Clock, Trash2, ChevronDown, Check, Settings, Crosshair, CircleSlash } from 'lucide';
     import { getTranslations } from '../../utils/i18n';
     import { requestBgAlertPermission } from '../../utils/backgroundAlerts';
 
@@ -160,6 +183,18 @@ const t = getTranslations(lang);
     let watchId: any = null;
     let guidanceLine: any = null;
     let etaInterval: any = null;
+
+    // "Coge el bus" suggestion coming from a planner favorite (line/dest +
+    // optional arrive-at time). favourites.astro passes it via query params.
+    // Sugerencia de bus a coger procedente de un favorito del planificador.
+    let suggestion: {
+      lineId: number | null;
+      destId: number | null;
+      mode: string;
+      targetTime: string | null;
+    } | null = null;
+    // Live ETA at the favourite destination stop per bus id (func=0), cached.
+    let destEtaCache: { destId: number; asOf: number; etaByBus: Record<string, number> } | null = null;
 
     function findStop(cat: any, id: number | string) {
       if (!cat || !cat.paradas) return null;
@@ -279,7 +314,9 @@ const t = getTranslations(lang);
           Trash2,
           ChevronDown,
           Check,
-          Settings
+          Settings,
+          Crosshair,
+          CircleSlash
         }
       });
     }
@@ -340,6 +377,20 @@ const t = getTranslations(lang);
         }, { once: true });
       }
 
+      // Favorite suggestion from the planner: highlight the concrete bus to
+      // board today so the favourite's plan is fulfilled.
+      // Sugerencia de favorito del planificador: resaltar hoy el bus a coger.
+      const hintLine = urlParams.get('line');
+      const hintDest = urlParams.get('dest');
+      if (hintLine && hintDest) {
+        suggestion = {
+          lineId: parseInt(hintLine),
+          destId: parseInt(hintDest),
+          mode: urlParams.get('mode') || 'now',
+          targetTime: urlParams.get('time'),
+        };
+      }
+
       fetchETAs();
       restartEtaRefresh();
 
@@ -347,12 +398,18 @@ const t = getTranslations(lang);
         fetchETAs();
       });
 
+      window.addEventListener('tracking-updated', () => applyTrackingHighlight());
+
       document.getElementById('close-modal')?.addEventListener('click', () => {
         document.getElementById('destination-modal')!.style.display = 'none';
       });
     }
 
     function renderStopInfo() {
+      const loadEl = document.getElementById('header-loading');
+      const realEl = document.getElementById('header-real');
+      if (loadEl) loadEl.style.display = 'none';
+      if (realEl) realEl.style.display = '';
       const catalog = storage.getCatalog();
       const customNames = storage.getStopNames();
       const alias = customNames[String(stopId)];
@@ -375,6 +432,8 @@ const t = getTranslations(lang);
     }
 
     function initMap() {
+      const loadEl = document.getElementById('stop-map-loading');
+      if (loadEl) loadEl.style.display = 'none';
       if (!map && stopData) {
         // @ts-ignore
         map = L.map('stop-map', { zoomControl: false }).setView([stopData.posy, stopData.posx], 17);
@@ -411,45 +470,44 @@ const t = getTranslations(lang);
       });
 
       locateBtn?.addEventListener('click', () => {
-        if (navigator.geolocation) {
-          if (watchId) {
-            navigator.geolocation.clearWatch(watchId);
-            watchId = null;
-            if (userMarker) userMarker.remove();
-            if (guidanceLine) guidanceLine.remove();
-            locateBtn.classList.remove('active');
-            return;
+        if (watchId) {
+          Geolocation.clearWatch({ id: watchId as string }).catch(() => {});
+          watchId = null;
+          if (userMarker) userMarker.remove();
+          if (guidanceLine) guidanceLine.remove();
+          locateBtn.classList.remove('active');
+          return;
+        }
+
+        locateBtn.classList.add('active');
+        Geolocation.watchPosition({ enableHighAccuracy: true, timeout: 10000 }, (pos: any) => {
+          if (!pos || !pos.coords) return;
+          const { latitude, longitude, heading } = pos.coords;
+          const latlng = [latitude, longitude];
+
+          if (!userMarker) {
+            // @ts-ignore
+            const userIcon = L.divIcon({
+              className: 'user-location-marker',
+              html: `<div class="marker-container"><div class="marker-dot"></div><div class="marker-arrow" style="transform: rotate(${heading || 0}deg)"></div></div>`,
+              iconSize: [30, 30],
+              iconAnchor: [15, 15]
+            });
+            // @ts-ignore
+            userMarker = L.marker(latlng, { icon: userIcon }).addTo(map);
+          } else {
+            userMarker.setLatLng(latlng);
+            const arrow = document.querySelector('.marker-arrow') as HTMLElement;
+            if (arrow && heading !== null) arrow.style.transform = `rotate(${heading}deg)`;
           }
 
-          locateBtn.classList.add('active');
-          watchId = navigator.geolocation.watchPosition((pos) => {
-            const { latitude, longitude, heading } = pos.coords;
-            const latlng = [latitude, longitude];
-
-            if (!userMarker) {
-              // @ts-ignore
-              const userIcon = L.divIcon({
-                className: 'user-location-marker',
-                html: `<div class="marker-container"><div class="marker-dot"></div><div class="marker-arrow" style="transform: rotate(${heading || 0}deg)"></div></div>`,
-                iconSize: [30, 30],
-                iconAnchor: [15, 15]
-              });
-              // @ts-ignore
-              userMarker = L.marker(latlng, { icon: userIcon }).addTo(map);
-            } else {
-              userMarker.setLatLng(latlng);
-              const arrow = document.querySelector('.marker-arrow') as HTMLElement;
-              if (arrow && heading !== null) arrow.style.transform = `rotate(${heading}deg)`;
-            }
-
-            updateGuidanceLine(latitude, longitude);
-            // @ts-ignore
-            map.panTo(latlng);
-          }, (err) => {
-            console.error(err);
-            locateBtn.classList.remove('active');
-          }, { enableHighAccuracy: true });
-        }
+          updateGuidanceLine(latitude, longitude);
+          // @ts-ignore
+          map.panTo(latlng);
+        }, (err: any) => {
+          console.error(err);
+          locateBtn.classList.remove('active');
+        }).then((id: any) => { watchId = id; }).catch(() => {});
       });
     }
 
@@ -497,11 +555,8 @@ const t = getTranslations(lang);
                       <span class="time-unit">min</span>
                     </div>
                     ${l.buses[0]?.bus ? `
-                      <button class="btn-track-subtle" data-bus="${l.buses[0].bus}" data-line="${l.linea}" title="${lang === 'en' ? 'Board this bus (GPS)' : 'Subir a este bus (GPS)'}">
+                      <button class="btn-track-subtle" data-bus="${l.buses[0].bus}" data-line="${l.linea}" title="${t.stopDetailTrackTitle}">
                         <i data-lucide="navigation" style="width: 18px; height: 18px;"></i>
-                      </button>
-                      <button class="btn-bell-subtle" data-bus="${l.buses[0].bus}" data-line="${l.linea}" title="${lang === 'en' ? 'Arrival Alert (Bell)' : 'Aviso de llegada (Campana)'}">
-                        <i data-lucide="bell" style="width: 18px; height: 18px;"></i>
                       </button>
                     ` : ''}
                   </div>
@@ -518,11 +573,8 @@ const t = getTranslations(lang);
                         <div class="extra-bus-right">
                           <span class="extra-time"><strong>${b.tiempo}</strong> min</span>
                           ${b.bus ? `
-                            <button class="btn-track-subtle-small" data-bus="${b.bus}" data-line="${l.linea}" title="${lang === 'en' ? 'GPS Tracking' : 'Seguimiento GPS'}">
+                            <button class="btn-track-subtle-small" data-bus="${b.bus}" data-line="${l.linea}" title="${t.stopDetailTrackTitle}">
                               <i data-lucide="navigation" style="width: 14px; height: 14px;"></i>
-                            </button>
-                            <button class="btn-bell-subtle-small" data-bus="${b.bus}" data-line="${l.linea}" title="${lang === 'en' ? 'Arrival Alert' : 'Aviso de llegada'}">
-                              <i data-lucide="bell" style="width: 14px; height: 14px;"></i>
                             </button>
                           ` : ''}
                         </div>
@@ -552,8 +604,8 @@ const t = getTranslations(lang);
             });
           });
 
-          // Add track button listeners (GPS route following)
-          // Agregar oyentes de eventos a los botones de seguimiento (ruta GPS)
+          // Add a single unified tracking button (arrival alert + route tracking)
+          // Un único botón de seguimiento (aviso de llegada + seguimiento de ruta)
           container.querySelectorAll('.btn-track-subtle, .btn-track-subtle-small').forEach(btn => {
             btn.addEventListener('click', (e) => {
               e.stopPropagation();
@@ -563,6 +615,7 @@ const t = getTranslations(lang);
               const currentTargetId = tracking.getTargetDestination();
               
               let isValidTarget = false;
+              let plannedRoute: any = null;
               if (currentTargetId) {
                  const line = catalog.actualizacion.lineas.find(l => l.id === lineId);
                  if (line) {
@@ -570,14 +623,17 @@ const t = getTranslations(lang);
                     if (route) {
                        const cIdx = route.paradas.indexOf(stopId);
                        const tIdx = route.paradas.indexOf(currentTargetId);
-                       if (tIdx > cIdx) isValidTarget = true;
+                       if (tIdx > cIdx) {
+                         isValidTarget = true;
+                         plannedRoute = route;
+                       }
                     }
                  }
               }
 
               if (isValidTarget && currentTargetId) {
                 pendingTracking = { busId, lineId };
-                startTracking(currentTargetId);
+                startTracking(currentTargetId, { planned: true });
                 tracking.clearTargetDestination();
               } else {
                 openDestinationSelector(busId, lineId);
@@ -585,53 +641,13 @@ const t = getTranslations(lang);
             });
           });
 
-          // Add bell button listeners (ETA arrival / departure warning at current stop)
-          // Agregar oyentes de eventos a los botones de campana (aviso de llegada o salida en la parada actual)
-          container.querySelectorAll('.btn-bell-subtle, .btn-bell-subtle-small').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-              e.stopPropagation();
-              const busId = btn.getAttribute('data-bus')!;
-              const lineId = parseInt(btn.getAttribute('data-line')!);
-              
-              // Enable ETA alerts in localStorage
-              // Activar la alerta de ETA en el almacenamiento local
-              localStorage.setItem('buscoruna_eta_alert_enabled', 'true');
-              
-              // Set tracking info: target current stop as destination
-              // Configurar la información de seguimiento: parada actual como origen y destino
-              tracking.set({
-                busId: busId,
-                lineId: lineId,
-                destinationStopId: stopId,
-                originStopId: stopId,
-                lastEta: null,
-                arrivalTime: null
-              });
-              
-              const activeLoc = storage.getActiveLocation();
-              const walkTime = storage.getStopWalkingTime(stopId, activeLoc.id);
-              const threshold = parseInt(localStorage.getItem('buscoruna_eta_alert_threshold') || '0');
-              
-              // Request notification permissions immediately if not granted
-              requestBgAlertPermission().catch(() => {});
-              
-              let noticeMsg = '';
-              if (walkTime && walkTime > 0) {
-                noticeMsg = lang === 'en'
-                  ? `⏰ Departure alert activated! We will notify you ${walkTime} min before so you leave ${activeLoc.name} on time for bus ${busId}.`
-                  : `⏰ ¡Aviso de salida activado! Te avisaremos cuando falten ${walkTime} min para que salgas de ${activeLoc.name} a tiempo para el bus ${busId}.`;
-              } else {
-                const thresholdText = threshold === 0 
-                  ? (lang === 'en' ? 'is arriving' : 'está llegando') 
-                  : (lang === 'en' ? `${threshold} min or less remain` : `queden ${threshold} min o menos`);
-                noticeMsg = lang === 'en' 
-                  ? `🔔 Arrival alert activated! We will notify you when bus ${busId} is at ${thresholdText} from this stop.` 
-                  : `🔔 ¡Aviso de llegada activado! Te avisaremos cuando el autobús ${busId} esté a ${thresholdText} de esta parada.`;
-              }
-              
-              inAppAlert(noticeMsg, { durationMs: 8000 });
-            });
-          });
+          // Mark the bus/line currently being tracked (highlight survives re-renders).
+          // Marcar el bus/línea en seguimiento (el resaltado sobrevive a re-renderizados).
+          applyTrackingHighlight(container);
+
+          // Highlight today's bus to board to fulfil a planner favourite.
+          // Resaltar hoy el bus a coger para cumplir un favorito del planificador.
+          await applyRecommendedBus(container, data.buses.lineas);
 
         } else {
           container.innerHTML = `<div class="empty-state-small">${lang === 'en' ? 'No upcoming buses at this moment.' : 'No hay buses próximos en este momento.'}</div>`;
@@ -640,6 +656,171 @@ const t = getTranslations(lang);
         console.error('ETA fetch error:', err);
         container.innerHTML = `<div class="error">${lang === 'en' ? 'Error connecting to the server.' : 'Error al conectar con el servidor.'}</div>`;
         startCooldown();
+      }
+    }
+
+    // Mark the button (and card) of the bus/line currently being tracked for
+    // this stop. Re-applied after every render and on tracking changes.
+    // Marcar el botón (y la tarjeta) del bus/línea en seguimiento para esta
+    // parada. Se re-aplica tras cada renderizado y al cambiar el seguimiento.
+    function applyTrackingHighlight(root?: HTMLElement) {
+      const el = root || document.getElementById('eta-list');
+      if (!el) return;
+      const info = tracking.get();
+      const tracked = info && String(info.originStopId) === String(stopId);
+      el.querySelectorAll('.eta-card').forEach((card: any) => {
+        const btn = card.querySelector('.btn-track-subtle, .btn-track-subtle-small');
+        const active = !!tracked && !!btn &&
+          btn.getAttribute('data-bus') === info.busId &&
+          String(btn.getAttribute('data-line')) === String(info.lineId);
+        card.classList.toggle('is-tracked', active);
+        btn?.classList.toggle('tracking-active', active);
+        if (btn && active) {
+          const color = (card as HTMLElement).style.getPropertyValue('--line-color') || '#3b82f6';
+          btn.style.background = color;
+          btn.style.borderColor = color;
+          btn.style.color = '#fff';
+        } else if (btn) {
+          btn.style.background = '';
+          btn.style.borderColor = '';
+          btn.style.color = '';
+        }
+      });
+    }
+
+    // Highlight the concrete bus to board to fulfil a planner favourite
+    // (line + destination + optional "arrive at" target time), recomputed on
+    // every refresh from today's live predictions: live ETA at the destination
+    // stop when known (func=0), else a per-stop estimate. Mirrors the
+    // planner's "recommended bus" logic (latest bus that still arrives on
+    // time; otherwise the next bus).
+    // Resalta el bus concreto a coger para cumplir un favorito guardado desde
+    // el planificador: ETA en vivo en la parada destino si se conoce, si no
+    // estimación por parada. Mismo criterio que el planificador.
+    async function applyRecommendedBus(container: HTMLElement, lineas: any[]) {
+      if (!suggestion || !suggestion.lineId || !suggestion.destId) return;
+      try {
+        const sugLineId = suggestion.lineId;
+        const lineArr = lineas.find((l: any) => l.linea.toString() === sugLineId.toString());
+        if (!lineArr || !Array.isArray(lineArr.buses) || lineArr.buses.length === 0) return;
+
+        // Live ETA at the favourite destination stop per bus id, cached 60s.
+        let etaByBus: Record<string, number> = {};
+        if (!destEtaCache || destEtaCache.destId !== suggestion.destId || Date.now() - destEtaCache.asOf > 60000) {
+          if (!isApiCooldownActive()) {
+            try {
+              const dData = await API.getStopArrivals(suggestion.destId);
+              etaByBus = {};
+              if (dData.resultado === 'OK' && dData.buses && Array.isArray(dData.buses.lineas)) {
+                for (const dl of dData.buses.lineas) {
+                  if (dl.linea.toString() !== sugLineId.toString()) continue;
+                  for (const db of (dl.buses || [])) {
+                    if (!db.bus) continue;
+                    let tt = typeof db.tiempo === 'number' ? db.tiempo : parseInt(db.tiempo);
+                    if (isNaN(tt)) tt = -1;
+                    etaByBus[db.bus.toString()] = tt;
+                  }
+                }
+              }
+              destEtaCache = { destId: suggestion.destId, asOf: Date.now(), etaByBus };
+            } catch {
+              destEtaCache = { destId: suggestion.destId, asOf: Date.now(), etaByBus };
+            }
+          }
+        } else {
+          etaByBus = destEtaCache.etaByBus;
+        }
+
+        // Stops between the current stop and the favourite destination.
+        let stopsBetween: number | null = null;
+        const cat = storage.getCatalog();
+        const lineMeta = cat?.actualizacion?.lineas?.find((l: any) => l.id.toString() === sugLineId.toString());
+        if (lineMeta && Array.isArray(lineMeta.rutas)) {
+          const route = lineMeta.rutas.find((r: any) => {
+            const ids = (r.paradas || []).map((p: any) => Number(p));
+            return ids.includes(Number(stopId)) && ids.includes(Number(suggestion!.destId));
+          });
+          if (route) {
+            const ids = route.paradas.map((p: any) => Number(p));
+            const ai = ids.indexOf(Number(stopId));
+            const bi = ids.indexOf(Number(suggestion!.destId));
+            if (ai !== -1 && bi !== -1 && bi > ai) stopsBetween = bi - ai;
+          }
+        }
+
+        const now = Date.now();
+        const available = lineArr.buses
+          .map((b: any) => {
+            const t = typeof b.tiempo === 'number' ? b.tiempo : parseInt(b.tiempo);
+            const originMins = isNaN(t) ? 0 : t;
+            let destMins = (b.bus ? etaByBus[b.bus.toString()] : undefined) ?? -1;
+            if (destMins < 0) {
+              destMins = originMins + (stopsBetween != null ? stopsBetween * 2.5 : 10);
+            }
+            return { busId: b.bus ? b.bus.toString() : null, arriveAt: new Date(now + destMins * 60000) };
+          })
+          .filter((x: any) => x.busId);
+        if (available.length === 0) return;
+
+        let rec: any;
+        if (suggestion.mode === 'arrive' && suggestion.targetTime) {
+          const [hh, mm] = suggestion.targetTime.split(':').map(Number);
+          const target = new Date();
+          target.setHours(hh, mm, 0, 0);
+          if (target.getTime() < now) target.setDate(target.getDate() + 1);
+          const safe = available.filter((x: any) => x.arriveAt.getTime() <= target.getTime());
+          rec = safe.length > 0
+            ? [...safe].sort((a: any, b: any) => b.arriveAt.getTime() - a.arriveAt.getTime())[0]
+            : available[0];
+        } else {
+          rec = available[0];
+        }
+        if (!rec || !rec.busId) return;
+
+        container.querySelectorAll('.eta-card').forEach((card: any) => {
+          const btn = card.querySelector('.btn-track-subtle, .btn-track-subtle-small');
+          if (!btn || btn.getAttribute('data-line') !== sugLineId.toString()) return;
+
+          const tracked = card.classList.contains('is-tracked');
+
+          // Chip with the bus to board and its estimated arrival at destination.
+          let chip = card.querySelector('.rec-chip') as HTMLElement | null;
+          if (!chip) {
+            chip = document.createElement('div');
+            chip.className = 'rec-chip';
+            const extra = card.querySelector('.eta-extra-buses');
+            if (extra) extra.parentNode?.insertBefore(chip, extra);
+            else card.appendChild(chip);
+          }
+          const etaClock = rec.arriveAt.toLocaleTimeString(
+            lang === 'en' ? 'en-US' : 'es-ES',
+            { hour: '2-digit', minute: '2-digit' },
+          );
+          chip.textContent = lang === 'en'
+            ? `✓ Board bus ${rec.busId} · Arrives ~${etaClock}`
+            : `✓ Coge el bus ${rec.busId} · Llega ~${etaClock}`;
+
+          // Ring only when this bus is not already tracked (the blue tracking
+          // highlight wins in that case). The follow button is never painted.
+          if (!tracked) card.classList.add('has-recommended');
+
+          // Expand the extra list so the recommended bus is visible and tint
+          // its row (the follow button stays untouched until pressed).
+          const extra = card.querySelector('.eta-extra-buses') as HTMLElement | null;
+          if (extra) {
+            extra.style.display = 'block';
+            card.classList.add('is-expanded');
+            extra.querySelectorAll('.extra-bus-row').forEach((row: any) => {
+              const rowBtn = row.querySelector('.btn-track-subtle-small');
+              row.classList.toggle(
+                'is-rec-bus',
+                !!rowBtn && rowBtn.getAttribute('data-bus') === rec.busId,
+              );
+            });
+          }
+        });
+      } catch (err) {
+        console.warn('applyRecommendedBus error:', err);
       }
     }
 
@@ -660,14 +841,16 @@ const t = getTranslations(lang);
       const upcomingStopIds = route.paradas.slice(currentIdx + 1);
 
       const modalList = document.getElementById('stops-list-modal')!;
+      const plannedId = tracking.getTargetDestination();
       if (upcomingStopIds.length === 0) {
         modalList.innerHTML = `<p class="text-muted">${lang === 'en' ? 'No subsequent stops on this route.' : 'No hay paradas posteriores en esta ruta.'}</p>`;
       } else {
         modalList.innerHTML = upcomingStopIds.map(sId => {
           const s = catalog.paradas[sId];
+          const isPlanned = plannedId !== null && sId === plannedId;
           return `
-            <div class="modal-list-item" data-stop="${sId}">
-              <strong>${s?.nombre || sId}</strong>
+            <div class="modal-list-item ${isPlanned ? 'planned' : ''}" data-stop="${sId}">
+              <strong>${s?.nombre || sId}${isPlanned ? ` <span class="planned-badge">✓ ${t.stopDetailPlannedBadge}</span>` : ''}</strong>
               <small>${lang === 'en' ? 'Stop' : 'Parada'} ${sId}</small>
             </div>
           `;
@@ -681,15 +864,38 @@ const t = getTranslations(lang);
         });
       }
 
+      // "Only alert me when it arrives": no destination needed.
+      // Opción "solo avísame de la llegada": no necesita destino.
+      const alertOnlyBtn = document.getElementById('btn-alert-only');
+      if (alertOnlyBtn) {
+        alertOnlyBtn.onclick = () => {
+          startTracking(stopId, { alertOnly: true });
+        };
+      }
+
       document.getElementById('destination-modal')!.style.display = 'flex';
     }
 
-    function startTracking(destStopId: number) {
+    function startTracking(destStopId: number, opts?: { planned?: boolean; alertOnly?: boolean }) {
       if (!pendingTracking) return;
+
+      const alertOnly = !!opts?.alertOnly;
 
       localStorage.setItem('buscoruna_gps_alert_enabled', 'true');
       localStorage.setItem('buscoruna_eta_alert_enabled', 'true');
       requestBgAlertPermission().catch(() => {});
+
+      // Snapshot the walking head-start from the active saved location (which
+      // may have been auto-detected by geolocation) so the unified flow can
+      // alert the user with enough time to leave.
+      const activeLocId = storage.getActiveLocationId();
+      const activeLoc = storage.getActiveLocation();
+      const walkMins = activeLocId && activeLoc
+        ? (storage.getStopWalkingTime(stopId, activeLocId) || 0)
+        : 0;
+
+      const catalog = storage.getCatalog();
+      const destStop = catalog?.paradas ? catalog.paradas[destStopId] : null;
 
       tracking.set({
         busId: pendingTracking.busId,
@@ -697,11 +903,26 @@ const t = getTranslations(lang);
         destinationStopId: destStopId,
         originStopId: stopId,
         lastEta: null,
-        arrivalTime: null
+        arrivalTime: null,
+        phase: 'toStop',
+        walkMinutes: walkMins,
+        locationName: walkMins > 0 ? (activeLoc?.name || '') : '',
+        destinationName: destStop?.nombre || `${lang === 'en' ? 'Stop' : 'Parada'} ${destStopId}`
       });
 
       document.getElementById('destination-modal')!.style.display = 'none';
-      inAppAlert(lang === 'en' ? 'Tracking started! We will notify you when you arrive at your destination.' : '¡Seguimiento iniciado! Te avisaremos cuando llegues a tu destino.');
+
+      const planned = opts?.planned && destStop;
+      const msg = alertOnly
+        ? (lang === 'en'
+          ? `Arrival alert set for bus ${pendingTracking.busId}. We will notify you when it reaches this stop.`
+          : `¡Aviso de llegada activado para el bus ${pendingTracking.busId}! Te avisaremos cuando llegue a esta parada.`)
+        : planned
+          ? t.trackingNearPlannedStop.replace('{stop}', destStop.nombre)
+          : (lang === 'en'
+            ? 'Tracking started! First we alert you when the bus arrives at this stop, then we count the remaining time to your destination.'
+            : '¡Seguimiento iniciado! Primero te avisamos cuando llegue el bus a esta parada y luego contamos el tiempo restante hasta tu destino.');
+      inAppAlert(msg, { durationMs: 9000 });
     }
 
     function updateFavoriteUI() {
@@ -754,36 +975,97 @@ const t = getTranslations(lang);
         const locations = storage.getUserLocations();
         const activeLocId = storage.getActiveLocationId();
         const activeLoc = storage.getActiveLocation();
+        const source = storage.getActiveLocationSource();
         const currentMins = storage.getStopWalkingTime(stopId, activeLocId);
 
+        // "Detect by GPS" pill: auto-detect which saved place I am at now.
+        const detectPill = `
+          <button type="button" class="walk-loc-pill walk-loc-detect" data-detect="1" title="${t.walkTimeDetectBtn}">
+            <i data-lucide="crosshair"></i>
+            <span>${t.walkTimeDetectBtn}</span>
+          </button>
+        `;
+
+        // "None" pill: explicitly deselect the current place.
+        const nonePill = `
+          <button type="button" class="walk-loc-pill walk-loc-none ${!activeLocId ? 'active' : ''}" data-none="1" title="${t.walkTimeDeselect}">
+            <i data-lucide="circle-slash"></i>
+            <span>${t.walkTimeNone}</span>
+          </button>
+        `;
+
         // Render location pills with Lucide icons (no emojis)
-        pillsContainer.innerHTML = locations.map(loc => {
+        const locPills = locations.map(loc => {
           const isActive = loc.id === activeLocId;
           const locTime = storage.getStopWalkingTime(stopId, loc.id);
           const timeBadge = locTime ? ` (${locTime} min)` : '';
           const iconName = loc.icon === 'home' || loc.id === 'casa' ? 'home' : (loc.icon === 'briefcase' || loc.id === 'trabajo' ? 'briefcase' : 'map-pin');
           const hasGps = typeof loc.lat === 'number' && typeof loc.lon === 'number';
+          // Show how the active place was selected (geo detection vs manual).
+          const sourceBadge = isActive && source === 'geo'
+            ? `<span class="source-badge geo">📍 ${t.walkTimeGeoDetected}</span>`
+            : (isActive && source === 'manual' ? `<span class="source-badge manual">${t.walkTimeManual}</span>` : '');
           return `
             <div class="walk-loc-item">
-              <button type="button" class="walk-loc-pill ${isActive ? 'active' : ''}" data-loc-id="${loc.id}">
+              <button type="button" class="walk-loc-pill ${isActive ? 'active' : ''}" data-loc-id="${loc.id}" title="${isActive ? t.walkTimeDeselect : ''}">
                 <i data-lucide="${iconName}"></i>
-                <span>${loc.name}${timeBadge}</span>
+                <span>${loc.name}${timeBadge}${sourceBadge}</span>
               </button>
               <button type="button" class="walk-loc-gps ${hasGps ? 'has-gps' : ''}" data-gps-id="${loc.id}" title="${hasGps ? t.locGpsClear : t.locGpsSet}" aria-label="${hasGps ? t.locGpsClear : t.locGpsSet}">
-                <i data-lucide="locate-fixed" style="width:18px; height:18px;"></i>
+                <i data-lucide="locate-fixed"></i>
               </button>
             </div>
           `;
         }).join('');
 
-        pillsContainer.querySelectorAll('.walk-loc-pill').forEach(pill => {
+        pillsContainer.innerHTML = `${detectPill}${nonePill}${locPills}`;
+
+        // Detect-by-GPS action: geolocation picks the closest saved place.
+        pillsContainer.querySelector('.walk-loc-detect')?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const detectBtn = e.currentTarget as HTMLElement;
+          detectBtn.classList.add('detect-loading');
+          getPosition().then((coords) => {
+            detectBtn.classList.remove('detect-loading');
+            if (coords) {
+              const detected = storage.autoSelectLocationFromGPS(coords.lat, coords.lon);
+              if (detected) {
+                inAppAlert(lang === 'en'
+                  ? `📍 Detected: ${detected.name}. Tap another place to change it.`
+                  : `📍 Detectado: ${detected.name}. Toca otro lugar para cambiarlo.`, { durationMs: 5000 });
+              } else {
+                inAppAlert(lang === 'en'
+                  ? 'No saved place found near your position. Tap a place below to indicate where you are.'
+                  : 'No se ha encontrado ningún lugar guardado cerca de tu posición. Toca un lugar de abajo para indicar dónde estás.', { durationMs: 6000 });
+              }
+            } else {
+              inAppAlert(isNativePlatform() ? t.locGpsFailNative : t.locGpsFailWeb, { durationMs: 6000 });
+            }
+            updateCard();
+          });
+        });
+
+        // None pill: remove the current selection.
+        pillsContainer.querySelector('.walk-loc-none')?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          storage.setActiveLocationId('');
+          updateCard();
+        });
+
+        // Location pills: tapping the active one deselects it; tapping another
+        // marks it as the current (manual) place.
+        pillsContainer.querySelectorAll('.walk-loc-pill[data-loc-id]').forEach(pill => {
           pill.addEventListener('click', (e) => {
             e.stopPropagation();
             const locId = pill.getAttribute('data-loc-id');
-            if (locId) {
+            if (!locId) return;
+            if (locId === activeLocId) {
+              storage.setActiveLocationId('');
+              inAppAlert(t.walkTimeDeselect, { durationMs: 3000 });
+            } else {
               storage.setActiveLocationId(locId);
-              updateCard();
             }
+            updateCard();
           });
         });
 
@@ -797,11 +1079,6 @@ const t = getTranslations(lang);
             if (hasGps) {
               storage.updateUserLocation(id, { lat: null, lon: null });
               updateCard();
-              return;
-            }
-            if (typeof navigator === 'undefined' || !navigator.geolocation) {
-              const na = isNativePlatform() ? t.locGpsUnavailableNative : t.locGpsUnavailableWeb;
-              inAppAlert(na, { durationMs: 5000 });
               return;
             }
             gpsBtn.classList.add('gps-loading');
@@ -819,6 +1096,26 @@ const t = getTranslations(lang);
           });
         });
 
+        // Status line: which place is active and how it was chosen.
+        const statusEl = document.getElementById('walk-loc-status');
+        if (statusEl) {
+          if (!activeLocId) {
+            statusEl.style.display = '';
+            statusEl.className = 'walk-loc-status';
+            statusEl.innerHTML = `ℹ️ ${t.walkTimeHintNone}`;
+          } else if (source === 'geo' && activeLoc) {
+            statusEl.style.display = '';
+            statusEl.className = 'walk-loc-status geo';
+            statusEl.innerHTML = `📍 ${t.walkTimeHintGeo.replace('{name}', activeLoc.name)}`;
+          } else if (activeLoc) {
+            statusEl.style.display = '';
+            statusEl.className = 'walk-loc-status manual';
+            statusEl.innerHTML = `✋ ${t.walkTimeHintManual.replace('{name}', activeLoc.name)}`;
+          } else {
+            statusEl.style.display = 'none';
+          }
+        }
+
         // Update stepper value
         if (timeVal) {
           timeVal.textContent = currentMins ? currentMins.toString() : '--';
@@ -830,14 +1127,18 @@ const t = getTranslations(lang);
 
         // Update hint text (no emojis, clean markdown)
         if (hint) {
-          if (currentMins && currentMins > 0) {
+          if (currentMins && currentMins > 0 && activeLoc) {
             hint.innerHTML = lang === 'en'
-              ? `<strong>Departure alert configured:</strong> When you tap the bell on any bus, we will alert you <strong>${currentMins} min in advance</strong> so you leave <em>${activeLoc.name}</em> on time.`
-              : `<strong>Aviso de salida configurado:</strong> Al activar la campana de aviso en un bus, te avisaremos <strong>${currentMins} min antes</strong> para que salgas de <em>${activeLoc.name}</em> con tiempo.`;
+              ? `<strong>Departure alert configured:</strong> When you tap the tracking button on a bus, we will alert you <strong>${currentMins} min in advance</strong> so you leave <em>${activeLoc.name}</em> on time.`
+              : `<strong>Aviso de salida configurado:</strong> Al activar el seguimiento de un bus, te avisaremos <strong>${currentMins} min antes</strong> para que salgas de <em>${activeLoc.name}</em> con tiempo.`;
+          } else if (currentMins && currentMins > 0) {
+            hint.innerHTML = lang === 'en'
+              ? `<strong>Departure alert configured:</strong> We will alert you <strong>${currentMins} min in advance</strong> so you head to the stop on time.`
+              : `<strong>Aviso de salida configurado:</strong> Te avisaremos <strong>${currentMins} min antes</strong> para que te dirijas a la parada con tiempo.`;
           } else {
             hint.innerHTML = lang === 'en'
-              ? `Indicate how many minutes you take to walk to this stop from <em>${activeLoc.name}</em> to receive the departure notification at the right moment.`
-              : `Indica cuántos minutos tardas caminando a esta parada desde <em>${activeLoc.name}</em> para recibir la alerta de salida en el momento exacto.`;
+              ? `Indicate how many minutes you take to walk to this stop to receive the departure notification at the right moment.`
+              : `Indica cuántos minutos tardas caminando a esta parada para recibir la alerta de salida en el momento exacto.`;
           }
         }
 
@@ -906,6 +1207,9 @@ const t = getTranslations(lang);
   .map-container {
     position: relative;
     margin-bottom: 1.5rem;
+    /* Own stacking context: keeps the floating map tools (.map-actions, z-index
+       1000) BELOW the fixed header (z-index 1000) when the page scrolls. */
+    z-index: 1;
   }
 
   .map-container.map-fullscreen {
@@ -1206,6 +1510,112 @@ const t = getTranslations(lang);
     transform: scale(1.05);
   }
 
+  .btn-track-subtle.tracking-active,
+  .btn-track-subtle-small.tracking-active {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    color: #fff;
+    transform: scale(1.05);
+    animation: tracking-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes tracking-pulse {
+    0%, 100% { box-shadow: 0 2px 10px rgba(59, 130, 246, 0.4); }
+    50% { box-shadow: 0 2px 18px rgba(59, 130, 246, 0.7); }
+  }
+
+  .eta-card.is-tracked { }
+
+  /* Recommended bus (planner favourite). The card ring + chip use the LINE
+     color; the follow button is never painted (it only lights up when the
+     user actually starts tracking). */
+  /* Bus recomendado (favorito del planificador). El anillo y el chip usan el
+     color de la LÍNEA; el botón de seguimiento no se pinta hasta usarlo. */
+  .rec-chip {
+    margin: 0.5rem 0.75rem;
+    padding: 0.4rem 0.65rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--line-color, var(--primary)) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--line-color, var(--primary)) 45%, transparent);
+    color: var(--line-color, var(--primary));
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+  }
+
+  .eta-card {
+    color: var(--text);
+    background: var(--card-bg, #fff);
+  }
+
+  .eta-card.has-recommended {
+    background: var(--line-color, #3b82f6);
+    box-shadow: 0 0 0 2px var(--line-color, #3b82f6), 0 4px 14px rgba(59,130,246,0.35);
+  }
+  .eta-card.has-recommended .line-num-badge {
+    background: rgba(255,255,255,0.9) !important;
+    color: var(--line-color, #3b82f6) !important;
+  }
+  .eta-card.has-recommended .eta-dest,
+  .eta-card.has-recommended .time-val,
+  .eta-card.has-recommended .time-unit,
+  .eta-card.has-recommended .next-label,
+  .eta-card.has-recommended .bus-id,
+  .eta-card.has-recommended strong { color: #fff; }
+  .eta-card.has-recommended .extra-bus-row { background: rgba(255,255,255,0.35) !important; color: var(--text) !important; }
+  .eta-card.has-recommended .extra-bus-row span,
+  .eta-card.has-recommended .extra-bus-row strong,
+  .eta-card.has-recommended .extra-bus-row .extra-bus-id { color: var(--text) !important; }
+
+  .extra-bus-row { color: var(--text); }
+
+  .extra-bus-row.is-rec-bus {
+    background: var(--line-color, var(--primary)) !important;
+    color: #fff !important;
+  }
+  .extra-bus-row.is-rec-bus span,
+  .extra-bus-row.is-rec-bus strong,
+  .extra-bus-row.is-rec-bus .extra-bus-id { color: #fff !important; }
+
+  /* "Only alert me when it arrives" option in the destination modal */
+  /* Opción "solo avísame de la llegada" en el modal de destino */
+  .alert-only-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    width: 100%;
+    text-align: left;
+    background: color-mix(in srgb, #3b82f6 9%, transparent);
+    border: 1.5px dashed color-mix(in srgb, #3b82f6 45%, transparent);
+    border-radius: 12px;
+    padding: 0.7rem 0.85rem;
+    margin-bottom: 0.6rem;
+    cursor: pointer;
+    color: var(--text);
+  }
+  .alert-only-option:active {
+    background: color-mix(in srgb, #3b82f6 16%, transparent);
+  }
+  .alert-only-option .alert-only-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #3b82f6;
+    margin-top: 1px;
+  }
+  .alert-only-option .alert-only-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    font-size: 0.86rem;
+  }
+  .alert-only-option small {
+    color: var(--muted, #64748b);
+    font-size: 0.75rem;
+  }
+
   .btn-bell-subtle {
     background: #f8fafc;
     border: 1px solid #e2e8f0;
@@ -1315,7 +1725,9 @@ const t = getTranslations(lang);
     width: 100%;
     height: 100%;
     background: rgba(0,0,0,0.5);
-    z-index: 2000;
+    /* Above the fixed bottom nav (z-index 8000) so the stop-selection list
+       and its buttons are never covered. */
+    z-index: 9000;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1352,6 +1764,21 @@ const t = getTranslations(lang);
   .modal-list-item:active { background: #f0f0f0; transform: scale(0.98); }
   .modal-list-item strong { display: block; font-size: 0.95rem; }
   .modal-list-item small { color: var(--text-muted); }
+  .modal-list-item.planned {
+    border-color: var(--primary);
+    background: #fff7f6;
+  }
+  .planned-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--primary);
+    background: rgba(244, 67, 54, 0.1);
+    padding: 0.15rem 0.4rem;
+    border-radius: 999px;
+    margin-left: 0.3rem;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
 
   .btn-secondary {
     background: #eee;
@@ -1557,6 +1984,73 @@ const t = getTranslations(lang);
   .walk-loc-pill i {
     width: 18px;
     height: 18px;
+  }
+
+  .walk-loc-pill.walk-loc-detect {
+    border-style: dashed;
+    color: var(--primary);
+    background: #fff;
+  }
+
+  .walk-loc-pill.walk-loc-detect.detect-loading svg {
+    animation: walk-gps-spin 0.8s linear infinite;
+  }
+
+  .walk-loc-pill.walk-loc-none {
+    border-style: dashed;
+    color: var(--text-muted);
+    background: #fff;
+  }
+
+  .source-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    margin-left: 0.35rem;
+    vertical-align: middle;
+  }
+
+  .walk-loc-pill:not(.active) .source-badge.geo {
+    background: #dcfce7;
+    color: #15803d;
+  }
+
+  .walk-loc-pill.active .source-badge.geo {
+    background: rgba(255, 255, 255, 0.25);
+    color: white;
+  }
+
+  .walk-loc-pill:not(.active) .source-badge.manual {
+    background: #e2e8f0;
+    color: #475569;
+  }
+
+  .walk-loc-pill.active .source-badge.manual {
+    background: rgba(255, 255, 255, 0.25);
+    color: white;
+  }
+
+  .walk-loc-status {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: 10px;
+    background: #f1f5f9;
+    color: #475569;
+    line-height: 1.4;
+  }
+
+  .walk-loc-status.geo {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .walk-loc-status.manual {
+    background: #e0f2fe;
+    color: #075985;
   }
 
   .btn-add-loc-pill {

@@ -30,6 +30,15 @@ export interface BackgroundTrackerPlugin {
         etaAlertEnabled?: boolean;
         gpsAlertEnabled?: boolean;
         lang?: string;
+        /** Unified tracking phase: 'toStop' (waiting at the boarding stop) or
+         *  'toDest' (on board, counting down to the destination). The native
+         *  foreground notification shows the stop ETA during 'toStop' and the
+         *  destination ETA during 'toDest'. */
+        phase?: string;
+        /** Configured alert melody for the bus arrival ('' = default mp3). */
+        busSound?: string;
+        /** Configured alert melody for the get-off/stop alert ('' = default mp3). */
+        stopSound?: string;
     }): Promise<{ success: boolean }>;
     stopTracking(): Promise<{ success: boolean }>;
     isTracking(): Promise<{ isTracking: boolean }>;
@@ -278,6 +287,11 @@ export async function startNativeBackgroundTracking(options: {
     etaAlertEnabled?: boolean;
     gpsAlertEnabled?: boolean;
     lang?: string;
+    phase?: string;
+    /** Configured alert melody for the bus arrival ('' = default mp3). */
+    busSound?: string;
+    /** Configured alert melody for the get-off/stop alert ('' = default mp3). */
+    stopSound?: string;
 }) {
     if (!isNativePlatform()) return;
     try {

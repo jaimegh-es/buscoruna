@@ -118,6 +118,15 @@ Con Capacitor se genera el APK de la app; el `server.url` de `capacitor.config.j
 
   Además configura el túnel ADB reverse del puerto `4321` para probar contra el servidor de desarrollo local.
 
+#### Releases automáticas del APK (GitHub Actions)
+
+El workflow `.github/workflows/build-apk.yml` solo construye el APK y crea una release de GitHub (la que la app consulta para auto-actualizarse) cuando un commit de `main` contiene `[RELEASE]` en su mensaje. Un commit normal **no** genera versión nueva ni APK.
+
+- `[RELEASE]` → sube la versión de patch (`0.0.3` → `0.0.4`).
+- `[RELEASE][1.2]` → fija la versión `1.2.0` (o usa `[RELEASE][2.3.4]` para una versión exacta).
+
+También se puede lanzar manualmente desde la pestaña *Actions* → *Build Android APK* → *Run workflow* (marcando `release` y, opcionalmente, indicando una versión). El despliegue de la web (worker de Cloudflare) es independiente y manual (`npm run deploy:web`).
+
 ## Aviso legal
 
 Los datos se obtienen a través de un endpoint abierto de los servidores de iTranvías, no se scrapea nada ni se hace nada ilegal. Respetamos el rate limiting de los servidores de iTranvías.  

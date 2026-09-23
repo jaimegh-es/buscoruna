@@ -13,18 +13,22 @@ import android.content.pm.ServiceInfo;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.util.Base64;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -41,6 +45,10 @@ public class BackgroundTrackerService extends Service implements LocationListene
 
     public static final String CHANNEL_BG_ID = "buscoruna_bg_live_v2";
     public static final String CHANNEL_ALERTS_ID = "buscoruna_alerts_channel";
+    // Silent high-priority channel used when a configured melody (default mp3 or
+    // custom upload) plays instead of the system notification sound, avoiding a
+    // double sound.
+    public static final String CHANNEL_ALERTS_SILENT_ID = "buscoruna_alerts_silent_ch";
 
     public static final int NOTIFICATION_ID_SERVICE = 424243;
     public static final int NOTIFICATION_ID_ARRIVAL_ALERT = 9001;
@@ -64,6 +72,14 @@ public class BackgroundTrackerService extends Service implements LocationListene
     private boolean etaAlertEnabled = true;
     private boolean gpsAlertEnabled = true;
     private String lang = "es";
+    // Unified tracking phase: "toStop" = waiting at the boarding stop (show the
+    // time until the bus reaches the stop), "toDest" = on board (show the time
+    // to the destination). Empty for legacy single-phase journeys.
+    private String phase = "";
+    // Configured alert melodies: base64 data URI when the user uploaded a custom
+    // mp3 from Settings, empty string = use the bundled default mp3.
+    private String busSound = "";
+    private String stopSound = "";
 
     private boolean etaTriggered = false;
     private boolean gpsTriggered = false;
@@ -121,6 +137,11 @@ public class BackgroundTrackerService extends Service implements LocationListene
             etaAlertEnabled = intent.getBooleanExtra("etaAlertEnabled", true);
             gpsAlertEnabled = intent.getBooleanExtra("gpsAlertEnabled", true);
             lang = intent.getStringExtra("lang") != null ? intent.getStringExtra("lang") : "es";
+            phase = intent.getStringExtra("phase") != null ? intent.getStringExtra("phase") : "";
+            // Melodies refresh on every start call (even mid-session), so a
+            // change in Settings without restarting tracking takes effect.
+            busSound = intent.getStringExtra("busSound") != null ? intent.getStringExtra("busSound") : "";
+            stopSound = intent.getStringExtra("stopSound") != null ? intent.getStringExtra("stopSound") : "";
 
             if (!isSameSession) {
                 etaTriggered = false;
@@ -164,6 +185,21 @@ public class BackgroundTrackerService extends Service implements LocationListene
             alertsChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             alertsChannel.setShowBadge(true);
             notificationManager.createNotificationChannel(alertsChannel);
+
+            // Silent channel: used when a configured melody is played instead of
+            // the system sound (avoids double sound on arrival/get-off alerts).
+            NotificationChannel silentAlertsChannel = new NotificationChannel(
+                CHANNEL_ALERTS_SILENT_ID,
+                "Coruña Bus · Avisos (melodía configurada)",
+                NotificationManager.IMPORTANCE_HIGH
+            );
+            silentAlertsChannel.setDescription("Avisos con melodía configurada (sin sonido del sistema)");
+            silentAlertsChannel.setSound(null, null);
+            silentAlertsChannel.enableVibration(true);
+            silentAlertsChannel.setVibrationPattern(new long[]{0, 400, 200, 400, 200, 400});
+            silentAlertsChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+            silentAlertsChannel.setShowBadge(true);
+            notificationManager.createNotificationChannel(silentAlertsChannel);
         }
     }
 
@@ -221,8 +257,32 @@ public class BackgroundTrackerService extends Service implements LocationListene
         String title;
         String body;
 
-        if (destinationStopId > 0 && destinationStopId != originStopId) {
-            // Mode: Journey to destination stop
+        boolean waitingAtStop = "toStop".equals(phase);
+
+        if (waitingAtStop) {
+            // Phase 1: waiting for the bus at the boarding stop. Always show the
+            // time remaining until the bus reaches the STOP (even when the
+            // destination ETA is already known too — the user is still on the
+            // platform and needs to know when to board).
+            if (lastEta >= 0) {
+                long etaTimeMs = System.currentTimeMillis() + lastEta * 60000L;
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
+                String etaClock = sdf.format(new java.util.Date(etaTimeMs));
+                String timeLabel = lastEta == 0
+                    ? ("en".equals(lang) ? "Arriving now!" : "¡Llegando ahora!")
+                    : (lastEta + " min (" + etaClock + ")");
+                title = "🚌 Bus " + busId + " · " + timeLabel;
+                body = ("en".equals(lang) ? "Waiting at: " : "Esperando en: ") + origInfo
+                    + " → " + ("en".equals(lang) ? "Dest: " : "Destino: ") + destInfo;
+            } else {
+                title = "en".equals(lang)
+                    ? ("🚌 Bus " + busId + " · Looking for the bus…")
+                    : ("🚌 Bus " + busId + " · Buscando bus…");
+                body = ("en".equals(lang) ? "Waiting at: " : "Esperando en: ") + origInfo
+                    + " → " + ("en".equals(lang) ? "Dest: " : "Destino: ") + destInfo;
+            }
+        } else if (destinationStopId > 0 && destinationStopId != originStopId) {
+            // Mode: Journey to destination stop (phase 'toDest' or legacy)
             if (lastDestEta >= 0) {
                 long etaTimeMs = System.currentTimeMillis() + lastDestEta * 60000L;
                 java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
@@ -412,6 +472,15 @@ public class BackgroundTrackerService extends Service implements LocationListene
                                                     }
                                                 }
                                             }
+
+                                            // "Alert only" journeys (origin ==
+                                            // destination) finish automatically
+                                            // once the bus is at the stop.
+                                            // Modo "solo aviso": termina solo
+                                            // cuando el bus está en la parada.
+                                            if (destinationStopId == originStopId && waitTime == 0 && executor != null) {
+                                                executor.schedule(() -> { if (isRunning) stopSelf(); }, 45, TimeUnit.SECONDS);
+                                            }
                                         }
                                         break;
                                     }
@@ -470,6 +539,49 @@ public class BackgroundTrackerService extends Service implements LocationListene
         }
     }
 
+    /**
+     * Play the configured melody for an alert.
+     * `soundConfig` is either a base64 data URI (custom upload) or empty (use
+     * the bundled default mp3, copied by `npx cap sync` from /public into
+     * android assets). Returns false when nothing could be played, so the
+     * caller falls back to the system notification sound.
+     * Reproduce la melodía configurada: data URI base64 personalizada o el mp3
+     * por defecto incluido en los assets. false si no se pudo reproducir.
+     */
+    private boolean playMelody(String soundConfig, String assetPath) {
+        try {
+            MediaPlayer player = new MediaPlayer();
+            if (soundConfig != null && !soundConfig.isEmpty()) {
+                // Custom base64 data URI (data:audio/mpeg;base64,....)
+                String b64 = soundConfig;
+                int comma = b64.indexOf(',');
+                if (comma != -1) b64 = b64.substring(comma + 1);
+                byte[] data = Base64.decode(b64, Base64.DEFAULT);
+                if (data.length == 0 || data.length > 5 * 1024 * 1024) return false;
+                String fileName = assetPath.contains("avisoparada")
+                    ? "corunabus_stop_alert.mp3" : "corunabus_bus_alert.mp3";
+                File f = new File(getCacheDir(), fileName);
+                FileOutputStream fos = new FileOutputStream(f);
+                try {
+                    fos.write(data);
+                } finally {
+                    fos.close();
+                }
+                player.setDataSource(f.getAbsolutePath());
+            } else {
+                player.setDataSource("file:///android_asset/" + assetPath);
+            }
+            player.setOnPreparedListener(MediaPlayer::start);
+            player.setOnCompletionListener(MediaPlayer::release);
+            player.setOnErrorListener((mp, what, extra) -> { mp.release(); return true; });
+            player.prepareAsync();
+            return true;
+        } catch (Exception e) {
+            Log.w(TAG, "Could not play melody " + assetPath, e);
+            return false;
+        }
+    }
+
     private void fireWalkDepartureAlert(int minutesLeft, int walkMins, String locName) {
         Intent openIntent = new Intent(this, MainActivity.class);
         openIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
@@ -484,7 +596,8 @@ public class BackgroundTrackerService extends Service implements LocationListene
             ? ("Bus " + busId + " arrives at " + stopName + " in " + minutesLeft + " min. It takes " + walkMins + " min from " + locName + ". Leave now!")
             : ("El bus " + busId + " llega a " + stopName + " en " + minutesLeft + " min. Tardas " + walkMins + " min desde " + locName + ". ¡Sal ahora!");
 
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ALERTS_ID)
+        boolean melody = playMelody(busSound, "public/avisobus.mp3");
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, melody ? CHANNEL_ALERTS_SILENT_ID : CHANNEL_ALERTS_ID)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
@@ -494,8 +607,8 @@ public class BackgroundTrackerService extends Service implements LocationListene
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setVibrate(new long[]{0, 500, 250, 500, 250, 500})
-            .setDefaults(NotificationCompat.DEFAULT_ALL);
+            .setVibrate(new long[]{0, 500, 250, 500, 250, 500});
+        if (!melody) builder.setDefaults(NotificationCompat.DEFAULT_ALL);
 
         if (notificationManager != null) {
             notificationManager.notify(NOTIFICATION_ID_ARRIVAL_ALERT, builder.build());
@@ -517,7 +630,8 @@ public class BackgroundTrackerService extends Service implements LocationListene
             ? ("Bus " + busId + " arrives at " + stopName + " in " + minutesLeft + " min. Board the bus!")
             : ("El bus " + busId + " llega a " + stopName + " en " + minutesLeft + " min. ¡Sube al bus!");
 
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ALERTS_ID)
+        boolean melody = playMelody(busSound, "public/avisobus.mp3");
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, melody ? CHANNEL_ALERTS_SILENT_ID : CHANNEL_ALERTS_ID)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
@@ -527,8 +641,8 @@ public class BackgroundTrackerService extends Service implements LocationListene
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setVibrate(new long[]{0, 400, 200, 400, 200, 400})
-            .setDefaults(NotificationCompat.DEFAULT_ALL);
+            .setVibrate(new long[]{0, 400, 200, 400, 200, 400});
+        if (!melody) builder.setDefaults(NotificationCompat.DEFAULT_ALL);
 
         if (notificationManager != null) {
             notificationManager.notify(NOTIFICATION_ID_ARRIVAL_ALERT, builder.build());
@@ -550,7 +664,8 @@ public class BackgroundTrackerService extends Service implements LocationListene
             ? ("Approaching your destination: " + destName + ". Alert the driver to get off!")
             : ("Te aproximas a tu destino: " + destName + ". ¡Avisa al conductor para bajarte!");
 
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ALERTS_ID)
+        boolean melody = playMelody(stopSound, "public/avisoparada.mp3");
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, melody ? CHANNEL_ALERTS_SILENT_ID : CHANNEL_ALERTS_ID)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
@@ -559,8 +674,8 @@ public class BackgroundTrackerService extends Service implements LocationListene
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setVibrate(new long[]{0, 500, 200, 500, 200, 500})
-            .setDefaults(NotificationCompat.DEFAULT_ALL);
+            .setVibrate(new long[]{0, 500, 200, 500, 200, 500});
+        if (!melody) builder.setDefaults(NotificationCompat.DEFAULT_ALL);
 
         if (notificationManager != null) {
             notificationManager.notify(NOTIFICATION_ID_GPS_ALERT, builder.build());
@@ -625,13 +740,20 @@ public class BackgroundTrackerService extends Service implements LocationListene
 
             float[] prevToDestResults = new float[1];
             Location.distanceBetween(prevLat, prevLon, destLat, destLon, prevToDestResults);
-            float distPrevToDest = prevToDestResults[0];
+            float distPrevToDest = Math.max(80f, prevToDestResults[0]);
 
-            atPrev = distToPrev < 120;
-            passedPrev = distToDest < Math.min(350, distPrevToDest * 0.85f);
+            // Spacing-aware thresholds: with very close stops the alert must not
+            // fire too early or from the wrong stop. It only fires at the
+            // second-to-last stop, or once the user is clearly closer to the
+            // destination than to that stop.
+            // Umbrales acordes a la distancia real entre paradas.
+            atPrev = distToPrev < Math.min(100f, distPrevToDest * 0.45f);
+            passedPrev = (distToDest < distToPrev) && (distToDest < Math.max(70f, distPrevToDest * 0.5f));
         }
 
-        boolean approachingDest = distToDest < 300;
+        // Only when the previous stop could not be resolved, fall back to a
+        // plain proximity check.
+        boolean approachingDest = (prevLat == 0.0 && prevLon == 0.0) && distToDest < 150;
 
         if (atPrev || passedPrev || approachingDest) {
             gpsTriggered = true;

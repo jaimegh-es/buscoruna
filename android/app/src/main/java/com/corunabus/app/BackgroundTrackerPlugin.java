@@ -53,6 +53,9 @@ public class BackgroundTrackerPlugin extends Plugin {
         intent.putExtra("etaAlertEnabled", call.getBoolean("etaAlertEnabled", true));
         intent.putExtra("gpsAlertEnabled", call.getBoolean("gpsAlertEnabled", true));
         intent.putExtra("lang", call.getString("lang", "es"));
+        intent.putExtra("phase", call.getString("phase", ""));
+        intent.putExtra("busSound", call.getString("busSound", ""));
+        intent.putExtra("stopSound", call.getString("stopSound", ""));
 
         try {
             ContextCompat.startForegroundService(context, intent);

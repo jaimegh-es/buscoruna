@@ -342,6 +342,7 @@ const t = getTranslations(lang);
   import { storage } from '../utils/storage';
   import { API } from '../services/api';
   import { tracking } from '../utils/tracking';
+  import { getPosition } from '../utils/geolocation';
   import { getTranslations } from '../utils/i18n';
 
   const lang = document.documentElement.getAttribute('data-lang') || 'es';
@@ -483,14 +484,7 @@ const t = getTranslations(lang);
     }
 
     getUserPosition(): Promise<{ lat: number; lon: number } | null> {
-      if (!navigator.geolocation) return Promise.resolve(null);
-      return new Promise((resolve) => {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
-          () => resolve(null),
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 15000 }
-        );
-      });
+      return getPosition();
     }
 
     async scanLines(busNumber?: string) {

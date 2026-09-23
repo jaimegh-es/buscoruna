@@ -10,6 +10,7 @@ import Landing from "../components/Landing.astro";
 import ProjectMenu from "../components/ProjectMenu.astro";
 import ProjectDrawer from "../components/ProjectDrawer.astro";
 import { getTranslations } from "../utils/i18n";
+import pkg from "../../package.json";
 
 const acceptLanguage = Astro.request.headers.get('accept-language') || '';
 const defaultLang = acceptLanguage.toLowerCase().includes('en') ? 'en' : 'es';
@@ -25,6 +26,9 @@ const { title } = Astro.props;
 <html lang={lang} data-lang={lang}>
     <head>
         <meta charset="UTF-8" />
+        <!-- App version (web changelog). Expuesta para que "Novedades" funcione
+             también en la web, no solo en el APK nativo. -->
+        <meta name="app-version" content={pkg.version} />
         <meta
             name="description"
             content={t.metaDescription || "Coruña Bus - El mejor planificador de rutas y tiempos en tiempo real para los buses de A Coruña. Consulta paradas, líneas y horarios actualizados."}
@@ -302,6 +306,46 @@ const { title } = Astro.props;
                         </div>
                     </div>
 
+                    <!-- Setting 3.4: Alert melodies (bus arrival + get-off) -->
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <label class="setting-title">
+                                <span>{t.settingsSoundsTitle}</span>
+                            </label>
+                            <p class="setting-desc">{t.settingsSoundsDesc}</p>
+
+                            <div style="display: flex; flex-direction: column; gap: 0.7rem; margin-top: 0.85rem;">
+                                <!-- Bus arrival sound -->
+                                <div class="sound-row">
+                                    <div class="sound-row-main">
+                                        <strong style="font-size:0.9rem;">{t.settingsSoundBusLabel}</strong>
+                                        <span id="sound-badge-bus" class="sound-badge"></span>
+                                    </div>
+                                    <div class="sound-row-actions">
+                                        <button type="button" id="sound-test-bus" class="btn-secondary sound-btn" title={t.settingsSoundTestTitle}><Icon name="play" size={14} /><span>{t.settingsSoundTest}</span></button>
+                                        <button type="button" id="sound-upload-bus" class="btn-secondary sound-btn" title={t.settingsSoundUploadTitle}><Icon name="upload" size={14} /><span>{t.settingsSoundUpload}</span></button>
+                                        <button type="button" id="sound-remove-bus" class="btn-secondary sound-btn sound-btn-remove" style="display:none" title={t.settingsSoundRemoveTitle}><Icon name="trash" size={14} /><span>{t.settingsSoundRemove}</span></button>
+                                    </div>
+                                    <input type="file" id="sound-file-bus" accept="audio/mpeg,audio/mp3,audio/*" style="display:none;" />
+                                </div>
+
+                                <!-- Get-off / stop alert sound -->
+                                <div class="sound-row">
+                                    <div class="sound-row-main">
+                                        <strong style="font-size:0.9rem;">{t.settingsSoundStopLabel}</strong>
+                                        <span id="sound-badge-stop" class="sound-badge"></span>
+                                    </div>
+                                    <div class="sound-row-actions">
+                                        <button type="button" id="sound-test-stop" class="btn-secondary sound-btn" title={t.settingsSoundTestTitle}><Icon name="play" size={14} /><span>{t.settingsSoundTest}</span></button>
+                                        <button type="button" id="sound-upload-stop" class="btn-secondary sound-btn" title={t.settingsSoundUploadTitle}><Icon name="upload" size={14} /><span>{t.settingsSoundUpload}</span></button>
+                                        <button type="button" id="sound-remove-stop" class="btn-secondary sound-btn sound-btn-remove" style="display:none" title={t.settingsSoundRemoveTitle}><Icon name="trash" size={14} /><span>{t.settingsSoundRemove}</span></button>
+                                    </div>
+                                    <input type="file" id="sound-file-stop" accept="audio/mpeg,audio/mp3,audio/*" style="display:none;" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Setting 3.5: User Locations & Walking Times -->
                     <div class="setting-item">
                         <div class="setting-info">
@@ -315,8 +359,22 @@ const { title } = Astro.props;
                                 <div style="display: flex; gap: 0.5rem; align-items: center;">
                                     <select id="settings-active-location" style="flex: 1; padding: 0.65rem; border-radius: 10px; border: 1.5px solid #e2e8f0; background: var(--card-bg); color: var(--text); font-size: 0.95rem; font-weight: 600;">
                                     </select>
-                                    <button type="button" id="settings-btn-add-location" class="btn-secondary" style="width: auto; padding: 0.65rem 0.95rem; font-size: 0.85rem; font-weight: 700; white-space: nowrap; border-radius: 10px;">
-                                        {t.settingsAddLocationBtn}
+                                    <button type="button" id="settings-btn-add-location" class="btn-secondary" style="width: auto; padding: 0.65rem 0.95rem; font-size: 0.85rem; font-weight: 700; white-space: nowrap; border-radius: 10px; display: inline-flex; align-items: center; gap: 0.4rem;">
+                                        <Icon name="plus" size={16} />
+                                        <span>{t.settingsAddLocationBtn}</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div id="settings-add-location-row" style="display: none; margin-top: 0.6rem;">
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <input type="text" id="settings-new-location-name" maxlength="40" placeholder={t.settingsLocationPrompt} style="flex: 1; padding: 0.6rem 0.7rem; border-radius: 10px; border: 1.5px solid #e2e8f0; background: var(--card-bg); color: var(--text); font-size: 0.9rem;" />
+                                    <button type="button" id="settings-confirm-add-location" class="btn-primary" style="padding: 0.6rem 1rem; font-size: 0.85rem; font-weight: 700; white-space: nowrap; border-radius: 10px; display: inline-flex; align-items: center; gap: 0.4rem;">
+                                        <Icon name="plus" size={16} />
+                                        <span>{t.settingsLocationAdd}</span>
+                                    </button>
+                                    <button type="button" id="settings-cancel-add-location" class="btn-secondary" title={t.settingsLocationCancelTitle} style="padding: 0.6rem 0.7rem; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center;">
+                                        <Icon name="x" size={16} />
                                     </button>
                                 </div>
                             </div>
@@ -334,6 +392,10 @@ const { title } = Astro.props;
                             </label>
                             <p class="setting-desc">{t.migrationDesc}</p>
                             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem;">
+                                <button type="button" id="btn-forzar-recarga" class="btn-secondary" style="flex: 1; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.6rem 0.9rem; font-size: 0.88rem; font-weight: 700; border-radius: 10px; white-space: nowrap; background:#fef3f2; border-color:#fecaca; color:#dc2626;">
+                                    <Icon name="refresh" size={16} />
+                                    <span>Forzar recarga de vistas</span>
+                                </button>
                                 <button type="button" id="btn-export-data" class="btn-secondary" style="flex: 1; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.6rem 0.9rem; font-size: 0.88rem; font-weight: 700; border-radius: 10px; white-space: nowrap;">
                                     <Icon name="share" size={16} />
                                     <span>{t.migrationExportBtn}</span>
@@ -548,6 +610,92 @@ const { title } = Astro.props;
         box-sizing: border-box;
         margin: 0;
         padding: 0;
+    }
+
+    /* ===== App-wide entrance animations & loading skeletons ===== */
+    @keyframes appFadeInUp {
+        from { opacity: 0; transform: translateY(14px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes appFadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    @keyframes appScaleIn {
+        from { opacity: 0; transform: scale(0.96) translateY(8px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    @keyframes appShimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+    }
+
+    /* Each page gently fades in on navigation (less abrupt than a hard swap). */
+    main { animation: appFadeIn 0.32s ease-out both; }
+
+    .anim-fade-in { animation: appFadeIn 0.32s ease-out both; }
+    .anim-up { animation: appFadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+    /* Staggered entrance for lists/grids of cards. */
+    .anim-stagger > * {
+        opacity: 0;
+        animation: appFadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .anim-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+    .anim-stagger > *:nth-child(2) { animation-delay: 0.07s; }
+    .anim-stagger > *:nth-child(3) { animation-delay: 0.12s; }
+    .anim-stagger > *:nth-child(4) { animation-delay: 0.17s; }
+    .anim-stagger > *:nth-child(5) { animation-delay: 0.22s; }
+    .anim-stagger > *:nth-child(6) { animation-delay: 0.27s; }
+    .anim-stagger > *:nth-child(7) { animation-delay: 0.32s; }
+    .anim-stagger > *:nth-child(8) { animation-delay: 0.37s; }
+    .anim-stagger > *:nth-child(9) { animation-delay: 0.42s; }
+    .anim-stagger > *:nth-child(10) { animation-delay: 0.47s; }
+    .anim-stagger > *:nth-child(11) { animation-delay: 0.52s; }
+    .anim-stagger > *:nth-child(12) { animation-delay: 0.57s; }
+
+    /* Modals fade the backdrop and scale the sheet in. */
+    .modal-overlay { animation: appFadeIn 0.18s ease-out both; }
+    .modal-content { animation: appScaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+    /* Loading skeleton blocks (shimmer). */
+    .skeleton {
+        position: relative;
+        overflow: hidden;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--card-bg) 45%, #e2e8f0);
+    }
+    .skeleton::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+        background-size: 200% 100%;
+        animation: appShimmer 1.4s linear infinite;
+    }
+    .skeleton-card { height: 88px; border-radius: 12px; background: linear-gradient(90deg,#e2e8f0 25%,#f8fafc 50%,#e2e8f0 75%); background-size: 200% auto; }
+    .skeleton-line { height: 14px; border-radius: 6px; background: linear-gradient(90deg,#e2e8f0 25%,#f8fafc 50%,#e2e8f0 75%); background-size: 200% auto; }
+
+    .loading-state { display: flex; flex-direction: column; gap: 0.85rem; padding: 0.25rem 0; }
+    .skeleton-stack { display: flex; flex-direction: column; gap: 0.6rem; }
+
+    .spinner { width: 28px; height: 28px; flex-shrink: 0; border: 3px solid rgba(59,130,246,0.2); border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; }
+
+    .map-loading-overlay { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; gap: 0.7rem; background: rgba(245,245,247,0.92); backdrop-filter: blur(3px); border-radius: 12px; color: var(--text); font-weight: 600; font-size: 0.9rem; animation: appFadeIn 0.2s ease-out; }
+
+    @media (prefers-reduced-motion: reduce) {
+        main,
+        .anim-fade-in,
+        .anim-up,
+        .modal-overlay,
+        .modal-content,
+        .skeleton::after {
+            animation: none !important;
+        }
+        .anim-stagger > * {
+            opacity: 1 !important;
+            animation: none !important;
+        }
     }
 
     body {
@@ -1308,6 +1456,56 @@ const { title } = Astro.props;
         border-color: var(--primary);
     }
 
+    /* Alert melodies settings rows */
+    /* Filas de configuración de melodías */
+    .sound-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+        background: var(--card-bg, #f8fafc);
+        border: 1.5px solid #e2e8f0;
+        padding: 0.6rem 0.8rem;
+        border-radius: 12px;
+    }
+    .sound-row-main {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+    }
+    .sound-badge {
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        width: fit-content;
+    }
+    .sound-row-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        flex-shrink: 0;
+    }
+    .sound-btn {
+        padding: 0.45rem 0.65rem;
+        font-size: 0.78rem;
+        font-weight: 700;
+        border-radius: 8px;
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+    .sound-btn-remove {
+        color: #ef4444;
+        border-color: #fee2e2;
+        background: #fff5f5;
+    }
+
     /* Modal Overlay (Reuse) */
     .modal-overlay {
         position: fixed;
@@ -1316,7 +1514,9 @@ const { title } = Astro.props;
         width: 100%;
         height: 100%;
         background: rgba(0, 0, 0, 0.6);
-        z-index: 3000;
+        /* Above the fixed bottom nav (z-index 8000) so modal footers/buttons
+           are never covered on mobile. */
+        z-index: 9000;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1543,7 +1743,9 @@ const { title } = Astro.props;
         stopNativeBackgroundTracking,
     } from "../utils/backgroundAlerts";
     import { checkForUpdate as checkUpdateInfo, downloadAndInstall, autoCheckOnOpen, getLatestApkUrl, type UpdateInfo } from "../utils/autoUpdate";
-    import { getChangelogFor, hasSeenChangelog, markChangelogSeen } from "../utils/changelog";
+    import { getPendingChangelog, markChangelogSeen } from "../utils/changelog";
+    import { createIcons, X, Trash2, Plus, MapPin } from "lucide";
+    import { playEventSound, getCustomSound, isCustomSoundSet, setCustomSound, MAX_CUSTOM_SIZE } from "../utils/sounds";
     import { Capacitor } from "@capacitor/core";
     import { App } from "@capacitor/app";
     import { notify } from "../utils/notify";
@@ -1640,14 +1842,21 @@ const { title } = Astro.props;
     // Comprobar actualizaciones de la app (solo build nativo)
     autoCheckOnOpen();
 
-    // Show the changelog once per new app version (native build only)
-    // Mostrar el changelog una vez por versión nueva (solo build nativo)
+    // Show the changelog once per new app version (native and web)
+    // Mostrar el changelog una vez por versión nueva (nativo y web)
     (async () => {
         try {
-            if (!isNativePlatform()) return;
-            const info = await App.getInfo();
-            const entry = getChangelogFor(info.version);
-            if (!entry || hasSeenChangelog(info.version)) return;
+            let appVersion: string | null = null;
+            if (isNativePlatform()) {
+                const info = await App.getInfo();
+                appVersion = info.version;
+            } else {
+                appVersion =
+                    document.querySelector('meta[name="app-version"]')?.getAttribute('content') || null;
+            }
+            if (!appVersion) return;
+            const entry = getPendingChangelog(appVersion);
+            if (!entry) return;
 
             const modal = document.getElementById('changelog-modal');
             const titleEl = document.getElementById('changelog-title');
@@ -1660,7 +1869,7 @@ const { title } = Astro.props;
 
             const close = () => {
                 modal.style.display = 'none';
-                markChangelogSeen(info.version);
+                markChangelogSeen(entry.version);
             };
             document.getElementById('changelog-ok')?.addEventListener('click', close);
             document.getElementById('changelog-close')?.addEventListener('click', close);
@@ -1707,7 +1916,312 @@ const { title } = Astro.props;
 
     // Cache + throttle for the expensive func=2 (full line info) ETA fallback.
     let lastLineInfoCheck = 0;
-    let lineInfoCache = { foundInLine: false, stopsLeft: -1 };
+    let lineInfoCache = { foundInLine: false, stopsLeft: -1, etaMins: -1, asOf: 0 };
+    // Real-time per-stop travel estimate (seconds) derived from observed bus
+    // position changes (func=2). Used by the phase-2 fallback so the remaining
+    // time keeps being recalculated from real data instead of a fixed guess.
+    let lastBusPosTime = 0;
+    let lastBusStopIdx = -1;
+    let avgSecPerStop: number | null = null;
+    // Phase 1: whether the tracked bus has been observed approaching the origin
+    // stop at least once. Avoids a premature board-transition when a far bus is
+    // momentarily not listed in the stop's arrivals.
+    let phase1BusSeen = false;
+
+    // Re-render the tracking bar right after a phase transition (the current
+    // update is still holding `isUpdating`, so a plain call would be skipped).
+    function scheduleTrackingRefresh(ms = 1000) {
+        setTimeout(() => {
+            if (!isUpdating) updateTrackingUI();
+        }, ms);
+    }
+
+    // Shows a destination ETA in the tracking bar (real-time "remaining" value).
+    function renderDestEta(time: number) {
+        document.getElementById("track-eta-val")!.textContent = time.toString();
+        const arrivalTime = new Date(Date.now() + time * 60000);
+        let timeStr = "--:--";
+        try {
+            timeStr = arrivalTime.toLocaleTimeString(lang === 'en' ? 'en-US' : 'es-ES', {
+                hour: "2-digit",
+                minute: "2-digit",
+            });
+        } catch (e) {
+            /* ignore invalid date */
+        }
+        document.getElementById("track-status")!.textContent =
+            time === 0
+                ? t.trackingArrivingDest
+                : `${t.trackingPhaseToDest}: ${timeStr}`;
+    }
+
+    // Ends tracking on arrival: notifies the user, then clears everything so
+    // the poller, GPS monitor, keep-awake silence and the persistent background
+    // notification stop (saving battery).
+    function finishTracking(title: string, body: string) {
+        if (!tracking.get()) return;
+        sendNotification(title, {
+            body,
+            requireInteraction: false,
+            icon: "/logo.png",
+            badge: "/logo.png"
+        });
+        inAppAlert(`${title}\n${body}`, { durationMs: 10000 });
+        // Take effect immediately: bump the generation so any in-flight update
+        // discards its results, then clear tracking (the tracking-updated
+        // handler stops the GPS monitor, silence playback and native bg task).
+        trackingGeneration++;
+        tracking.clear();
+    }
+
+    // Phase 1 ('toStop'): count down, in real time, until the bus reaches the
+    // boarding/origin stop. This integrates the old "arrival alert" button,
+    // including the walking head-start from the active saved location.
+    async function updatePhaseToStop(info: any, gen: number) {
+        const etaAlertEnabled = localStorage.getItem('buscoruna_eta_alert_enabled') !== 'false';
+        const etaAlertTriggered = localStorage.getItem('buscoruna_eta_alert_triggered') === 'true';
+        const walkMins = info.walkMinutes || 0;
+        // "Alert only" mode: the user asked to be notified when the bus reaches
+        // this stop, without a destination. The journey ends on arrival.
+        // Modo "solo aviso": el usuario solo quiere que le avisen de la llegada
+        // a esta parada. El seguimiento acaba en cuanto llega el bus.
+        const alertOnly = info.destinationStopId === info.originStopId;
+        // Head-start (walking minutes) or the configured ETA lead, whichever is more in advance.
+        const cfgThreshold = parseInt(localStorage.getItem('buscoruna_eta_alert_threshold') || '2', 10);
+        const threshold = walkMins > 0 ? walkMins : (isNaN(cfgThreshold) ? 2 : cfgThreshold);
+
+        const data = await API.getStopArrivals(info.originStopId);
+        if (gen !== trackingGeneration || !tracking.get()) return;
+
+        let found = false;
+        let waitTime: number | null = null;
+        if (data && data.resultado === "OK" && data.buses && Array.isArray(data.buses.lineas)) {
+            for (const l of data.buses.lineas) {
+                if (l.linea.toString() !== info.lineId.toString()) continue;
+                if (!Array.isArray(l.buses)) continue;
+                const b = l.buses.find(
+                    (bus: any) => bus.bus && bus.bus.toString() === info.busId.toString(),
+                );
+                if (!b) continue;
+                found = true;
+                let t = typeof b.tiempo === "number" ? b.tiempo : parseInt(b.tiempo);
+                if (isNaN(t)) t = 0; // ">>>", "PRX", etc.
+                waitTime = t;
+                break;
+            }
+        }
+
+        // The bus is no longer reported at the origin stop: it already arrived
+        // (or passed). Board and switch to phase 2 (remaining to destination).
+        // Only do this once we have actually observed the bus approaching; a
+        // bus that is simply not listed yet keeps us waiting.
+        if (!found || waitTime === null) {
+            if (phase1BusSeen) {
+                tracking.patch({ phase: 'toDest' });
+                scheduleTrackingRefresh();
+                inAppAlert(t.trackingBoardNow, { durationMs: 6000 });
+            } else {
+                document.getElementById("track-status")!.textContent =
+                    t.trackingSearchingBus;
+                document.getElementById("track-eta-val")!.textContent = "--";
+            }
+            return;
+        }
+        phase1BusSeen = true;
+
+        // Integrated arrival/departure alert: notify with the head-start so the
+        // user leaves the saved location on time.
+        if (etaAlertEnabled && !etaAlertTriggered && waitTime <= threshold) {
+            localStorage.setItem('buscoruna_eta_alert_triggered', 'true');
+            const hasLocation = walkMins > 0 && !!info.locationName;
+            const notifyBody = hasLocation
+                ? t.trackingLeaveNow.replace('{bus}', info.busId).replace('{n}', String(waitTime)).replace('{loc}', info.locationName)
+                : t.trackingLeaveNowNoLoc.replace('{bus}', info.busId).replace('{n}', String(waitTime));
+
+            sendNotification(lang === 'en' ? '🚌 Your bus is arriving!' : '🚌 ¡Tu autobús está llegando!', {
+                body: notifyBody,
+                requireInteraction: true,
+                icon: "/logo.png",
+                badge: "/logo.png"
+            });
+
+            // Play sound and vibration FIRST, before any UI, so the user hears it immediately.
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+            playEventSound('bus');
+
+            inAppAlert(`🔔 ${notifyBody}`, { durationMs: 10000 });
+        }
+
+        // The bus reached the stop. In "alert only" mode (no destination) the
+        // journey is finished: the user only asked to be notified of the
+        // arrival. Otherwise, board and switch to phase 2.
+        if (waitTime <= 0) {
+            if (alertOnly) {
+                finishTracking(
+                    lang === 'en' ? '🚌 Your bus has arrived' : '🚌 Tu autobús ha llegado',
+                    lang === 'en'
+                        ? 'Arrival alert finished. Tracking stopped to save battery.'
+                        : 'Aviso finalizado. Se ha detenido el seguimiento para ahorrar batería.'
+                );
+            } else {
+                tracking.patch({ phase: 'toDest' });
+                scheduleTrackingRefresh();
+                inAppAlert(t.trackingBoardNow, { durationMs: 6000 });
+            }
+            return;
+        }
+
+        document.getElementById("track-eta-val")!.textContent = waitTime.toString();
+        const arrivalTime = new Date(Date.now() + waitTime * 60000);
+        let timeStr = "--:--";
+        try {
+            timeStr = arrivalTime.toLocaleTimeString(lang === 'en' ? 'en-US' : 'es-ES', {
+                hour: "2-digit",
+                minute: "2-digit",
+            });
+        } catch (e) {
+            /* ignore invalid date */
+        }
+        document.getElementById("track-status")!.textContent =
+            `${t.trackingPhaseToStop}: ${timeStr}`;
+    }
+
+    // Phase 2 ('toDest'): count down the real-time remaining time to the
+    // destination. It is recalculated from live per-stop data (func=0 at the
+    // destination stop); when the bus is not reported there yet it uses the
+    // live bus position (func=2) plus a real-time per-stop travel average.
+    async function updatePhaseToDest(info: any, gen: number) {
+        // Step 1: real-time ETA at the destination stop.
+        const data = await API.getStopArrivals(info.destinationStopId);
+        if (gen !== trackingGeneration || !tracking.get()) return;
+
+        let busFoundAtStop = false;
+        let targetBus: any = null;
+        if (data && data.resultado === "OK" && data.buses && Array.isArray(data.buses.lineas)) {
+            for (const l of data.buses.lineas) {
+                if (!Array.isArray(l.buses)) continue;
+                const b = l.buses.find(
+                    (bus: any) => bus.bus && bus.bus.toString() === info.busId.toString(),
+                );
+                if (b) {
+                    targetBus = b;
+                    busFoundAtStop = true;
+                    break;
+                }
+            }
+        }
+
+        if (busFoundAtStop && targetBus) {
+            let time = typeof targetBus.tiempo === "number" ? targetBus.tiempo : parseInt(targetBus.tiempo);
+            if (isNaN(time)) time = 0;
+            renderDestEta(time);
+            // On arrival at the destination: finish tracking to save battery.
+            if (time <= 0) {
+                finishTracking(t.trackingFinishedTitle, t.trackingFinishedBody);
+            }
+            return;
+        }
+
+        // Step 2: bus not reported at the destination yet -> live position
+        // (func=2) + real-time per-stop average. Throttled to once a minute.
+        const cached = lineInfoCache;
+        const stale = Date.now() - cached.asOf >= 60000;
+        let foundInLine = cached.foundInLine;
+        let stopsLeft = cached.stopsLeft;
+        let etaMins = cached.etaMins;
+
+        if (stale) {
+            lastLineInfoCheck = Date.now();
+            foundInLine = false;
+            stopsLeft = -1;
+            etaMins = -1;
+            try {
+                const lineData = await API.getLineInfo(info.lineId);
+                if (gen !== trackingGeneration || !tracking.get()) return;
+
+                const catalog = storage.getCatalog();
+                if (lineData && lineData.paradas && catalog) {
+                    // Find the stops where the bus currently is (live position).
+                    const busStopIds: number[] = [];
+                    if (Array.isArray(lineData.paradas)) {
+                        for (const dir of lineData.paradas) {
+                            if (!Array.isArray(dir.paradas)) continue;
+                            for (const p of dir.paradas) {
+                                if (
+                                    Array.isArray(p.buses) &&
+                                    p.buses.some(
+                                        (b: any) => b.bus && b.bus.toString() === info.busId.toString(),
+                                    )
+                                ) {
+                                    busStopIds.push(parseInt(p.id.toString()));
+                                }
+                            }
+                        }
+                    }
+
+                    if (busStopIds.length > 0) {
+                        const busAtStopId = busStopIds[0];
+                        const targetDestIdNum = parseInt(info.destinationStopId.toString());
+                        const line = catalog.actualizacion.lineas.find(
+                            (l: any) => l.id.toString() === info.lineId.toString(),
+                        );
+                        if (line && Array.isArray(line.rutas)) {
+                            for (const route of line.rutas) {
+                                if (!Array.isArray(route.paradas)) continue;
+                                const routeParadas = route.paradas.map((p) => parseInt(p.toString()));
+                                const bIdx = routeParadas.indexOf(busAtStopId);
+                                const dIdx = routeParadas.indexOf(targetDestIdNum);
+                                if (bIdx !== -1 && dIdx !== -1 && bIdx <= dIdx) {
+                                    stopsLeft = dIdx - bIdx;
+                                    foundInLine = stopsLeft > 0;
+
+                                    // Keep a per-stop travel average from real
+                                    // observations of the bus moving.
+                                    const now = Date.now();
+                                    if (lastBusStopIdx !== -1 && lastBusStopIdx !== bIdx) {
+                                        const elapsedSec = (now - lastBusPosTime) / 1000;
+                                        const moved = Math.abs(bIdx - lastBusStopIdx);
+                                        if (elapsedSec > 0 && moved > 0) {
+                                            const secPerStop = elapsedSec / moved;
+                                            avgSecPerStop = avgSecPerStop === null
+                                                ? secPerStop
+                                                : avgSecPerStop * 0.7 + secPerStop * 0.3;
+                                        }
+                                    }
+                                    lastBusPosTime = now;
+                                    lastBusStopIdx = bIdx;
+
+                                    const defaultSecPerStop = 150;
+                                    const perStop = avgSecPerStop ?? defaultSecPerStop;
+                                    etaMins = Math.max(1, Math.round((stopsLeft * perStop) / 60));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (lineErr) {
+                // Ignore transient failures on the throttled fallback.
+                foundInLine = false;
+                stopsLeft = -1;
+                etaMins = -1;
+            }
+            lineInfoCache = { foundInLine, stopsLeft, etaMins, asOf: Date.now() };
+        }
+
+        // Tracking may have been stopped while the fallback was running.
+        if (gen !== trackingGeneration || !tracking.get()) return;
+
+        if (foundInLine) {
+            document.getElementById("track-eta-val")!.textContent = etaMins.toString();
+            document.getElementById("track-status")!.textContent =
+                `~${stopsLeft} ${t.trackingStopsAway}`;
+        } else {
+            document.getElementById("track-status")!.textContent =
+                t.trackingSearchingBus;
+            document.getElementById("track-eta-val")!.textContent = "--";
+        }
+    }
 
     async function updateTrackingUI() {
         if (isUpdating) return;
@@ -1717,6 +2231,7 @@ const { title } = Astro.props;
 
         if (!info) {
             bar.style.display = "none";
+            phase1BusSeen = false;
             if (trackingInterval) {
                 clearInterval(trackingInterval);
                 trackingInterval = null;
@@ -1742,17 +2257,18 @@ const { title } = Astro.props;
         }
 
         const catalog = storage.getCatalog();
-        let destStopName = info.destinationStopId.toString();
+        let destStopName = info.destinationName || info.destinationStopId.toString();
         if (catalog) {
             const destStop = catalog.paradas[info.destinationStopId];
             destStopName = destStop?.nombre || destStopName;
         }
-        
-        // Dynamically update label depending on whether we are waiting or travelling
-        // Actualizar dinámicamente el texto según si estamos esperando en la parada o de viaje
+
+        // Unified tracking label: phase 1 waits at the boarding stop (counting
+        // until the bus arrives), phase 2 travels towards the destination.
         const trackTitleEl = document.querySelector("#tracking-bar .tracking-text strong");
+        const phase = info.phase || 'toStop';
         if (trackTitleEl) {
-            if (info.destinationStopId.toString() === info.originStopId.toString()) {
+            if (phase === 'toStop') {
                 trackTitleEl.innerHTML = `${t.trackingBarWaiting} <span id="track-dest-name">${destStopName}</span>`;
             } else {
                 trackTitleEl.innerHTML = `${t.trackingBarDest} <span id="track-dest-name">${destStopName}</span>`;
@@ -1769,241 +2285,14 @@ const { title } = Astro.props;
             isUpdating = false;
         }, MAX_TRACKING_UPDATE_MS);
         try {
-            // Check ETA alert for the boarding/origin stop if enabled and not already triggered
-            // Comprobar la alerta de ETA para la parada de origen si está activa y aún no se ha disparado
-            const etaAlertEnabled = localStorage.getItem('buscoruna_eta_alert_enabled') !== 'false';
-            const etaAlertTriggered = localStorage.getItem('buscoruna_eta_alert_triggered') === 'true';
-
-            // The boarding-alert look-up and the destination ETA reply can run in
-            // parallel: awaiting them sequentially would double the perceived
-            // latency of the tracking bar.
-            const originAlertCheck = (async () => {
-                if (!(etaAlertEnabled && !etaAlertTriggered && info.originStopId)) return;
-                try {
-                    const originData = await API.getStopArrivals(info.originStopId);
-                    if (originData && originData.resultado === "OK" && originData.buses && Array.isArray(originData.buses.lineas)) {
-                        const lineInfo = originData.buses.lineas.find(
-                            (bl: any) => bl.linea.toString() === info.lineId.toString()
-                        );
-                        if (lineInfo && Array.isArray(lineInfo.buses)) {
-                            const b = lineInfo.buses.find(
-                                (bus: any) => bus.bus && bus.bus.toString() === info.busId.toString()
-                            );
-                            if (b) {
-                                let waitTime = typeof b.tiempo === "number" ? b.tiempo : parseInt(b.tiempo);
-                                if (!isNaN(waitTime)) {
-                                    const threshold = parseInt(localStorage.getItem('buscoruna_eta_alert_threshold') || '2');
-                                    if (waitTime <= threshold && gen === trackingGeneration && tracking.get()) {
-                                        // Trigger arrival alert!
-                                        // Disparar aviso de llegada
-                                        localStorage.setItem('buscoruna_eta_alert_triggered', 'true');
-                                        
-                                        // Send system notification (compatible with Android/Chrome)
-                                        // Enviar notificación del sistema (compatible con Android/Chrome)
-                                        const notifyTitle = lang === 'en' ? '🚌 Your bus is arriving!' : '🚌 ¡Tu autobús está llegando!';
-                                        const notifyBody = lang === 'en' 
-                                            ? `Bus ${info.busId} will arrive at your origin stop in ${waitTime} min. Board the bus!`
-                                            : `El bus ${info.busId} llegará a tu parada de origen en ${waitTime} min. ¡Sube al bus!`;
-                                        sendNotification(notifyTitle, {
-                                            body: notifyBody,
-                                            requireInteraction: true,
-                                            icon: "/logo.png",
-                                            badge: "/logo.png"
-                                        });
-
-                                        // Play sound and vibration FIRST, before any UI, so the user hears it immediately.
-                                        // Reproducir sonido y vibración PRIMERO, antes de cualquier UI, para escucharlo al instante.
-                                        if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
-                                        try {
-                                            const context = new (window.AudioContext || (window as any).webkitAudioContext)();
-                                            if (context.state === 'suspended') await context.resume();
-                                            const osc = context.createOscillator();
-                                            osc.type = "sine";
-                                            osc.frequency.setValueAtTime(523.25, context.currentTime); // C5 note
-                                            osc.connect(context.destination);
-                                            osc.start();
-                                            osc.stop(context.currentTime + 0.6);
-                                        } catch (e) {}
-
-                                        // Non-blocking in-app banner (replaces blocking alert() which delayed the sound).
-                                        // Banner no bloqueante (sustituye al alert() bloqueante que retrasaba el sonido).
-                                        const alertText = lang === 'en'
-                                            ? `🔔 Arrival alert! Your bus (Bus ${info.busId}) will arrive in ${waitTime} min.`
-                                            : `🔔 ¡Aviso de llegada! Tu autobús (Bus ${info.busId}) llegará en ${waitTime} min.`;
-                                        inAppAlert(alertText, { durationMs: 10000 });
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } catch (etaErr) {
-                    console.warn("Failed to check boarding ETA alert", etaErr);
-                }
-            })();
-
-            // Step 1: Try getting arrivals at the destination stop
-            const data = await API.getStopArrivals(info.destinationStopId);
-            await originAlertCheck;
-
-            // The user may have stopped tracking while we were waiting: bail out
-            // without touching the UI.
-            if (gen !== trackingGeneration || !tracking.get()) return;
-            let busFoundAtStop = false;
-            let targetBus: any = null;
-
-            if (
-                data &&
-                data.resultado === "OK" &&
-                data.buses &&
-                Array.isArray(data.buses.lineas)
-            ) {
-                for (const l of data.buses.lineas) {
-                    if (!Array.isArray(l.buses)) continue;
-                    const b = l.buses.find(
-                        (bus: any) =>
-                            bus.bus &&
-                            bus.bus.toString() === info.busId.toString(),
-                    );
-                    if (b) {
-                        targetBus = b;
-                        busFoundAtStop = true;
-                        break;
-                    }
-                }
-            }
-
-            if (busFoundAtStop && targetBus) {
-                let time =
-                    typeof targetBus.tiempo === "number"
-                        ? targetBus.tiempo
-                        : parseInt(targetBus.tiempo);
-                if (isNaN(time)) time = 0; // Fallback for ">>>", "PRX", etc.
-
-                document.getElementById("track-eta-val")!.textContent =
-                    time.toString();
-                const arrivalTime = new Date(Date.now() + time * 60000);
-                let timeStr = "--:--";
-                try {
-                    timeStr = arrivalTime.toLocaleTimeString(lang === 'en' ? 'en-US' : 'es-ES', {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                    });
-                } catch (e) {
-                    /* ignore invalid date */
-                }
-
-                document.getElementById("track-status")!.textContent =
-                    `${t.trackingArrival}: ${timeStr}`;
-                if (time === 0) {
-                    if (info.destinationStopId.toString() === info.originStopId.toString()) {
-                        document.getElementById("track-status")!.textContent =
-                            t.trackingArrivingStop;
-                    } else {
-                        document.getElementById("track-status")!.textContent =
-                            t.trackingArrivingDest;
-                    }
-                }
+            if (phase === 'toStop') {
+                await updatePhaseToStop(info, gen);
             } else {
-                // Step 2: Fallback - Check full line info (func=2)
-                // Throttled: only hit this expensive endpoint once per minute,
-                // reuse the cached stops-left in between.
-                let foundInLine = lineInfoCache.foundInLine;
-                let stopsLeft = lineInfoCache.stopsLeft;
-                const lineInfoStale = Date.now() - lastLineInfoCheck >= 60000;
-
-                if (lineInfoStale) {
-                    lastLineInfoCheck = Date.now();
-                    lineInfoCache.foundInLine = false;
-                    lineInfoCache.stopsLeft = -1;
-
-                    try {
-                        const lineData = await API.getLineInfo(info.lineId);
-
-                        if (lineData && lineData.paradas && catalog) {
-                            // Normalize lineData paradas into a flat list of stops with their buses
-                            const stopsWithBuses = [];
-                            if (Array.isArray(lineData.paradas)) {
-                                for (const dir of lineData.paradas) {
-                                    if (Array.isArray(dir.paradas)) {
-                                        for (const p of dir.paradas) {
-                                            if (
-                                                Array.isArray(p.buses) &&
-                                                p.buses.some(
-                                                    (b: any) =>
-                                                        b.bus &&
-                                                        b.bus.toString() ===
-                                                            info.busId.toString(),
-                                                )
-                                            ) {
-                                                stopsWithBuses.push(
-                                                    parseInt(p.id.toString()),
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (stopsWithBuses.length > 0) {
-                                const busAtStopId = stopsWithBuses[0];
-                                const targetDestIdNum = parseInt(
-                                    info.destinationStopId.toString(),
-                                );
-
-                                const line = catalog.actualizacion.lineas.find(
-                                    (l: any) =>
-                                        l.id.toString() === info.lineId.toString(),
-                                );
-                                if (line && Array.isArray(line.rutas)) {
-                                    for (const route of line.rutas) {
-                                        if (!Array.isArray(route.paradas)) continue;
-                                        const routeParadas = route.paradas.map((p) =>
-                                            parseInt(p.toString()),
-                                        );
-                                        const bIdx = routeParadas.indexOf(busAtStopId);
-                                        const dIdx =
-                                            routeParadas.indexOf(targetDestIdNum);
-
-                                        if (
-                                            bIdx !== -1 &&
-                                            dIdx !== -1 &&
-                                            bIdx <= dIdx
-                                        ) {
-                                            stopsLeft = dIdx - bIdx;
-                                            foundInLine = true;
-                                            lineInfoCache.foundInLine = true;
-                                            lineInfoCache.stopsLeft = dIdx - bIdx;
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } catch (lineErr) {
-                        // Ignore transient failures on the throttled fallback.
-                        lineInfoCache.foundInLine = false;
-                    }
-                }
-
-                // Tracking may have been stopped while the fallback was running.
-                if (gen !== trackingGeneration || !tracking.get()) return;
-
-                if (foundInLine) {
-                    const estimatedMins = Math.max(
-                        1,
-                        Math.round(stopsLeft * 2.5),
-                    );
-                    document.getElementById("track-eta-val")!.textContent =
-                        estimatedMins.toString();
-                    document.getElementById("track-status")!.textContent =
-                        `~${stopsLeft} ${t.trackingStopsAway}`;
-                } else {
-                    document.getElementById("track-status")!.textContent =
-                        t.trackingSearchingBus;
-                    document.getElementById("track-eta-val")!.textContent =
-                        "--";
-                }
+                await updatePhaseToDest(info, gen);
             }
+            // On arrival the flow finishes itself (tracking.clear()), so a
+            // fresh get() tells us whether we still need to keep polling.
+            if (!tracking.get()) return;
         } catch (err) {
             console.warn("Failed to update tracking ETA", err);
             document.getElementById("track-status")!.textContent =
@@ -2051,6 +2340,10 @@ const { title } = Astro.props;
     });
 
     // Modal logic for fallback
+    // "Cambiar destino": la lista de paradas se construye desde el catálogo
+    // local (fiable, sin red) y la posición actual del bus (func=2) se usa solo
+    // como filtro de mejor esfuerzo. Antes dependía de que la llamada func=2
+    // tuviera respuesta válida y del catálogo, por eso fallaba siempre.
     document
         .getElementById("edit-tracking-dest")
         ?.addEventListener("click", async () => {
@@ -2064,21 +2357,49 @@ const { title } = Astro.props;
             modal.style.display = "flex";
             list.innerHTML = '<div class="small">Cargando paradas...</div>';
 
+            // Catálogo local primero; si la página aún no lo cargó, lo pedimos.
+            let catalog = storage.getCatalog();
+            if (!catalog) {
+                try {
+                    const fetched = await API.getCatalog();
+                    if (fetched) {
+                        catalog = fetched;
+                        storage.setCatalog(fetched);
+                    }
+                } catch (err) {
+                    catalog = null;
+                }
+            }
+
             try {
-                const catalog = storage.getCatalog();
-                const lineData = await API.getLineInfo(info.lineId);
+                const line = catalog?.actualizacion?.lineas?.find(
+                    (l: any) => l.id.toString() === info.lineId.toString(),
+                );
+                if (!catalog || !line || !Array.isArray(line.rutas)) {
+                    list.innerHTML =
+                        '<div class="small">No se pudieron cargar las paradas de esta línea.</div>';
+                    return;
+                }
+                lineNameEl.textContent = line.lin_comer || info.lineId.toString();
 
-                if (lineData && Array.isArray(lineData.paradas) && catalog) {
-                    lineNameEl.textContent = info.lineId.toString();
-                    const line = catalog.actualizacion.lineas.find(
-                        (l: any) => l.id.toString() === info.lineId.toString(),
-                    );
-                    if (line) lineNameEl.textContent = line.lin_comer;
+                // Todas las paradas de la línea (sin duplicados), en orden de ruta.
+                const allStopIds: number[] = [];
+                line.rutas.forEach((r: any) => {
+                    if (!Array.isArray(r.paradas)) return;
+                    r.paradas.forEach((sId: any) => {
+                        const n = parseInt(sId);
+                        if (!allStopIds.includes(n)) allStopIds.push(n);
+                    });
+                });
 
-                    // Find current bus position to filter upcoming stops
-                    let currentBusStopId: number | null = null;
-                    for (const dir of lineData.paradas) {
-                        if (Array.isArray(dir.paradas)) {
+                // Mejor esfuerzo: localizar el bus en la línea (func=2) para
+                // listar solo las paradas que le quedan por delante.
+                let currentBusStopId: number | null = null;
+                try {
+                    const lineData = await API.getLineInfo(info.lineId);
+                    if (lineData && Array.isArray(lineData.paradas)) {
+                        for (const dir of lineData.paradas) {
+                            if (!Array.isArray(dir.paradas)) continue;
                             for (const p of dir.paradas) {
                                 if (
                                     Array.isArray(p.buses) &&
@@ -2095,56 +2416,69 @@ const { title } = Astro.props;
                                     break;
                                 }
                             }
+                            if (currentBusStopId) break;
                         }
-                        if (currentBusStopId) break;
                     }
+                } catch (err) {
+                    // Si func=2 falla, se listan todas las paradas de la línea.
+                }
 
-                    // Get all stops on the line (from catalog for names)
-                    const allStopIds: number[] = [];
-                    if (line) {
-                        line.rutas.forEach((r: any) => {
-                            r.paradas.forEach((sId: any) => {
-                                if (!allStopIds.includes(parseInt(sId)))
-                                    allStopIds.push(parseInt(sId));
-                            });
-                        });
+                // Orden de muestra:
+                // 1) Si sabemos dónde está el bus, solo las paradas posteriores.
+                // 2) Si no, las paradas posteriores a la parada de origen en la
+                //    ruta que contiene el destino actual (preserva el sentido).
+                // 3) Si no aplica, todas las paradas de la línea.
+                let ordered: number[] = allStopIds;
+                if (currentBusStopId) {
+                    const pos = allStopIds.indexOf(currentBusStopId);
+                    if (pos !== -1) ordered = allStopIds.slice(pos + 1);
+                } else {
+                    const route = line.rutas.find((r: any) => {
+                        const ids = (r.paradas || []).map((p: any) => parseInt(p));
+                        return (
+                            ids.includes(parseInt(info.originStopId)) &&
+                            ids.includes(parseInt(info.destinationStopId))
+                        );
+                    });
+                    if (route) {
+                        const ids = route.paradas.map((p: any) => parseInt(p));
+                        const originIdx = ids.indexOf(parseInt(info.originStopId));
+                        if (originIdx !== -1) ordered = ids.slice(originIdx + 1);
                     }
+                }
 
-                    // Filter: if we know where the bus is, only show stops after it.
-                    // For simplicity, if we don't know, show all.
-                    list.innerHTML = allStopIds
-                        .map((sId) => {
-                            const s = catalog.paradas[sId];
-                            return `
+                list.innerHTML = ordered
+                    .map((sId) => {
+                        const s = catalog.paradas[sId];
+                        return `
             <div class="modal-list-item" data-stop="${sId}">
               <strong>${s?.nombre || sId}</strong>
               <small>Parada ${sId}</small>
             </div>
           `;
-                        })
-                        .join("");
+                    })
+                    .join("");
 
-                    list.querySelectorAll(".modal-list-item").forEach(
-                        (item) => {
-                            item.addEventListener("click", () => {
-                                const newDestId = parseInt(
-                                    item.getAttribute("data-stop")!,
-                                );
-                                const currentInfo = tracking.get();
-                                if (currentInfo) {
-                                    tracking.set({
-                                        ...currentInfo,
-                                        destinationStopId: newDestId,
-                                    });
-                                }
-                                modal.style.display = "none";
-                            });
-                        },
-                    );
-                } else {
-                    list.innerHTML =
-                        '<div class="small">No se pudieron cargar las paradas de esta línea.</div>';
-                }
+                list.querySelectorAll(".modal-list-item").forEach(
+                    (item) => {
+                        item.addEventListener("click", () => {
+                            const newDestId = parseInt(
+                                item.getAttribute("data-stop")!,
+                            );
+                            const currentInfo = tracking.get();
+                            if (currentInfo) {
+                                // destinationName undefined -> se re-resuelve
+                                // con el catálogo al refrescar la barra.
+                                tracking.set({
+                                    ...currentInfo,
+                                    destinationStopId: newDestId,
+                                    destinationName: undefined,
+                                });
+                            }
+                            modal.style.display = "none";
+                        });
+                    },
+                );
             } catch (err) {
                 list.innerHTML =
                     '<div class="small">Error al conectar con el servidor.</div>';
@@ -2280,16 +2614,23 @@ const { title } = Astro.props;
             let distPrevToDest = Infinity;
             if (prevStop) {
                 const distToPrev = getDistance(userLat, userLon, prevStop.posy, prevStop.posx);
-                distPrevToDest = getDistance(prevStop.posy, prevStop.posx, destStop.posy, destStop.posx);
+                distPrevToDest = Math.max(80, getDistance(prevStop.posy, prevStop.posx, destStop.posy, destStop.posx));
 
-                // At the previous stop (< 120m) or already closer to destination
-                // than the previous stop (we passed it).
-                atPreviousStop = distToPrev < 120;
-                passedPreviousStop = distToDest < Math.min(350, distPrevToDest * 0.85);
+                // Spacing-aware thresholds: when two stops are very close, the
+                // alert must NOT fire too early or from the wrong stop. It only
+                // fires at the second-to-last stop, or once the user is clearly
+                // closer to the destination than to that stop.
+                // Umbrales acordes a la distancia real entre paradas: con
+                // paradas muy cercanas no debe avisar antes de tiempo ni desde
+                // una parada equivocada.
+                atPreviousStop = distToPrev < Math.min(100, distPrevToDest * 0.45);
+                passedPreviousStop =
+                    distToDest < distToPrev &&
+                    distToDest < Math.max(70, distPrevToDest * 0.5);
             }
             // Fallback: if the route couldn't be resolved, still warn when the
             // user is physically close to the destination stop.
-            const approachingDest = distToDest < 150;
+            const approachingDest = !prevStop && distToDest < 150;
 
             console.log(`[GPS Alert] distToDest: ${distToDest.toFixed(1)}m, atPrev: ${atPreviousStop}, passedPrev: ${passedPreviousStop}`);
 
@@ -2311,19 +2652,9 @@ const { title } = Astro.props;
                     navigator.vibrate([300, 100, 300, 100, 300]);
                 }
                 
-                // Play oscillator beep sound
-                // Emitir un pitido de advertencia por el altavoz
-                try {
-                    const context = new (window.AudioContext || (window as any).webkitAudioContext)();
-                    const osc = context.createOscillator();
-                    osc.type = "sine";
-                    osc.frequency.setValueAtTime(880, context.currentTime);
-                    osc.connect(context.destination);
-                    osc.start();
-                    osc.stop(context.currentTime + 0.5);
-                } catch (soundErr) {
-                    console.warn("Could not play warning sound", soundErr);
-                }
+                // Play the configured get-off/stop alert melody
+                // Reproducir la melodía configurada para el aviso de parada
+                playEventSound('stop');
 
                 // Send background push/system notification if permission granted (compatible with Android/Chrome)
                 // Enviar notificación del sistema si los permisos han sido concedidos (compatible con Android/Chrome)
@@ -2495,6 +2826,7 @@ const { title } = Astro.props;
         if (langSelect) langSelect.value = document.documentElement.getAttribute('data-lang') || 'es';
 
         renderLocationsSettingsUI();
+        renderSoundsSettingsUI();
 
         // Show the appropriate warning depending on platform
         // Mostrar la advertencia adecuada según la plataforma
@@ -2515,9 +2847,8 @@ const { title } = Astro.props;
         const activeId = storage.getActiveLocationId();
 
         if (activeLocSelect) {
-            activeLocSelect.innerHTML = locs.map(l => {
-                const icon = l.icon === 'home' || l.id === 'casa' ? '🏠' : (l.icon === 'briefcase' || l.id === 'trabajo' ? '💼' : '📍');
-                return `<option value="${l.id}" ${l.id === activeId ? 'selected' : ''}>${icon} ${l.name}</option>`;
+            activeLocSelect.innerHTML = `<option value="" ${!activeId ? 'selected' : ''}>${t.walkTimeNone}</option>` + locs.map(l => {
+                return `<option value="${l.id}" ${l.id === activeId ? 'selected' : ''}>${l.name}</option>`;
             }).join('');
         }
 
@@ -2526,7 +2857,7 @@ const { title } = Astro.props;
                 const isDefault = l.id === 'casa' || l.id === 'trabajo';
                 const hasGps = typeof l.lat === 'number' && typeof l.lon === 'number';
                 const gpsBadge = hasGps 
-                    ? `<span style="font-size:0.75rem; background:#dcfce7; color:#15803d; font-weight:700; padding:2px 8px; border-radius:6px;">📍 ${t.locGpsSaved}</span>`
+                    ? `<span style="font-size:0.75rem; background:#dcfce7; color:#15803d; font-weight:700; padding:2px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:0.3rem;"><i data-lucide="map-pin" style="width:12px; height:12px;"></i>${t.locGpsSaved}</span>`
                     : `<span style="font-size:0.75rem; background:#f1f5f9; color:#64748b; font-weight:600; padding:2px 8px; border-radius:6px;">${t.locGpsNone}</span>`;
                 
                 return `
@@ -2540,13 +2871,13 @@ const { title } = Astro.props;
                                 ${t.locGpsSet}
                             </button>
                             ${hasGps ? `
-                                <button type="button" class="btn-secondary btn-clear-gps" data-id="${l.id}" style="padding:0.45rem 0.6rem; font-size:0.8rem; color:#ef4444; border-color:#fee2e2; background:#fff5f5; border-radius:8px;" title="${t.locGpsClear}">
-                                    ✕
+                                <button type="button" class="btn-secondary btn-clear-gps" data-id="${l.id}" style="padding:0.45rem 0.6rem; font-size:0.8rem; color:#ef4444; border-color:#fee2e2; background:#fff5f5; border-radius:8px; display:inline-flex; align-items:center; justify-content:center;" title="${t.locGpsClear}">
+                                    <i data-lucide="x" style="width:14px; height:14px;"></i>
                                 </button>
                             ` : ''}
                             ${!isDefault ? `
-                                <button type="button" class="btn-secondary btn-del-loc" data-id="${l.id}" style="padding:0.45rem 0.6rem; font-size:0.8rem; color:#ef4444; border-color:#fee2e2; background:#fff5f5; border-radius:8px;" title="Borrar">
-                                    🗑️
+                                <button type="button" class="btn-secondary btn-del-loc" data-id="${l.id}" style="padding:0.45rem 0.6rem; font-size:0.8rem; color:#ef4444; border-color:#fee2e2; background:#fff5f5; border-radius:8px; display:inline-flex; align-items:center; justify-content:center;" title="Borrar">
+                                    <i data-lucide="trash-2" style="width:14px; height:14px;"></i>
                                 </button>
                             ` : ''}
                         </div>
@@ -2554,14 +2885,19 @@ const { title } = Astro.props;
                 `;
             }).join('');
 
+            createIcons({
+                icons: {
+                    X,
+                    Trash2,
+                    MapPin,
+                    Plus
+                }
+            });
+
             listContainer.querySelectorAll('.btn-set-gps').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const id = btn.getAttribute('data-id');
                     if (!id) return;
-                    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-                        inAppAlert(isNativePlatform() ? t.locGpsUnavailableNative : t.locGpsUnavailableWeb, { durationMs: 5000 });
-                        return;
-                    }
                     btn.textContent = '...';
                     getPosition().then((coords) => {
                         if (coords) {
@@ -2597,16 +2933,106 @@ const { title } = Astro.props;
         }
     }
 
-    document.getElementById("settings-btn-add-location")?.addEventListener("click", () => {
-        const name = prompt(t.settingsLocationPrompt);
-        if (name && name.trim()) {
-            const newLoc = storage.addUserLocation(name.trim());
-            storage.setActiveLocationId(newLoc.id);
-            renderLocationsSettingsUI();
+    // Alert melodies UI (test / upload custom mp3 / reset to default)
+    // Interfaz de melodías de aviso (probar / subir mp3 / volver al predeterminado)
+    function renderSoundsSettingsUI() {
+        const events = ['bus', 'stop'] as const;
+        for (const ev of events) {
+            const badge = document.getElementById(`sound-badge-${ev}`);
+            const removeBtn = document.getElementById(`sound-remove-${ev}`);
+            const custom = isCustomSoundSet(ev);
+            if (badge) badge.textContent = custom ? t.settingsSoundCustomBadge : t.settingsSoundDefault;
+            if (removeBtn) removeBtn.style.display = custom ? '' : 'none';
         }
+    }
+
+    const soundEvents = ['bus', 'stop'];
+    soundEvents.forEach(ev => {
+        document.getElementById(`sound-test-${ev}`)?.addEventListener('click', () => {
+            playEventSound(ev as 'bus' | 'stop');
+        });
+        document.getElementById(`sound-upload-${ev}`)?.addEventListener('click', () => {
+            const input = document.getElementById(`sound-file-${ev}`) as HTMLInputElement;
+            if (input) {
+                input.value = '';
+                input.click();
+            }
+        });
+        document.getElementById(`sound-file-${ev}`)?.addEventListener('change', (e: any) => {
+            const file = e.target?.files?.[0];
+            if (!file) return;
+            if (file.size > MAX_CUSTOM_SIZE) {
+                inAppAlert(t.settingsSoundTooBig, { durationMs: 5000 });
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const dataUri = event.target?.result as string;
+                if (dataUri) {
+                    setCustomSound(ev as 'bus' | 'stop', dataUri);
+                    renderSoundsSettingsUI();
+                    inAppAlert(lang === 'en' ? 'Custom sound saved' : 'Sonido personalizado guardado', { durationMs: 4000 });
+                }
+            };
+            reader.readAsDataURL(file);
+        });
+        document.getElementById(`sound-remove-${ev}`)?.addEventListener('click', () => {
+            setCustomSound(ev as 'bus' | 'stop', null);
+            renderSoundsSettingsUI();
+        });
+    });
+
+    const settingsLocAddRow = document.getElementById("settings-add-location-row");
+    const settingsLocNameInput = document.getElementById("settings-new-location-name") as HTMLInputElement;
+
+    function addLocationFromInput() {
+        const name = (settingsLocNameInput?.value || "").trim();
+        if (!name) {
+            inAppAlert(t.settingsLocationNoName, { durationMs: 3000 });
+            return;
+        }
+        const newLoc = storage.addUserLocation(name);
+        storage.setActiveLocationId(newLoc.id);
+        if (settingsLocNameInput) settingsLocNameInput.value = "";
+        if (settingsLocAddRow) settingsLocAddRow.style.display = "none";
+        renderLocationsSettingsUI();
+    }
+
+    document.getElementById("settings-btn-add-location")?.addEventListener("click", () => {
+        if (!settingsLocAddRow) return;
+        const showing = settingsLocAddRow.style.display !== "none";
+        settingsLocAddRow.style.display = showing ? "none" : "flex";
+        if (!showing) settingsLocNameInput?.focus();
+    });
+    document.getElementById("settings-confirm-add-location")?.addEventListener("click", addLocationFromInput);
+    document.getElementById("settings-cancel-add-location")?.addEventListener("click", () => {
+        if (settingsLocAddRow) settingsLocAddRow.style.display = "none";
+    });
+    settingsLocNameInput?.addEventListener("keydown", (e: KeyboardEvent) => {
+        if (e.key === "Enter") addLocationFromInput();
     });
 
     // Data Migration & Backup
+    // Cache invalidation on new web version
+    try {
+        const metaVer = document.querySelector('meta[name="app-version"]')?.getAttribute('content') || '0';
+        const cachedVer = localStorage.getItem('buscoruna_cache_version');
+        if (cachedVer && cachedVer !== metaVer) {
+            sessionStorage.clear();
+            localStorage.removeItem('buscoruna_cache_version');
+        }
+        localStorage.setItem('buscoruna_cache_version', metaVer);
+    } catch (e) {}
+
+    document.getElementById("btn-forzar-recarga")?.addEventListener("click", () => {
+        try {
+            localStorage.removeItem('buscoruna_cache_version');
+            sessionStorage.clear();
+            if ('caches' in window) { caches.keys().then(names => Promise.all(names.map(n => caches.delete(n)))); }
+        } catch (e) {}
+        window.location.href = '/?force_reload=' + Date.now();
+    });
+
     document.getElementById("btn-export-data")?.addEventListener("click", async () => {
         const dump = storage.exportAllUserData();
         try {
@@ -2924,6 +3350,7 @@ const { title } = Astro.props;
                 (title, body) => {
                     inAppAlert(`${title} ${body}`, { durationMs: 10000 });
                     if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+                    playEventSound('bus');
                 },
             );
         } else {
@@ -2962,7 +3389,10 @@ const { title } = Astro.props;
                     locationName: locationName,
                     etaAlertEnabled: etaEnabled,
                     gpsAlertEnabled: gpsEnabled,
-                    lang: lang
+                    lang: lang,
+                    phase: info.phase || 'toStop',
+                    busSound: getCustomSound('bus') ?? '',
+                    stopSound: getCustomSound('stop') ?? ''
                 });
             }
             applySettings();
@@ -3007,7 +3437,10 @@ const { title } = Astro.props;
                 locationName: locationName,
                 etaAlertEnabled: etaEnabled,
                 gpsAlertEnabled: gpsEnabled,
-                lang: lang
+                lang: lang,
+                phase: initialInfo.phase || 'toStop',
+                busSound: getCustomSound('bus') ?? '',
+                stopSound: getCustomSound('stop') ?? ''
             });
         }
         applySettings();

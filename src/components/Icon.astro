@@ -28,11 +28,14 @@ import {
   Minus,
   Briefcase,
   Clock,
-  Trash2
+  Trash2,
+  Play,
+  Upload,
+  Bell
 } from '@lucide/astro';
 
 interface Props {
-  name: 'refresh' | 'edit' | 'settings' | 'search' | 'stop' | 'bus' | 'star' | 'heart' | 'map' | 'x' | 'chevron-right' | 'chevron-left' | 'chevron-down' | 'location' | 'star-outline' | 'heart-outline' | 'shield' | 'ban' | 'menu' | 'share' | 'plus' | 'minus' | 'home' | 'briefcase' | 'clock' | 'trash' | 'maximize' | 'minimize' | 'street-view' | 'navigation' | 'download';
+  name: 'refresh' | 'edit' | 'settings' | 'search' | 'stop' | 'bus' | 'star' | 'heart' | 'map' | 'x' | 'chevron-right' | 'chevron-left' | 'chevron-down' | 'location' | 'star-outline' | 'heart-outline' | 'shield' | 'ban' | 'menu' | 'share' | 'plus' | 'minus' | 'home' | 'briefcase' | 'clock' | 'trash' | 'maximize' | 'minimize' | 'street-view' | 'navigation' | 'download' | 'play' | 'upload' | 'bell';
   class?: string;
   size?: number;
 }
@@ -70,7 +73,10 @@ const iconMap = {
   minimize: Minimize2,
   'street-view': Camera,
   navigation: Navigation2,
-  download: Download
+  download: Download,
+  play: Play,
+  upload: Upload,
+  bell: Bell
 };
 
 const SelectedIcon = iconMap[name];

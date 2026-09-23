@@ -21,10 +21,11 @@
       "172.16.180.172",
       "172.17.0.1",
       "172.18.0.1",
-      "172.16.0.2"
+      "172.16.0.2",
+      "172.16.180.185"
     ],
     "cleartext": true,
-    "url": "https://xn--coruabus-g3a.inled.es"
+    "url": "http://localhost:4321"
   },
   "android": {
     "allowMixedContent": true

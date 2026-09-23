@@ -11,7 +11,16 @@ const t = getTranslations(lang);
 	<section class="lines-page">
     <div id="lines-view">
       <h2>{t.linesTitle}</h2>
-      <div id="lines-list" class="grid-list">{t.linesLoadingLines}</div>
+      <div id="lines-list" class="grid-list anim-stagger">
+        <div class="loading-state">
+          <div class="loading">{t.linesLoadingLines}</div>
+          <div class="skeleton-stack" aria-hidden="true">
+            <div class="skeleton skeleton-card" style="height:90px"></div>
+            <div class="skeleton skeleton-card" style="height:90px"></div>
+            <div class="skeleton skeleton-card" style="height:90px"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="line-detail-view" style="display: none;">

@@ -245,7 +245,9 @@ const t = getTranslations(lang);
     width: 100%;
     height: 100%;
     background: rgba(0,0,0,0.5);
-    z-index: 2000;
+    /* Above the fixed bottom nav (z-index 8000) so the confirmation
+       bottom-sheet buttons are never covered. */
+    z-index: 9000;
     padding: 1rem;
   }
 
@@ -423,6 +425,9 @@ const t = getTranslations(lang);
       left: 0;
       right: 0;
       animation: slideUpModal 0.3s ease-out;
+      /* Keep the buttons clear of the fixed bottom navigation and the
+         device's safe area (home-indicator bar). */
+      padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 0.75rem);
     }
     
     .modal {
@@ -785,6 +790,7 @@ const t = getTranslations(lang);
     Map
   } from 'lucide';
   import { getTranslations } from '../utils/i18n';
+  import { getPosition } from '../utils/geolocation';
 
   const lang = document.documentElement.getAttribute('data-lang') || 'es';
   const t = getTranslations(lang);
@@ -1018,66 +1024,65 @@ const t = getTranslations(lang);
 
     setupGeoButtons() {
       this.querySelector('#get-location-origin')?.addEventListener('click', () => {
-        if (navigator.geolocation) {
-          const resultsDiv = this.querySelector('#origin-results') as HTMLDivElement;
-          resultsDiv.innerHTML = `<div class="autocomplete-item"><small>${lang === 'en' ? 'Locating...' : 'Localizando...'}</small></div>`;
-          resultsDiv.style.display = 'block';
+        const resultsDiv = this.querySelector('#origin-results') as HTMLDivElement;
+        resultsDiv.innerHTML = `<div class="autocomplete-item"><small>${lang === 'en' ? 'Locating...' : 'Localizando...'}</small></div>`;
+        resultsDiv.style.display = 'block';
 
-          navigator.geolocation.getCurrentPosition((pos) => {
-            const { latitude, longitude } = pos.coords;
-            const nearby = this.findNearbyStops(latitude, longitude, 2000).slice(0, 5);
-            
-            if (nearby.length > 0) {
-              resultsDiv.innerHTML = `
-                <div class="autocomplete-item current-pos" data-lat="${latitude}" data-lon="${longitude}">
-                  <span class="icon"><i data-lucide="navigation" style="width: 18px; height: 18px;"></i></span>
+        getPosition().then((pos) => {
+          if (!pos) {
+            resultsDiv.innerHTML = `<div class="autocomplete-item"><small>${lang === 'en' ? 'Error getting location.' : 'Error al obtener ubicación.'}</small></div>`;
+            return;
+          }
+          const nearby = this.findNearbyStops(pos.lat, pos.lon, 2000).slice(0, 5);
+
+          if (nearby.length > 0) {
+            resultsDiv.innerHTML = `
+              <div class="autocomplete-item current-pos" data-lat="${pos.lat}" data-lon="${pos.lon}">
+                <span class="icon"><i data-lucide="navigation" style="width: 18px; height: 18px;"></i></span>
+                <div class="info">
+                  <strong>${lang === 'en' ? 'My exact location' : 'Mi ubicación exacta'}</strong>
+                  <small>${lang === 'en' ? 'Use GPS coordinates' : 'Usar coordenadas GPS'}</small>
+                </div>
+              </div>
+              <div style="padding: 0.5rem 1rem; background: #f3f4f6; font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">${lang === 'en' ? 'Nearby stops' : 'Paradas cercanas'}</div>
+              ${nearby.map((s: any) => `
+                <div class="autocomplete-item stop" data-type="stop" data-id="${s.id}" data-name="${s.nombre}">
+                  <span class="icon"><i data-lucide="map-pin" style="width: 18px; height: 18px;"></i></span>
                   <div class="info">
-                    <strong>${lang === 'en' ? 'My exact location' : 'Mi ubicación exacta'}</strong>
-                    <small>${lang === 'en' ? 'Use GPS coordinates' : 'Usar coordenadas GPS'}</small>
+                    <strong>${s.nombre}</strong>
+                    <small>${lang === 'en' ? 'Stop' : 'Parada'} ${s.id} (${Math.round(s.dist)}m)</small>
                   </div>
                 </div>
-                <div style="padding: 0.5rem 1rem; background: #f3f4f6; font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase;">${lang === 'en' ? 'Nearby stops' : 'Paradas cercanas'}</div>
-                ${nearby.map((s: any) => `
-                  <div class="autocomplete-item stop" data-type="stop" data-id="${s.id}" data-name="${s.nombre}">
-                    <span class="icon"><i data-lucide="map-pin" style="width: 18px; height: 18px;"></i></span>
-                    <div class="info">
-                      <strong>${s.nombre}</strong>
-                      <small>${lang === 'en' ? 'Stop' : 'Parada'} ${s.id} (${Math.round(s.dist)}m)</small>
-                    </div>
-                  </div>
-                `).join('')}
-              `;
-              this.renderIcons();
+              `).join('')}
+            `;
+            this.renderIcons();
 
-              resultsDiv.querySelectorAll('.autocomplete-item').forEach(item => {
-                item.addEventListener('click', () => {
-                  const input = this.querySelector('#origin') as HTMLInputElement;
-                  if (item.classList.contains('current-pos')) {
-                    const originInput = this.querySelector('#origin') as HTMLInputElement;
-                    if (originInput) originInput.value = lang === 'en' ? "My location" : "Mi ubicación";
-                    this.selectedOrigin = {
-                      type: 'place',
-                      nombre: lang === 'en' ? "My location" : "Mi ubicación",
-                      posy: latitude,
-                      posx: longitude
-                    };
-                  } else {
-                    const id = item.getAttribute('data-id');
-                    const name = item.getAttribute('data-name');
-                    input.value = name || '';
-                    const stop = this.catalog.paradas[id!];
-                    this.selectedOrigin = { type: 'stop', ...stop };
-                  }
-                  resultsDiv.style.display = 'none';
-                });
+            resultsDiv.querySelectorAll('.autocomplete-item').forEach(item => {
+              item.addEventListener('click', () => {
+                const input = this.querySelector('#origin') as HTMLInputElement;
+                if (item.classList.contains('current-pos')) {
+                  const originInput = this.querySelector('#origin') as HTMLInputElement;
+                  if (originInput) originInput.value = lang === 'en' ? "My location" : "Mi ubicación";
+                  this.selectedOrigin = {
+                    type: 'place',
+                    nombre: lang === 'en' ? "My location" : "Mi ubicación",
+                    posy: pos.lat,
+                    posx: pos.lon
+                  };
+                } else {
+                  const id = item.getAttribute('data-id');
+                  const name = item.getAttribute('data-name');
+                  input.value = name || '';
+                  const stop = this.catalog.paradas[id!];
+                  this.selectedOrigin = { type: 'stop', ...stop };
+                }
+                resultsDiv.style.display = 'none';
               });
-            } else {
-              resultsDiv.innerHTML = `<div class="autocomplete-item"><small>${t.tripNoStopsFound}</small></div>`;
-            }
-          }, () => {
-            resultsDiv.innerHTML = `<div class="autocomplete-item"><small>${lang === 'en' ? 'Error getting location.' : 'Error al obtener ubicación.'}</small></div>`;
-          });
-        }
+            });
+          } else {
+            resultsDiv.innerHTML = `<div class="autocomplete-item"><small>${t.tripNoStopsFound}</small></div>`;
+          }
+        });
       });
 
       this.querySelector('#get-location-dest')?.addEventListener('click', () => {
@@ -1109,19 +1114,15 @@ const t = getTranslations(lang);
 
       setTimeout(() => {
         this.map.invalidateSize();
-        
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition((pos) => {
-            const { latitude, longitude } = pos.coords;
-            this.map.setView([latitude, longitude], 16);
-            this.showNearbyStopsOnMap(latitude, longitude);
-          }, (err) => {
-            console.error('Geolocation error:', err);
+
+        getPosition().then((pos) => {
+          if (pos) {
+            this.map.setView([pos.lat, pos.lon], 16);
+            this.showNearbyStopsOnMap(pos.lat, pos.lon);
+          } else {
             this.showNearbyStopsOnMap(43.3623, -8.4115);
-          }, { enableHighAccuracy: true });
-        } else {
-          this.showNearbyStopsOnMap(43.3623, -8.4115);
-        }
+          }
+        });
       }, 200);
     }
 
@@ -1549,7 +1550,14 @@ const t = getTranslations(lang);
             const line = parseInt(btn.getAttribute('data-line')!);
             const lineName = btn.getAttribute('data-line-name')!;
             
-            storage.toggleFavoriteRoute(origin, dest, line, lineName);
+            // When the favorite is saved from the planner, attach the planning
+            // goal (mode + target time) so the stop view can pick the concrete
+            // bus to board today. Al guardar desde el planificador se adjunta
+            // el objetivo (modo + hora) para elegir el bus a coger hoy.
+            const ttInput = this.querySelector('#target-time') as HTMLInputElement | null;
+            const favTargetTime = ttInput?.value || null;
+            
+            storage.toggleFavoriteRoute(origin, dest, line, lineName, this.plannerMode, this.plannerMode === 'arrive' ? favTargetTime : null);
             
             // Check if it is now a favorite
             // Comprobar si ahora es favorita
