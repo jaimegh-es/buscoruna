@@ -14,6 +14,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        version: '0.0.4',
+        title: '🎉 Nueva página de bienvenida',
+        items: [
+            'Landing renovada y separada de la app: entra desde ella o navega directo con /welcome.',
+            'Vista previa en directo de la app desde la propia landing.',
+            'Tres formas de usarla claramente explicadas: Web, PWA y APK (la recomendada).',
+            'Mejoras de geolocalización: timeout en web, permiso de ubicación aproximada en Android 12+ y detección más rápida del bus.',
+        ],
+    },
+    {
         version: '0.0.3',
         title: '🛡️ Detección de bloqueos y mejoras',
         items: [
