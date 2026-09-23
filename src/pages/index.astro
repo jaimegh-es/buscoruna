@@ -8,43 +8,26 @@ const t = getTranslations(lang);
 ---
 
 <Layout title={`${t.appName} | ${t.bottomNavHome}`}>
-  <div id="landing-overlay" style="position:fixed;inset:0;z-index:9999;background:rgba(245,245,247,0.96);backdrop-filter:blur(12px);overflow-y:auto;padding:2rem 1rem;display:none;" class="anim-up">
-    <div style="max-width:1100px;margin:0 auto;">
-      <button onclick="this.closest('#landing-overlay').style.display='none';localStorage.setItem('buscoruna_first_visit','seen');" style="position:sticky;top:0.75rem;float:right;z-index:2;background:var(--primary);color:#fff;border:none;padding:0.6rem 1.2rem;border-radius:10px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(59,130,246,0.35);">Entrar / Cerrar</button>
-      <div style="text-align:center;padding:2.5rem 0 1rem;">
-        <h1 style="font-size:clamp(2.4rem,6vw,4rem);font-weight:800;letter-spacing:-0.04em;line-height:1.05;">Coruña <span style="color:var(--primary);">Bus</span></h1>
-        <p style="font-size:1.15rem;color:var(--text-muted);max-width:680px;margin:0 auto 2rem;">Planifica tu ruta, recibe avisos de llegada, avisa de parada con sonido, consulta líneas, favoritos y clima.</p>
-        <a href="/planner" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.9rem 1.8rem;font-size:1.05rem;border-radius:12px;text-decoration:none;background:var(--primary);color:#fff;font-weight:700;box-shadow:0 6px 20px rgba(59,130,246,0.3);"><Icon name="navigation" size={20}/> Empezar ruta</a>
+    <div id="landing-overlay" style="position:fixed;inset:0;z-index:9999;background:rgba(245,245,247,0.96);backdrop-filter:blur(8px);overflow-y:auto;padding:2rem 1rem;display:none;" class="anim-up">
+    <div style="max-width: 960px; margin: 0 auto;">
+      <button onclick="this.closest('#landing-overlay').style.display='none';localStorage.setItem('buscoruna_first_visit','seen');" style="position:sticky;top:0.5rem;float:right;background:var(--primary);color:#fff;border:none;padding:0.5rem 1rem;border-radius:8px;font-weight:700;cursor:pointer;">Cerrar / Entrar</button>
+      <div style="text-align:center;padding:2rem 0;">
+        <h1 style="font-size: clamp(2.2rem,5vw,3.4rem); font-weight:800; letter-spacing:-0.03em;">Coruña <span style="color:var(--primary);">Bus</span></h1>
+        <p style="font-size:1.15rem; color:var(--text-muted); max-width:640px; margin:0 auto 2rem;">Planifica tu ruta, recibe avisos de llegada, avisa de parada con sonido, consulta líneas, favoritos y clima local.</p>
+        <a href="/planner" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.85rem 1.6rem;font-size:1rem;border-radius:12px;text-decoration:none;background:var(--primary);color:#fff;font-weight:700;">Planifica tu ruta <Icon name="navigation" size={18} /></a>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.2rem;padding:1rem 0;">
-        <a href="/planner" class="card" style="padding:1.4rem;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:0.7rem;background:#fff;border:1px solid #e5e7eb;border-radius:16px;transition:transform .15s,box-shadow .15s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 10px 30px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
-          <div style="width:52px;height:52px;border-radius:14px;background:color-mix(in srgb,var(--primary) 12%,transparent);display:flex;align-items:center;justify-content:center;color:var(--primary);"><Icon name="navigation" size={26}/></div>
-          <h3 style="font-size:1.1rem;font-weight:700;">Planificador de rutas</h3>
-          <p style="font-size:0.9rem;color:var(--text-muted);">Origen y destino con avisos de llegada y parada.</p>
-        </a>
-        <a href="/stops" class="card" style="padding:1.4rem;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:0.7rem;background:#fff;border:1px solid #e5e7eb;border-radius:16px;transition:transform .15s,box-shadow .15s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 10px 30px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
-          <div style="width:52px;height:52px;border-radius:14px;background:color-mix(in srgb,var(--line-color,#10b981) 12%,transparent);display:flex;align-items:center;justify-content:center;color:var(--line-color,#10b981);"><Icon name="map" size={26}/></div>
-          <h3 style="font-size:1.1rem;font-weight:700;">Paradas cercanas</h3>
-          <p style="font-size:0.9rem;color:var(--text-muted);">Mapa interactivo, satélite y Street View.</p>
-        </a>
-        <a href="/stop/1" class="card" style="padding:1.4rem;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:0.7rem;background:#fff;border:1px solid #e5e7eb;border-radius:16px;transition:transform .15s,box-shadow .15s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 10px 30px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
-          <div style="width:52px;height:52px;border-radius:14px;background:color-mix(in srgb,#f59e0b 12%,transparent);display:flex;align-items:center;justify-content:center;color:#f59e0b;"><Icon name="bell" size={26}/></div>
-          <h3 style="font-size:1.1rem;font-weight:700;">Avisos de llegada</h3>
-          <p style="font-size:0.9rem;color:var(--text-muted);">Sonidos configurables, GPS y alertas de parada.</p>
-        </a>
-        <a href="/favorites" class="card" style="padding:1.4rem;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:0.7rem;background:#fff;border:1px solid #e5e7eb;border-radius:16px;transition:transform .15s,box-shadow .15s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 10px 30px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
-          <div style="width:52px;height:52px;border-radius:14px;background:color-mix(in srgb,#a855f7 12%,transparent);display:flex;align-items:center;justify-content:center;color:#a855f7;"><Icon name="star" size={26}/></div>
-          <h3 style="font-size:1.1rem;font-weight:700;">Favoritos con nombres</h3>
-          <p style="font-size:0.9rem;color:var(--text-muted);">Guarda paradas y configura tiempos.</p>
-        </a>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;padding:1rem 0;">
+        <a href="/planner" class="card" style="padding:1.2rem;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:0.6rem;"><div style="width:48px;height:48px;border-radius:12px;background:color-mix(in srgb,var(--primary) 10%,transparent);display:flex;align-items:center;justify-content:center;color:var(--primary);"><Icon name="navigation" size={24}/></div><h3 style="font-size:1.05rem;font-weight:700;">Planificador de rutas</h3><p style="font-size:0.85rem;color:var(--text-muted);">Indica origen y destino y conoce qué autobús coger con aviso.</p></a>
+        <a href="/stops" class="card" style="padding:1.2rem;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:0.6rem;"><div style="width:48px;height:48px;border-radius:12px;background:color-mix(in srgb,var(--line-color,#10b981) 10%,transparent);display:flex;align-items:center;justify-content:center;color:var(--line-color,#10b981);"><Icon name="map" size={24}/></div><h3 style="font-size:1.05rem;font-weight:700;">Paradas cercanas</h3><p style="font-size:0.85rem;color:var(--text-muted);">Mapa interactivo, satélite y Street View cerca de ti.</p></a>
+        <a href="/stop/1" class="card" style="padding:1.2rem;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:0.6rem;"><div style="width:48px;height:48px;border-radius:12px;background:color-mix(in srgb,#f59e0b 10%,transparent);display:flex;align-items:center;justify-content:center;color:#f59e0b;"><Icon name="bell" size={24}/></div><h3 style="font-size:1.05rem;font-weight:700;">Avisos de llegada</h3><p style="font-size:0.85rem;color:var(--text-muted);">Te avisa con el tiempo que configures y detecta tu ubicación.</p></a>
+        <a href="/favorites" class="card" style="padding:1.2rem;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:0.6rem;"><div style="width:48px;height:48px;border-radius:12px;background:color-mix(in srgb,#a855f7 10%,transparent);display:flex;align-items:center;justify-content:center;color:#a855f7;"><Icon name="star" size={24}/></div><h3 style="font-size:1.05rem;font-weight:700;">Favoritos con nombres</h3><p style="font-size:0.85rem;color:var(--text-muted);">Guarda paradas, pon nombres y configura tiempos de salida.</p></a>
       </div>
-      <div style="padding:2rem 0 1.5rem;">
-        <h3 style="font-size:1.15rem;font-weight:700;margin-bottom:1rem;">Nuevas funciones</h3>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;">
-          <div class="card" style="padding:1.1rem;background:#fff;border:1px solid #e5e7eb;border-radius:14px;"><h4 style="font-weight:700;margin-bottom:0.3rem;"><Icon name="bell" size={18}/> Melodías configurables</h4><p style="font-size:0.85rem;color:var(--text-muted);">Sube MP3 o usa avisobus / avisoparada por defecto.</p></div>
-          <div class="card" style="padding:1.1rem;background:#fff;border:1px solid #e5e7eb;border-radius:14px;"><h4 style="font-weight:700;margin-bottom:0.3rem;"><Icon name="map" size={18}/> GPS espaciado</h4><p style="font-size:0.85rem;color:var(--text-muted);">Umbrales reales entre paradas; alerta solo si origen == destino.</p></div>
-          <div class="card" style="padding:1.1rem;background:#fff;border:1px solid #e5e7eb;border-radius:14px;"><h4 style="font-weight:700;margin-bottom:0.3rem;"><Icon name="shield" size={18}/> Notificaciones bloqueo</h4><p style="font-size:0.85rem;color:var(--text-muted);">Avisos sin desbloquear; canal silencioso disponible.</p></div>
-          <div class="card" style="padding:1.1rem;background:#fff;border:1px solid #e5e7eb;border-radius:14px;"><h4 style="font-weight:700;margin-bottom:0.3rem;"><Icon name="sun" size={18}/> Clima en inicio</h4><p style="font-size:0.85rem;color:var(--text-muted);">Widget de clima local junto a bienvenida.</p></div>
+      <div style="padding: 1rem 0;">
+        <h3 style="font-size: 1.1rem; font-weight: 700;">Características</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap: 1rem;">
+          <div class="card" style="padding: 1rem;"><h4 style="font-weight: 700; margin-bottom: 0.3rem;"><Icon name="bell" size={18}/> Avisos configurables</h4><p style="font-size: 0.85rem; color: var(--text-muted);">Melodías personalizadas o predeterminadas para llegada y aviso.</p></div>
+          <div class="card" style="padding: 1rem;"><h4 style="font-weight: 700; margin-bottom: 0.3rem;"><Icon name="map" size={18}/> Mapa satelital + Street View</h4><p style="font-size: 0.85rem; color: var(--text-muted);">Visualiza la parada y comprueba la ruta.</p></div>
+          <div class="card" style="padding: 1rem;"><h4 style="font-weight: 700; margin-bottom: 0.3rem;"><Icon name="shield" size={18}/> Notificaciones en bloqueo</h4><p style="font-size: 0.85rem; color: var(--text-muted);">Recibe avisos sin desbloquear el teléfono.</p></div>
         </div>
       </div>
     </div>
@@ -58,7 +41,7 @@ const t = getTranslations(lang);
     })();
   </script>
 
-    <div class="home-dashboard anim-stagger">
+<div class="home-dashboard anim-stagger">
         <section class="welcome-section">
             <div class="welcome-header">
                 <div class="welcome-text">
