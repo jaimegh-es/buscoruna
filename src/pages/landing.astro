@@ -1,0 +1,63 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Icon from "../components/Icon.astro";
+import { getTranslations } from "../utils/i18n";
+
+const lang = Astro.cookies.get('buscoruna_lang')?.value || 'es';
+const t = getTranslations(lang);
+---
+
+<Layout title={`${t.appName} | ${t.bottomNavHome}`}>
+  <main class="landing-page" style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem 1rem;background:linear-gradient(160deg,#f8fafc 0%,#e0e7ff 100%);">
+    <div style="text-align:center;max-width:980px;width:100%;">
+      <a href="/" style="display:inline-flex;align-items:center;gap:0.6rem;text-decoration:none;font-size:2.6rem;font-weight:800;color:#0f172a;letter-spacing:-0.04em;line-height:1;">
+        <span style="width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,#3b82f6,#6366f1);display:inline-flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 8px 24px rgba(59,130,246,0.35);"><Icon name="bus" size={24}/></span>
+        Coruña <span style="color:var(--primary);">Bus</span>
+      </a>
+      <h1 style="font-size:clamp(2.2rem,5.5vw,3.6rem);font-weight:800;margin-top:1.2rem;line-height:1.1;letter-spacing:-0.03em;">Planifica tu ruta con avisos inteligentes</h1>
+      <p style="font-size:1.15rem;color:var(--text-muted);max-width:680px;margin:0.8rem auto 2.5rem;">Planificador de rutas, paradas cercanas, avisos configurables con sonido, favoritos con nombres, GPS espaciado y clima local.</p>
+
+      <a href="/planner" style="display:inline-flex;align-items:center;gap:0.6rem;padding:1rem 2rem;font-size:1.1rem;border-radius:14px;text-decoration:none;background:var(--primary);color:#fff;font-weight:700;box-shadow:0 10px 28px rgba(59,130,246,0.35);transition:transform .15s,box-shadow .15s;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 14px 36px rgba(59,130,246,0.45)'" onmouseout="this.style.transform='';this.style.boxShadow='0 10px 28px rgba(59,130,246,0.35)'">
+        <Icon name="navigation" size={20}/> {t.homeActionPlan || 'Planifica tu ruta'}
+      </a>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;margin-top:3rem;text-align:left;">
+        <a href="/planner" class="card" style="padding:1.2rem;text-decoration:none;color:inherit;background:#fff;border:1px solid #e5e7eb;border-radius:16px;display:flex;flex-direction:column;gap:0.6rem;transition:transform .15s,box-shadow .15s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 12px 30px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+          <div style="width:48px;height:48px;border-radius:12px;background:color-mix(in srgb,var(--primary) 10%,transparent);display:flex;align-items:center;justify-content:center;color:var(--primary);"><Icon name="navigation" size={24}/></div>
+          <h3 style="font-size:1.05rem;font-weight:700;">Planificador</h3>
+          <p style="font-size:0.85rem;color:var(--text-muted);">Origen, destino y aviso de parada.</p>
+        </a>
+        <a href="/stops" class="card" style="padding:1.2rem;text-decoration:none;color:inherit;background:#fff;border:1px solid #e5e7eb;border-radius:16px;display:flex;flex-direction:column;gap:0.6rem;transition:transform .15s,box-shadow .15s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 12px 30px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+          <div style="width:48px;height:48px;border-radius:12px;background:color-mix(in srgb,var(--line-color,#10b981) 10%,transparent);display:flex;align-items:center;justify-content:center;color:var(--line-color,#10b981);"><Icon name="map" size={24}/></div>
+          <h3 style="font-size:1.05rem;font-weight:700;">Paradas</h3>
+          <p style="font-size:0.85rem;color:var(--text-muted);">Mapa interactivo, satélite y Street View.</p>
+        </a>
+        <a href="/stop/1" class="card" style="padding:1.2rem;text-decoration:none;color:inherit;background:#fff;border:1px solid #e5e7eb;border-radius:16px;display:flex;flex-direction:column;gap:0.6rem;transition:transform .15s,box-shadow .15s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 12px 30px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+          <div style="width:48px;height:48px;border-radius:12px;background:color-mix(in srgb,#f59e0b 10%,transparent);display:flex;align-items:center;justify-content:center;color:#f59e0b;"><Icon name="bell" size={24}/></div>
+          <h3 style="font-size:1.05rem;font-weight:700;">Avisos</h3>
+          <p style="font-size:0.85rem;color:var(--text-muted);">Melodías configurables y GPS espaciado.</p>
+        </a>
+        <a href="/favorites" class="card" style="padding:1.2rem;text-decoration:none;color:inherit;background:#fff;border:1px solid #e5e7eb;border-radius:16px;display:flex;flex-direction:column;gap:0.6rem;transition:transform .15s,box-shadow .15s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 12px 30px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+          <div style="width:48px;height:48px;border-radius:12px;background:color-mix(in srgb,#a855f7 10%,transparent);display:flex;align-items:center;justify-content:center;color:#a855f7;"><Icon name="star" size={24}/></div>
+          <h3 style="font-size:1.05rem;font-weight:700;">Favoritos</h3>
+          <p style="font-size:0.85rem;color:var(--text-muted);">Guarda paradas con nombres y tiempos.</p>
+        </a>
+      </div>
+
+      <div style="margin-top:2.5rem;padding:1.2rem 1.5rem;background:#fff;border:1px solid #e5e7eb;border-radius:16px;text-align:left;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;">
+        <div>
+          <h4 style="font-weight:700;margin-bottom:0.3rem;"><Icon name="music" size={16}/> Melodías</h4>
+          <p style="font-size:0.8rem;color:var(--text-muted);">Sube MP3 personalizado o usa los predeterminados.</p>
+        </div>
+        <div>
+          <h4 style="font-weight:700;margin-bottom:0.3rem;"><Icon name="shield" size={16}/> Notificaciones bloqueo</h4>
+          <p style="font-size:0.8rem;color:var(--text-muted);">Canal silencioso disponible; recibe avisos sin desbloquear.</p>
+        </div>
+        <div>
+          <h4 style="font-weight:700;margin-bottom:0.3rem;"><Icon name="sun" size={16}/> Clima local</h4>
+          <p style="font-size:0.8rem;color:var(--text-muted);">Consulta el tiempo desde el inicio.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+</Layout>
