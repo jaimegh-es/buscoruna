@@ -6,7 +6,6 @@ interface Props {
 import CatalogLoader from "../components/CatalogLoader.astro";
 import Icon from "../components/Icon.astro";
 import InstallPopup from "../components/InstallPopup.astro";
-import Landing from "../components/Landing.astro";
 import ProjectMenu from "../components/ProjectMenu.astro";
 import ProjectDrawer from "../components/ProjectDrawer.astro";
 import { getTranslations } from "../utils/i18n";
@@ -105,7 +104,6 @@ const { title } = Astro.props;
     </head>
     <body>
         <CatalogLoader />
-        <Landing />
         <InstallPopup />
 
         <!-- Global Loader Popup (non-blocking, sits above the header) -->
@@ -200,6 +198,9 @@ const { title } = Astro.props;
                 <div class="legal-disclaimer">
                     <p>
                         <strong>{t.disclaimerTitle}</strong> {t.disclaimerContent}
+                    </p>
+                    <p style="margin-top:0.5rem;">
+                        <a href="/welcome" style="color: var(--primary); font-weight: 700; text-decoration: none;">{t.footerWelcomeLink}</a>
                     </p>
                 </div>
             </footer>
@@ -2899,7 +2900,7 @@ const { title } = Astro.props;
                     const id = btn.getAttribute('data-id');
                     if (!id) return;
                     btn.textContent = '...';
-                    getPosition().then((coords) => {
+                    getPosition({ forceRefresh: true }).then((coords) => {
                         if (coords) {
                             storage.updateUserLocation(id, { lat: coords.lat, lon: coords.lon });
                             inAppAlert(t.locGpsSuccess, { durationMs: 4000 });

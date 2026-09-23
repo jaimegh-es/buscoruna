@@ -1028,7 +1028,7 @@ const t = getTranslations(lang);
         resultsDiv.innerHTML = `<div class="autocomplete-item"><small>${lang === 'en' ? 'Locating...' : 'Localizando...'}</small></div>`;
         resultsDiv.style.display = 'block';
 
-        getPosition().then((pos) => {
+        getPosition({ forceRefresh: true }).then((pos) => {
           if (!pos) {
             resultsDiv.innerHTML = `<div class="autocomplete-item"><small>${lang === 'en' ? 'Error getting location.' : 'Error al obtener ubicación.'}</small></div>`;
             return;

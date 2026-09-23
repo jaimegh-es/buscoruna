@@ -484,7 +484,7 @@ const t = getTranslations(lang);
     }
 
     getUserPosition(): Promise<{ lat: number; lon: number } | null> {
-      return getPosition();
+      return getPosition({ forceRefresh: true });
     }
 
     async scanLines(busNumber?: string) {

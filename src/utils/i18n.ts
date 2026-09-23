@@ -176,6 +176,7 @@ export const translations = {
     landingFeature5Title: "100% Libre de Anuncios",
     landingFeature5Desc: "Disfruta de una experiencia limpia y enfocada en lo que importa: llegar a tiempo. Sin banners molestos, sin rastreadores y sin interrupciones publicitarias.",
     landingOpenAppFooter: "Abrir App Web",
+    footerWelcomeLink: "Sobre Coruña Bus",
 
     // Install Popup
     installTitle: "Instalar Coruña Bus",
@@ -580,6 +581,7 @@ export const translations = {
     landingFeature5Title: "100% Ad-Free",
     landingFeature5Desc: "Enjoy a clean experience focused on what matters: arriving on time. No annoying banners, no trackers, and no advertising interruptions.",
     landingOpenAppFooter: "Open Web App",
+    footerWelcomeLink: "About Coruña Bus",
 
     // Install Popup
     installTitle: "Install Coruña Bus",

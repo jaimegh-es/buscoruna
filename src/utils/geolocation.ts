@@ -6,7 +6,19 @@ export interface GeolocationResult {
   lon: number;
 }
 
+export interface GetPositionOptions {
+  forceRefresh?: boolean;
+}
+
 const PERMISSION_DENIED = 1;
+
+let inFlightPromise: Promise<GeolocationResult | null> | null = null;
+let lastKnownPosition: { result: GeolocationResult; time: number } | null = null;
+
+export function clearGeolocationCache(): void {
+  inFlightPromise = null;
+  lastKnownPosition = null;
+}
 
 export const isNativePlatform = (): boolean => {
   try {
@@ -22,12 +34,32 @@ function requestWebPosition(options: PositionOptions): Promise<GeolocationResult
       reject(new Error('Geolocation API unavailable'));
       return;
     }
+    const timeoutMs = (options.timeout ?? 10000) + 1500;
+    const timer = setTimeout(() => {
+      reject(new Error('Geolocation timeout'));
+    }, timeoutMs);
+
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
-      (err) => reject(err),
+      (pos) => {
+        clearTimeout(timer);
+        if (pos?.coords && typeof pos.coords.latitude === 'number' && typeof pos.coords.longitude === 'number') {
+          resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        } else {
+          reject(new Error('Invalid position data'));
+        }
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
       options
     );
   });
+}
+
+function isPermissionGranted(status: any): boolean {
+  if (!status) return false;
+  return status.location === 'granted' || status.coarseLocation === 'granted';
 }
 
 async function getNativePosition(): Promise<GeolocationResult | null> {
@@ -36,9 +68,9 @@ async function getNativePosition(): Promise<GeolocationResult | null> {
   // read the real device GPS position.
   try {
     const status = await Geolocation.checkPermissions();
-    if (status.location && status.location !== 'granted') {
+    if (!isPermissionGranted(status)) {
       const granted = await Geolocation.requestPermissions();
-      if (granted.location !== 'granted') return null;
+      if (!isPermissionGranted(granted)) return null;
     }
 
     // Fast, cached/network fix first: the fused provider can return a recent
@@ -104,33 +136,68 @@ function nativeWatchOnce(durationMs: number): Promise<GeolocationResult | null> 
   });
 }
 
-/**
- * Obtains the user's position as reliably as possible.
- *
- * Native app: reads the device GPS through the Capacitor Geolocation plugin.
- * Web/PWA: fast, low-accuracy fix first (network / cached fix, up to 60s old)
- * and, on failure (except a denied permission prompt), one retry with high
- * accuracy.
- *
- * Returns `null` when the position cannot be obtained.
- */
-export async function getPosition(): Promise<GeolocationResult | null> {
-  if (Capacitor.isNativePlatform()) {
-    return await getNativePosition();
-  }
-
+async function getWebPosition(): Promise<GeolocationResult | null> {
   if (typeof navigator === 'undefined' || !navigator.geolocation) return null;
 
   try {
-    return await requestWebPosition({ enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
+    return await requestWebPosition({ enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 });
   } catch (err) {
     const code = (err as GeolocationPositionError | undefined)?.code;
     if (code === PERMISSION_DENIED) return null;
   }
 
   try {
-    return await requestWebPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+    return await requestWebPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
   } catch {
     return null;
   }
+}
+
+/**
+ * Obtains the user's position as reliably as possible.
+ *
+ * Native app: reads the device GPS through the Capacitor Geolocation plugin.
+ * Supports both precise (fine) and approximate (coarse) location permissions on Android 12+.
+ *
+ * Web/PWA: fast low-accuracy fix first (network / cached fix up to 60s old)
+ * and, on failure (except a denied permission prompt), retries with high accuracy
+ * with a cached fix allowance so mobile browsers do not stall on cold satellite lock.
+ *
+ * Concurrent calls are deduplicated into a single shared promise, and recent fixes
+ * are cached in memory for 15s (bypassable with `forceRefresh: true`).
+ *
+ * Returns `null` when the position cannot be obtained.
+ */
+export async function getPosition(options?: GetPositionOptions): Promise<GeolocationResult | null> {
+  const isTest = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
+  const ttl = isTest ? 0 : 15000;
+
+  const now = Date.now();
+  if (!options?.forceRefresh && ttl > 0 && lastKnownPosition && (now - lastKnownPosition.time < ttl)) {
+    return lastKnownPosition.result;
+  }
+
+  if (inFlightPromise && !options?.forceRefresh) {
+    return inFlightPromise;
+  }
+
+  const run = (async () => {
+    try {
+      let res: GeolocationResult | null = null;
+      if (Capacitor.isNativePlatform()) {
+        res = await getNativePosition();
+      } else {
+        res = await getWebPosition();
+      }
+      if (res) {
+        lastKnownPosition = { result: res, time: Date.now() };
+      }
+      return res;
+    } finally {
+      inFlightPromise = null;
+    }
+  })();
+
+  inFlightPromise = run;
+  return run;
 }

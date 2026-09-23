@@ -1025,7 +1025,7 @@ const t = getTranslations(lang);
           e.stopPropagation();
           const detectBtn = e.currentTarget as HTMLElement;
           detectBtn.classList.add('detect-loading');
-          getPosition().then((coords) => {
+          getPosition({ forceRefresh: true }).then((coords) => {
             detectBtn.classList.remove('detect-loading');
             if (coords) {
               const detected = storage.autoSelectLocationFromGPS(coords.lat, coords.lon);
@@ -1082,7 +1082,7 @@ const t = getTranslations(lang);
               return;
             }
             gpsBtn.classList.add('gps-loading');
-            getPosition().then((coords) => {
+            getPosition({ forceRefresh: true }).then((coords) => {
               if (coords) {
                 storage.updateUserLocation(id, { lat: coords.lat, lon: coords.lon });
                 inAppAlert(t.locGpsSuccess, { durationMs: 4000 });

@@ -1,0 +1,730 @@
+---
+// Página de aterrizaje independiente: no usa el Layout de la app para que
+// quede claro que la landing y la aplicación son productos separados.
+// Los textos siguen de cerca la redacción del README (Funciones).
+import { getTranslations } from "../utils/i18n";
+
+const acceptLanguage = Astro.request.headers.get("accept-language") || "";
+const cookieLang = Astro.cookies.get("buscoruna_lang")?.value;
+const lang = cookieLang || (acceptLanguage.toLowerCase().includes("en") ? "en" : "es");
+const t = getTranslations(lang);
+
+const isEn = lang === "en";
+---
+
+<!doctype html>
+<html lang={lang}>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="description" content={t.ogDescription} />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="icon" type="image/png" href="/logo.png" />
+        <title>{t.appName} — {isEn ? 'The bus app made by someone who rides it every day' : 'La app de buses hecha por quien va cada día en bus'}</title>
+    </head>
+    <body>
+        <header class="site-header">
+            <div class="header-inner">
+                <a class="brand" href="/welcome" aria-label={t.appName}>
+                    <img src="/favicon.svg" alt="" width="36" height="36" />
+                    <span class="brand-name">Coruña<b>Bus</b></span>
+                </a>
+                <div class="header-actions">
+                    <button data-lang-switch data-lang="es" class="lang-btn" class:list={[{ active: lang === 'es' }]} type="button">ES</button>
+                    <button data-lang-switch data-lang="en" class="lang-btn" class:list={[{ active: lang === 'en' }]} type="button">EN</button>
+                    <a class="btn btn-solid btn-sm" href="/" id="open-app-top">{t.landingEnterBtn}</a>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <section class="hero">
+                <div class="hero-copy">
+                    <h1>{isEn
+                        ? 'The bus app created by the person who uses it every day.'
+                        : 'La app de los buses creada por quien usa el bus diariamente.'}</h1>
+                    <p class="hero-sub">{isEn
+                        ? 'Everything you need, it has it: real-time times, route planning, arrival alerts and stop reminders. Available as web, PWA and native Android app.'
+                        : 'Lo que necesitas, lo tiene: tiempos en tiempo real, planificador de rutas, avisos de llegada y aviso de parada. Disponible en web, PWA y aplicación nativa para Android.'}</p>
+                    <div class="hero-actions">
+                        <a class="btn btn-solid" href="/">{t.landingEnterBtn}</a>
+                        <a class="btn btn-ghost" href="https://github.com/jaimegh-es/buscoruna" target="_blank" rel="noopener noreferrer">{isEn ? 'View on GitHub' : 'Ver en GitHub'}</a>
+                    </div>
+                    <p class="hero-meta">{isEn
+                        ? 'Free and ad-free · Web, PWA and Android'
+                        : 'Gratis y sin anuncios · Web, PWA y Android'}</p>
+                </div>
+                <div class="hero-media">
+                    <video class="demo-video" autoplay loop muted playsinline>
+                        <source src="/demos/calculadora-rutas.mp4" type="video/mp4" />
+                    </video>
+                </div>
+            </section>
+
+            <section class="try-it">
+                <h2>{isEn ? 'Try it right here, no install' : 'Pruébala aquí mismo, sin instalar nada'}</h2>
+                <p class="try-sub">{isEn
+                    ? 'A live preview of the real app. Open it to use it in full.'
+                    : 'Una vista previa en directo de la app real. Ábrela para usarla completa.'}</p>
+                <div class="phone-frame">
+                    <iframe
+                        src="/"
+                        title="Coruña Bus — vista previa"
+                        loading="lazy"
+                        tabindex="-1"
+                        aria-hidden="true"
+                    ></iframe>
+                    <div class="phone-overlay">
+                        <p class="phone-overlay-hint">{isEn ? 'The real app, live' : 'La app real, en directo'}</p>
+                        <a class="btn btn-solid" href="/">{t.landingEnterBtn}</a>
+                    </div>
+                </div>
+            </section>
+
+            <section class="ways">
+                <h2>{isEn ? 'Three ways to use it' : 'Tres formas de usarla'}</h2>
+                <div class="ways-grid">
+                    <article class="way">
+                        <h3>{isEn ? 'Web' : 'Web'}</h3>
+                        <p>{isEn
+                            ? 'Open the page and use it. Nothing to install, no account, no registration.'
+                            : 'Abre la página y úsala. Nada que instalar, ni cuenta, ni registro.'}</p>
+                        <a class="btn btn-ghost" href="/">{t.landingOpenAppFooter}</a>
+                    </article>
+                    <article class="way">
+                        <h3>PWA</h3>
+                        <p>{isEn
+                            ? 'Install it from the browser as a Web App: icon on your home screen and offline access, like a native app.'
+                            : 'Instálala desde el navegador como Web App: icono en tu pantalla de inicio y acceso offline, como una app nativa.'}</p>
+                        <a class="btn btn-ghost" href="/">{t.installBtn}</a>
+                    </article>
+                    <article class="way way-featured">
+                        <span class="way-badge">{isEn ? 'Recommended' : 'Recomendada'}</span>
+                        <h3>Android (APK)</h3>
+                        <p>{isEn
+                            ? 'The native app: arrival alerts in the background and on the lock screen, plus built-in updates and Obtainium support.'
+                            : 'La app nativa: avisos de llegada en segundo plano y en pantalla de bloqueo, además de actualizaciones integradas y compatibilidad con Obtainium.'}</p>
+                        <div class="way-actions">
+                            <a class="btn btn-solid" href="https://github.com/jaimegh-es/buscoruna/releases/latest/download/app-debug.apk" download="coruna-bus.apk">{t.downloadAndroidBtn}</a>
+                            <a class="btn btn-ghost" href="obtainium://add/https://github.com/jaimegh-es/buscoruna">{t.obtainiumAddBtn}</a>
+                        </div>
+                        <p class="way-note">{t.playStoreComingSoonDesc}</p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="features">
+                <h2>{isEn ? 'Functions' : 'Funciones'}</h2>
+                <p class="features-sub">{isEn
+                    ? 'Along with the usual features of a bus stop app (times, lines, stops...), it includes:'
+                    : 'Junto con las funciones habituales de una app de paradas (mostrar tiempos, líneas, paradas...), incluye adicionalmente:'}</p>
+                <div class="feature-grid">
+                    <article class="feature">
+                        <h3>{isEn ? 'Route planner' : 'Planificador de rutas'}</h3>
+                        <p>{isEn
+                            ? 'Say where you are leaving from and where you want to go, and the arrival time (or leave it blank). It tells you which lines and which exact bus to take, lets you jump to its stop and add a bus arrival alert.'
+                            : 'Indicas de dónde a dónde quieres ir y la hora de llegada (o la dejas en blanco). Te dice qué líneas coger y qué bus concreto, permitiéndote acceder a su parada y añadir un aviso de llegada del bus.'}</p>
+                    </article>
+                    <article class="feature">
+                        <h3>{isEn ? 'Bus arrival alerts' : 'Avisos de llegada de bus'}</h3>
+                        <p>{isEn
+                            ? 'It alerts you when the bus is X minutes away, with the lead time you configure. It detects via location whether you are at one of your preconfigured places, which add extra lead time you set per place (for example, from home it takes me 3 minutes to reach the stop).'
+                            : 'Te avisa cuando queda X minutos para la llegada del bus a la parada, con la antelación que hayas configurado. Detecta mediante ubicación si te encuentras en una de tus ubicaciones preconfiguradas, las cuales añaden tiempo extra de antelación según la ubicación (por ejemplo, si estoy en casa tardo 3 minutos en llegar a la parada).'}</p>
+                    </article>
+                    <article class="feature">
+                        <h3>{isEn ? 'Arrival time at destination + remaining time' : 'Cálculo de hora de llegada a destino + tiempo restante'}</h3>
+                        <p>{isEn
+                            ? 'It computes how long is left until you reach your destination and at what time you will arrive — perfect to warn that you are running late. The calculation is very good.'
+                            : 'Calcula cuánto queda para que llegues al destino y a qué hora llegarás — perfecto para avisar si llegas tarde. El cálculo es muy bueno.'}</p>
+                    </article>
+                    <article class="feature">
+                        <h3>{isEn ? 'Stop request notification' : 'Notificación de aviso de parada'}</h3>
+                        <p>{isEn
+                            ? 'The app tracks your location during the ride and plays a sound so you can request the stop and the bus pulls over. You will never forget to ask again.'
+                            : 'La aplicación detecta tu ubicación durante el trayecto y emite un sonido para que puedas avisar de parada y el bus pare. Nunca más te olvidarás de avisar.'}</p>
+                    </article>
+                    <article class="feature">
+                        <h3>{isEn ? 'Lock screen notifications' : 'Notificaciones en pantalla de bloqueo'}</h3>
+                        <p>{isEn
+                            ? 'So you do not have to unlock your phone to see the information.'
+                            : 'Para que no tengas que desbloquear el teléfono para ver la información.'}</p>
+                    </article>
+                    <article class="feature">
+                        <h3>{isEn ? 'Nearby stops detector' : 'Detector de paradas cercanas'}</h3>
+                        <p>{isEn
+                            ? 'A stop finder that automatically shows the stops near your location and places them on a map.'
+                            : 'Incluye un buscador de paradas que te muestra automáticamente las paradas cercanas a tu ubicación y te las sitúa en un mapa.'}</p>
+                    </article>
+                    <article class="feature">
+                        <h3>{isEn ? 'Custom names for favorite stops' : 'Nombres personalizados para paradas favoritas'}</h3>
+                        <p>{isEn
+                            ? 'Add a descriptive name to your favorite stops.'
+                            : 'Añade un nombre descriptivo a tus paradas favoritas.'}</p>
+                    </article>
+                    <article class="feature">
+                        <h3>{isEn ? 'Time calculation presets' : 'Presets de cálculo de tiempo'}</h3>
+                        <p>{isEn
+                            ? 'Calculate every day the bus you should take with real data, without filling the form each time.'
+                            : 'Calcula cada día el bus que debes coger con datos reales y sin tener que rellenar el formulario cada vez.'}</p>
+                    </article>
+                    <article class="feature">
+                        <h3>{isEn ? 'Satellite stop map + Street View' : 'Mapa satelital de paradas + Street View'}</h3>
+                        <p>{isEn
+                            ? 'So you can find a stop you do not know.'
+                            : 'Para que sepas llegar a una parada que no te es conocida.'}</p>
+                    </article>
+                    <article class="feature">
+                        <h3>{isEn ? 'Local news + weather and temperature' : 'Noticias locales + tiempo y temperatura'}</h3>
+                        <p>{isEn
+                            ? 'To keep you entertained during the ride.'
+                            : 'Para que te entretengas durante el trayecto.'}</p>
+                    </article>
+                    <article class="feature">
+                        <h3>{isEn ? 'Built-in updater + Obtainium compatibility' : 'Actualizador integrado y compatibilidad con Obtainium'}</h3>
+                        <p>{isEn
+                            ? 'Coming soon to the Play Store (when the author turns 18, hehe).'
+                            : 'Próximamente en la Play Store (cuando cumpla 18 años, jeje).'}</p>
+                    </article>
+                    <article class="feature">
+                        <h3>{isEn ? 'Spanish and English' : 'Español e inglés'}</h3>
+                        <p>{isEn
+                            ? 'So foreigners have an app to use in the international language that is not the uncomfortable official one.'
+                            : 'Para que los extranjeros tengan una app que usar en el idioma internacional y que no sea la incómoda oficial.'}</p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="demos">
+                <h2>{isEn ? 'See it in action' : 'Velo en acción'}</h2>
+                <div class="demo-grid">
+                    <figure class="demo">
+                        <video class="demo-video" autoplay loop muted playsinline preload="none">
+                            <source src="/demos/paradas.mp4" type="video/mp4" />
+                        </video>
+                        <figcaption>{t.landingFeature3Title}</figcaption>
+                    </figure>
+                    <figure class="demo">
+                        <video class="demo-video" autoplay loop muted playsinline preload="none">
+                            <source src="/demos/calculadora-tiempo.mp4" type="video/mp4" />
+                        </video>
+                        <figcaption>{t.landingFeature2Title}</figcaption>
+                    </figure>
+                </div>
+            </section>
+        </main>
+
+        <footer class="site-footer">
+            <p class="footer-langs">
+                <button data-lang-switch data-lang="es" class="lang-btn" class:list={[{ active: lang === 'es' }]} type="button">ES</button>
+                <button data-lang-switch data-lang="en" class="lang-btn" class:list={[{ active: lang === 'en' }]} type="button">EN</button>
+            </p>
+            <p class="footer-links">
+                <a href="/">{t.landingOpenAppFooter}</a>
+                <a href="mailto:contacto@inled.es">contacto@inled.es</a>
+                <a href="https://github.com/jaimegh-es/buscoruna" target="_blank" rel="noopener noreferrer">GitHub</a>
+            </p>
+        </footer>
+
+        <script>
+            // Al cambiar idioma persistimos cookie + localStorage igual que hace
+            // la app (Layout.astro), para que la landing y la app compartan idioma.
+            function persistLang(value: string) {
+                localStorage.setItem('buscoruna_lang', value);
+                document.cookie = `buscoruna_lang=${value};path=/;max-age=${60 * 60 * 24 * 365}`;
+                window.location.reload();
+            }
+            document.querySelectorAll('[data-lang-switch]').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    persistLang(btn.getAttribute('data-lang') === 'en' ? 'en' : 'es');
+                });
+            });
+        </script>
+    </body>
+</html>
+
+<style>
+    :root {
+        --wb-red: #f44336;
+        --wb-red-dark: #d32f2f;
+        --wb-ink: #1c212a;
+        --wb-muted: #5b6472;
+        --wb-bg: #ffffff;
+        --wb-panel: #f7f7f8;
+        --wb-line: #e8e8ec;
+        --wb-radius: 14px;
+    }
+
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    html {
+        scroll-behavior: smooth;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background: var(--wb-bg);
+        color: var(--wb-ink);
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* ---------- Header ---------- */
+    .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: rgba(255, 255, 255, 0.94);
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--wb-line);
+    }
+
+    /* El header en móvil era el problema: título + idiomas + botón no cabían.
+       Ahora la fila se envuelve y el logo usa un tamaño fluido. */
+    .header-inner {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.5rem 0.9rem;
+        padding: 0.6rem clamp(0.8rem, 3vw, 2.5rem);
+    }
+
+    .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        text-decoration: none;
+        color: inherit;
+        min-width: 0;
+    }
+
+    .brand img {
+        width: clamp(28px, 7vw, 36px);
+        height: clamp(28px, 7vw, 36px);
+        flex-shrink: 0;
+    }
+
+    .brand-name {
+        font-size: clamp(1rem, 4vw, 1.15rem);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        white-space: nowrap;
+    }
+
+    .brand-name b {
+        color: var(--wb-red);
+    }
+
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .lang-btn {
+        border: 1px solid var(--wb-line);
+        background: #fff;
+        color: var(--wb-muted);
+        font-size: 0.78rem;
+        font-weight: 700;
+        padding: 0.32rem 0.55rem;
+        border-radius: 999px;
+        cursor: pointer;
+    }
+
+    .lang-btn.active {
+        border-color: var(--wb-red);
+        color: var(--wb-red);
+    }
+
+    /* ---------- Botones ---------- */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        padding: 0.7rem 1.3rem;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 0.95rem;
+        text-decoration: none;
+        border: 1.5px solid transparent;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .btn-sm {
+        padding: 0.45rem 0.8rem;
+        font-size: 0.82rem;
+    }
+
+    .btn-solid {
+        background: var(--wb-red);
+        color: #fff;
+    }
+
+    .btn-solid:hover {
+        background: var(--wb-red-dark);
+        transform: translateY(-1px);
+    }
+
+    .btn-ghost {
+        border-color: var(--wb-line);
+        color: var(--wb-ink);
+        background: #fff;
+    }
+
+    .btn-ghost:hover {
+        border-color: var(--wb-muted);
+    }
+
+    /* ---------- Hero ---------- */
+    .hero {
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: clamp(1.5rem, 4vw, 4rem);
+        align-items: center;
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: clamp(2.2rem, 6vw, 5rem) clamp(1rem, 4vw, 2.5rem);
+    }
+
+    .hero-kicker {
+        font-size: 0.8rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--wb-red);
+        margin-bottom: 0.9rem;
+    }
+
+    .hero h1 {
+        font-size: clamp(1.75rem, 4.5vw, 3rem);
+        line-height: 1.12;
+        letter-spacing: -0.03em;
+        margin-bottom: 1rem;
+    }
+
+    .hero-sub {
+        font-size: 1.05rem;
+        color: var(--wb-muted);
+        max-width: 34rem;
+        margin-bottom: 1.6rem;
+    }
+
+    .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.7rem;
+        margin-bottom: 0.9rem;
+    }
+
+    .hero-meta {
+        font-size: 0.8rem;
+        color: var(--wb-muted);
+    }
+
+    .demo-video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .hero-media {
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 24px 60px rgba(28, 33, 42, 0.18);
+        background: #000;
+        aspect-ratio: 9 / 16;
+        max-height: 480px;
+        max-width: 270px;
+        justify-self: center;
+        width: 100%;
+    }
+
+    /* ---------- Try it (iframe) ---------- */
+    .try-it {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: clamp(2rem, 5vw, 4rem) clamp(1rem, 4vw, 2.5rem);
+        border-top: 1px solid var(--wb-line);
+        text-align: center;
+    }
+
+    .try-it h2,
+    .ways h2,
+    .features h2,
+    .demos h2 {
+        font-size: clamp(1.4rem, 2.6vw, 1.9rem);
+        letter-spacing: -0.02em;
+        margin-bottom: 0.6rem;
+    }
+
+    .try-sub {
+        color: var(--wb-muted);
+        margin-bottom: 1.4rem;
+    }
+
+    .phone-frame {
+        position: relative;
+        width: min(100%, 400px);
+        aspect-ratio: 9 / 19;
+        margin: 0 auto 1.4rem;
+        border: 10px solid #1c212a;
+        border-radius: 34px;
+        overflow: hidden;
+        background: #fff;
+        box-shadow: 0 24px 60px rgba(28, 33, 42, 0.25);
+    }
+
+    .phone-frame iframe {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        display: block;
+    }
+
+    /* Overlay difuminado sobre la vista previa: se ve la app en directo,
+       pero para usarla hay que entrar en la app real (botón al index). */
+    .phone-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        padding: 1rem;
+        background: rgba(245, 245, 247, 0.35);
+        backdrop-filter: blur(7px);
+        -webkit-backdrop-filter: blur(7px);
+        border-radius: 24px;
+    }
+
+    .phone-overlay-hint {
+        font-weight: 800;
+        font-size: 1rem;
+        text-align: center;
+        color: var(--wb-ink);
+    }
+
+    /* ---------- Ways (Web / PWA / APK) ---------- */
+    .ways {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: clamp(2rem, 5vw, 4rem) clamp(1rem, 4vw, 2.5rem);
+        border-top: 1px solid var(--wb-line);
+    }
+
+    .ways-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 1rem;
+        align-items: stretch;
+    }
+
+    .way {
+        position: relative;
+        background: var(--wb-panel);
+        border: 1px solid var(--wb-line);
+        border-radius: var(--wb-radius);
+        padding: 1.4rem 1.3rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+    }
+
+    .way-featured {
+        border: 2px solid var(--wb-red);
+        background: #fff7f6;
+    }
+
+    .way-badge {
+        position: absolute;
+        top: -0.7rem;
+        left: 1.2rem;
+        background: var(--wb-red);
+        color: #fff;
+        font-size: 0.68rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 0.18rem 0.6rem;
+        border-radius: 999px;
+    }
+
+    .way h3 {
+        font-size: 1.1rem;
+    }
+
+    .way p {
+        font-size: 0.88rem;
+        color: var(--wb-muted);
+        flex: 1;
+    }
+
+    .way-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .way-note {
+        font-size: 0.75rem;
+        color: var(--wb-muted);
+    }
+
+    /* ---------- Features ---------- */
+    .features {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: clamp(2rem, 5vw, 4rem) clamp(1rem, 4vw, 2.5rem);
+        border-top: 1px solid var(--wb-line);
+    }
+
+    .features-sub {
+        color: var(--wb-muted);
+        margin-bottom: 1.6rem;
+        max-width: 44rem;
+    }
+
+    .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 1rem;
+    }
+
+    .feature {
+        background: var(--wb-panel);
+        border: 1px solid var(--wb-line);
+        border-radius: var(--wb-radius);
+        padding: 1.2rem 1.25rem;
+    }
+
+    .feature h3 {
+        font-size: 1rem;
+        margin-bottom: 0.45rem;
+    }
+
+    .feature p {
+        font-size: 0.88rem;
+        color: var(--wb-muted);
+    }
+
+    /* ---------- Demos ---------- */
+    .demos {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: clamp(2rem, 5vw, 4rem) clamp(1rem, 4vw, 2.5rem);
+        border-top: 1px solid var(--wb-line);
+    }
+
+    .demo-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.2rem;
+        max-width: 640px;
+        margin: 0 auto;
+    }
+
+    .demo {
+        display: flex;
+        flex-direction: column;
+        gap: 0.7rem;
+    }
+
+    .demo video {
+        width: 100%;
+        aspect-ratio: 9 / 16;
+        object-fit: cover;
+        border-radius: 14px;
+        border: 1px solid var(--wb-line);
+        background: #000;
+        max-height: 420px;
+    }
+
+    .demo figcaption {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: var(--wb-muted);
+        text-align: center;
+    }
+
+    /* ---------- Footer ---------- */
+    .site-footer {
+        border-top: 1px solid var(--wb-line);
+        background: var(--wb-panel);
+        padding: 2.2rem clamp(1rem, 4vw, 2.5rem);
+        text-align: center;
+        font-size: 0.85rem;
+        color: var(--wb-muted);
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+    }
+
+    .footer-links {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 1.2rem;
+    }
+
+    .footer-links a {
+        color: var(--wb-red);
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .footer-links a:hover {
+        text-decoration: underline;
+    }
+
+    .footer-langs {
+        display: flex;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 760px) {
+        /* En móvil el header se queda solo en logo + Entrar: los idiomas
+           siguen disponibles en el pie de página. */
+        .header-actions .lang-btn {
+            display: none;
+        }
+
+        .hero {
+            grid-template-columns: 1fr;
+        }
+
+        .hero-media {
+            max-height: 420px;
+            justify-self: start;
+        }
+
+        .header-actions .btn-sm {
+            padding: 0.4rem 0.7rem;
+            font-size: 0.78rem;
+        }
+
+        .ways-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        html {
+            scroll-behavior: auto;
+        }
+        .btn {
+            transition: none;
+        }
+    }
+</style>

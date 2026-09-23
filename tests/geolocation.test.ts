@@ -110,4 +110,34 @@ describe('getPosition()', () => {
     expect(result).toBeNull();
     expect(globalThis.navigator.geolocation).toBeUndefined();
   });
+
+  it('deduplicates concurrent in-flight calls to getPosition()', async () => {
+    let resolvePos: any;
+    const calls: PositionOptions[] = [];
+    const mock = {
+      calls,
+      getCurrentPosition: vi.fn((success) => {
+        calls.push({});
+        resolvePos = () => success({
+          coords: { latitude: 43.3623, longitude: -8.4115, accuracy: 10 },
+          timestamp: Date.now(),
+        } as any);
+      }),
+    };
+    Object.defineProperty(globalThis.navigator, 'geolocation', {
+      value: mock,
+      configurable: true,
+      writable: true,
+    });
+
+    const p1 = getPosition();
+    const p2 = getPosition();
+
+    resolvePos();
+    const [res1, res2] = await Promise.all([p1, p2]);
+
+    expect(res1).toEqual({ lat: 43.3623, lon: -8.4115 });
+    expect(res2).toEqual({ lat: 43.3623, lon: -8.4115 });
+    expect(mock.getCurrentPosition).toHaveBeenCalledTimes(1);
+  });
 });

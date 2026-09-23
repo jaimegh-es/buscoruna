@@ -54,6 +54,16 @@ describe('getPosition() in the native (Capacitor) app', () => {
     expect(Geolocation.requestPermissions).toHaveBeenCalled();
   });
 
+  it('supports coarse location permission (approximate location on Android 12+)', async () => {
+    vi.mocked(Geolocation.checkPermissions).mockResolvedValue({ location: 'denied', coarseLocation: 'granted' } as never);
+    vi.mocked(Geolocation.getCurrentPosition).mockResolvedValue(makePosition(43.3623, -8.4115) as never);
+
+    const result = await getPosition();
+
+    expect(result).toEqual({ lat: 43.3623, lon: -8.4115 });
+    expect(Geolocation.requestPermissions).not.toHaveBeenCalled();
+  });
+
   it('returns null and does not read the position when permission is denied', async () => {
     vi.mocked(Geolocation.checkPermissions).mockResolvedValue({ location: 'denied' } as never);
     vi.mocked(Geolocation.requestPermissions).mockResolvedValue({ location: 'denied' } as never);
@@ -88,10 +98,10 @@ describe('getPosition() in the native (Capacitor) app', () => {
   it('falls back to a short watch session when both one-shot attempts fail', async () => {
     vi.mocked(Geolocation.checkPermissions).mockResolvedValue({ location: 'granted' } as never);
     vi.mocked(Geolocation.getCurrentPosition).mockRejectedValue(new Error('no fix') as never);
-    vi.mocked(Geolocation.watchPosition).mockImplementation((_opts as never, callback: (...args: never[]) => void) => {
+    vi.mocked(Geolocation.watchPosition).mockImplementation(((_opts: any, callback: any) => {
       setTimeout(() => callback({ coords: { latitude: 43.3623, longitude: -8.4115 } } as never), 10);
       return Promise.resolve('watch-1');
-    });
+    }) as any);
 
     const result = await getPosition();
 

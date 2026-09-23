@@ -8,38 +8,20 @@ const t = getTranslations(lang);
 ---
 
 <Layout title={`${t.appName} | ${t.bottomNavHome}`}>
-    <div id="landing-overlay" style="position:fixed;inset:0;z-index:9999;background:rgba(245,245,247,0.96);backdrop-filter:blur(8px);overflow-y:auto;padding:2rem 1rem;display:none;" class="anim-up">
-    <div style="max-width: 960px; margin: 0 auto;">
-      <button onclick="this.closest('#landing-overlay').style.display='none';localStorage.setItem('buscoruna_first_visit','seen');" style="position:sticky;top:0.5rem;float:right;background:var(--primary);color:#fff;border:none;padding:0.5rem 1rem;border-radius:8px;font-weight:700;cursor:pointer;">Cerrar / Entrar</button>
-      <div style="text-align:center;padding:2rem 0;">
-        <h1 style="font-size: clamp(2.2rem,5vw,3.4rem); font-weight:800; letter-spacing:-0.03em;">Coruña <span style="color:var(--primary);">Bus</span></h1>
-        <p style="font-size:1.15rem; color:var(--text-muted); max-width:640px; margin:0 auto 2rem;">Planifica tu ruta, recibe avisos de llegada, avisa de parada con sonido, consulta líneas, favoritos y clima local.</p>
-        <a href="/planner" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.85rem 1.6rem;font-size:1rem;border-radius:12px;text-decoration:none;background:var(--primary);color:#fff;font-weight:700;">Planifica tu ruta <Icon name="navigation" size={18} /></a>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;padding:1rem 0;">
-        <a href="/planner" class="card" style="padding:1.2rem;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:0.6rem;"><div style="width:48px;height:48px;border-radius:12px;background:color-mix(in srgb,var(--primary) 10%,transparent);display:flex;align-items:center;justify-content:center;color:var(--primary);"><Icon name="navigation" size={24}/></div><h3 style="font-size:1.05rem;font-weight:700;">Planificador de rutas</h3><p style="font-size:0.85rem;color:var(--text-muted);">Indica origen y destino y conoce qué autobús coger con aviso.</p></a>
-        <a href="/stops" class="card" style="padding:1.2rem;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:0.6rem;"><div style="width:48px;height:48px;border-radius:12px;background:color-mix(in srgb,var(--line-color,#10b981) 10%,transparent);display:flex;align-items:center;justify-content:center;color:var(--line-color,#10b981);"><Icon name="map" size={24}/></div><h3 style="font-size:1.05rem;font-weight:700;">Paradas cercanas</h3><p style="font-size:0.85rem;color:var(--text-muted);">Mapa interactivo, satélite y Street View cerca de ti.</p></a>
-        <a href="/stop/1" class="card" style="padding:1.2rem;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:0.6rem;"><div style="width:48px;height:48px;border-radius:12px;background:color-mix(in srgb,#f59e0b 10%,transparent);display:flex;align-items:center;justify-content:center;color:#f59e0b;"><Icon name="bell" size={24}/></div><h3 style="font-size:1.05rem;font-weight:700;">Avisos de llegada</h3><p style="font-size:0.85rem;color:var(--text-muted);">Te avisa con el tiempo que configures y detecta tu ubicación.</p></a>
-        <a href="/favorites" class="card" style="padding:1.2rem;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:0.6rem;"><div style="width:48px;height:48px;border-radius:12px;background:color-mix(in srgb,#a855f7 10%,transparent);display:flex;align-items:center;justify-content:center;color:#a855f7;"><Icon name="star" size={24}/></div><h3 style="font-size:1.05rem;font-weight:700;">Favoritos con nombres</h3><p style="font-size:0.85rem;color:var(--text-muted);">Guarda paradas, pon nombres y configura tiempos de salida.</p></a>
-      </div>
-      <div style="padding: 1rem 0;">
-        <h3 style="font-size: 1.1rem; font-weight: 700;">Características</h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap: 1rem;">
-          <div class="card" style="padding: 1rem;"><h4 style="font-weight: 700; margin-bottom: 0.3rem;"><Icon name="bell" size={18}/> Avisos configurables</h4><p style="font-size: 0.85rem; color: var(--text-muted);">Melodías personalizadas o predeterminadas para llegada y aviso.</p></div>
-          <div class="card" style="padding: 1rem;"><h4 style="font-weight: 700; margin-bottom: 0.3rem;"><Icon name="map" size={18}/> Mapa satelital + Street View</h4><p style="font-size: 0.85rem; color: var(--text-muted);">Visualiza la parada y comprueba la ruta.</p></div>
-          <div class="card" style="padding: 1rem;"><h4 style="font-weight: 700; margin-bottom: 0.3rem;"><Icon name="shield" size={18}/> Notificaciones en bloqueo</h4><p style="font-size: 0.85rem; color: var(--text-muted);">Recibe avisos sin desbloquear el teléfono.</p></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    (function() {
-      if (localStorage.getItem('buscoruna_first_visit') !== 'seen') {
-        document.getElementById('landing-overlay').style.display = 'block';
-      }
-    })();
-  </script>
+    <script is:inline>
+        // La landing es una página separada (/welcome). A los visitantes nuevos
+        // de la web se les lleva allí una vez; en la app nativa no se redirige.
+        (function () {
+            var isNative = typeof window.Capacitor !== 'undefined' && window.Capacitor?.isNativePlatform?.();
+            if (isNative) return;
+            if (localStorage.getItem('buscoruna_first_visit') !== 'seen') {
+                // Se marca aquí mismo: la redirección ocurre una sola vez y
+                // volver a "/" después ya no rebota a /welcome.
+                localStorage.setItem('buscoruna_first_visit', 'seen');
+                location.replace('/welcome');
+            }
+        })();
+    </script>
 
 <div class="home-dashboard anim-stagger">
         <section class="welcome-section">
