@@ -14,6 +14,24 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        version: '0.0.6',
+        title: '🚏 Seguimiento más inteligente',
+        items: [
+            'Avisos con antelación real desde tu ubicación de salida: si guardas el tiempo que tardas andando a la parada (casa, trabajo...), la app te avisa con ese margen para que salgas a tiempo.',
+            'El seguimiento finaliza solo al llegar al destino: ya no se queda buscando el bus sin fin al llegar a la parada.',
+            'Modo "solo aviso" (sin destino obligatorio): el seguimiento acaba cuando el bus llega a tu parada de salida.',
+            'Más ahorro de batería: el seguimiento en segundo plano se detiene automáticamente al llegar.',
+            'Animaciones y transiciones renovadas en toda la interfaz: entradas suaves, skeletons de carga y modales más fluidos.',
+        ],
+    },
+    {
+        version: '0.0.5',
+        title: '🔧 Corrección de arranque',
+        items: [
+            'Solucionado un fallo que hacía que la app cargara desde "localhost" dentro del móvil: ahora apunta al servidor real de producción y arranca mostrando los datos correctamente.',
+        ],
+    },
+    {
         version: '0.0.4',
         title: '🎉 Nueva página de bienvenida',
         items: [
