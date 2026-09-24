@@ -85,6 +85,8 @@ public class BackgroundTrackerService extends Service implements LocationListene
     private boolean gpsTriggered = false;
     private int lastEta = -1;
     private int lastDestEta = -1;
+    // Guards the self-stop scheduled after arrival so it only fires once.
+    private volatile boolean stopScheduled = false;
 
     private ScheduledExecutorService executor;
     private PowerManager.WakeLock wakeLock;
@@ -148,6 +150,7 @@ public class BackgroundTrackerService extends Service implements LocationListene
                 gpsTriggered = false;
                 lastEta = -1;
                 lastDestEta = -1;
+                stopScheduled = false;
 
                 startForegroundServiceNotification();
                 startPollingLoop();
@@ -427,6 +430,19 @@ public class BackgroundTrackerService extends Service implements LocationListene
         }
     }
 
+    /**
+     * Stop the service a bit after arrival so the last notification/foreground
+     * state is visible, without keeping the battery drain running forever.
+     * Guarded so only one schedule wins.
+     */
+    private void scheduleStopAfter(long seconds) {
+        if (stopScheduled || executor == null || executor.isShutdown()) return;
+        stopScheduled = true;
+        executor.schedule(() -> {
+            if (isRunning) stopSelf();
+        }, seconds, TimeUnit.SECONDS);
+    }
+
     private void pollEta() {
         if (originStopId <= 0) return;
 
@@ -443,6 +459,7 @@ public class BackgroundTrackerService extends Service implements LocationListene
                     if (buses != null) {
                         JSONArray lineas = buses.optJSONArray("lineas");
                         if (lineas != null) {
+                            boolean originFound = false;
                             for (int i = 0; i < lineas.length(); i++) {
                                 JSONObject lineaObj = lineas.getJSONObject(i);
                                 Object lineVal = lineaObj.opt("linea");
@@ -455,6 +472,7 @@ public class BackgroundTrackerService extends Service implements LocationListene
                                     JSONObject bObj = busArray.getJSONObject(j);
                                     Object bVal = bObj.opt("bus");
                                     if (matchesBus(bVal, busId)) {
+                                        originFound = true;
                                         String tStr = bObj.optString("tiempo", "");
                                         int waitTime = parseWaitTime(tStr);
                                         if (waitTime >= 0) {
@@ -478,13 +496,23 @@ public class BackgroundTrackerService extends Service implements LocationListene
                                             // once the bus is at the stop.
                                             // Modo "solo aviso": termina solo
                                             // cuando el bus está en la parada.
-                                            if (destinationStopId == originStopId && waitTime == 0 && executor != null) {
-                                                executor.schedule(() -> { if (isRunning) stopSelf(); }, 45, TimeUnit.SECONDS);
+                                            if (destinationStopId == originStopId && waitTime == 0) {
+                                                scheduleStopAfter(45);
                                             }
                                         }
                                         break;
                                     }
                                 }
+                            }
+                            // Alert-only journey whose arrival alert already fired
+                            // and whose bus is no longer listed (it arrived or
+                            // passed): finish, otherwise the service would keep
+                            // polling forever.
+                            // Viaje "solo aviso" cuyo aviso ya se lanzó y el bus ya
+                            // no aparece (llegó o pasó): se acaba el seguimiento,
+                            // si no, el servicio seguiría sondeando sin fin.
+                            if (destinationStopId == originStopId && !originFound && etaTriggered) {
+                                scheduleStopAfter(30);
                             }
                         }
                     }
@@ -508,6 +536,7 @@ public class BackgroundTrackerService extends Service implements LocationListene
                         if (dBuses != null) {
                             JSONArray dLineas = dBuses.optJSONArray("lineas");
                             if (dLineas != null) {
+                                boolean destFound = false;
                                 for (int i = 0; i < dLineas.length(); i++) {
                                     JSONObject dLineaObj = dLineas.getJSONObject(i);
                                     if (!matchesLine(dLineaObj.opt("linea"), lineId)) continue;
@@ -518,16 +547,34 @@ public class BackgroundTrackerService extends Service implements LocationListene
                                         if (matchesBus(db.opt("bus"), busId)) {
                                             int dTime = parseWaitTime(db.optString("tiempo", ""));
                                             if (dTime >= 0) {
+                                                destFound = true;
                                                 lastDestEta = dTime;
                                                 updateForegroundNotification();
                                                 if (dTime <= 2 && !gpsTriggered) {
                                                     gpsTriggered = true;
                                                     fireDestinationAlert();
                                                 }
+                                                // The bus is at the destination
+                                                // stop: the journey is over.
+                                                // El bus está en la parada de
+                                                // destino: viaje terminado.
+                                                if (dTime == 0) {
+                                                    scheduleStopAfter(45);
+                                                }
                                             }
                                             break;
                                         }
                                     }
+                                }
+                                // The destination feed stopped reporting the bus
+                                // right after it was within 1-2 min (or after the
+                                // "press the stop button" alert fired): it reached
+                                // the terminus, finish instead of polling forever.
+                                // El feed de destino deja de listar el bus justo
+                                // cuando estaba a 1-2 min (o tras avisar de bajada):
+                                // llegó a la cabecera; se acaba el sondeo.
+                                if (!destFound && (gpsTriggered || (lastDestEta >= 0 && lastDestEta <= 2))) {
+                                    scheduleStopAfter(60);
                                 }
                             }
                         }

@@ -1725,7 +1725,7 @@ const { title } = Astro.props;
 </style>
 
 <script>
-    import { tracking } from "../utils/tracking";
+    import { tracking, getWalkHeadStart } from "../utils/tracking";
     import { API, isApiLoading, isApiCooldownActive } from "../services/api";
     import { storage } from "../utils/storage";
     import { getTranslations } from "../utils/i18n";
@@ -1928,6 +1928,15 @@ const { title } = Astro.props;
     // stop at least once. Avoids a premature board-transition when a far bus is
     // momentarily not listed in the stop's arrivals.
     let phase1BusSeen = false;
+    // Phase 2 ('toDest') termination helpers: remember the last destination
+    // ETA observed and how many consecutive polls the bus is missing from the
+    // destination feed, so arrival is detected even when the feed drops the
+    // bus right at/after the stop (the old code searched forever).
+    // Ayudas de finalización de la fase 2: recuerdan la última ETA de destino
+    // observada y las poll consecutivas sin el bus para detectar la llegada
+    // aunque el feed deje de listarlo justo en/después de la parada.
+    let lastDestObserved = -1;
+    let destGoneStreak = 0;
 
     // Re-render the tracking bar right after a phase transition (the current
     // update is still holding `isUpdating`, so a plain call would be skipped).
@@ -1981,7 +1990,12 @@ const { title } = Astro.props;
     async function updatePhaseToStop(info: any, gen: number) {
         const etaAlertEnabled = localStorage.getItem('buscoruna_eta_alert_enabled') !== 'false';
         const etaAlertTriggered = localStorage.getItem('buscoruna_eta_alert_triggered') === 'true';
-        const walkMins = info.walkMinutes || 0;
+        // Walking head-start from the active saved departure location, with a
+        // storage fallback so flows that don't snapshot it (bus tracker / trip
+        // planner) still alert with enough margin to leave on time.
+        const headStart = getWalkHeadStart(info);
+        const walkMins = headStart.walkMinutes;
+        const locName = headStart.locationName;
         // "Alert only" mode: the user asked to be notified when the bus reaches
         // this stop, without a destination. The journey ends on arrival.
         // Modo "solo aviso": el usuario solo quiere que le avisen de la llegada
@@ -2018,9 +2032,23 @@ const { title } = Astro.props;
         // bus that is simply not listed yet keeps us waiting.
         if (!found || waitTime === null) {
             if (phase1BusSeen) {
-                tracking.patch({ phase: 'toDest' });
-                scheduleTrackingRefresh();
-                inAppAlert(t.trackingBoardNow, { durationMs: 6000 });
+                if (alertOnly) {
+                    // "Alert only" journey (no destination): the bus reached (or
+                    // passed) the stop, so the journey ends here. Ending avoids a
+                    // never-ending phase 2 that searches the same stop forever.
+                    // Modo "solo aviso": el bus llegó (o pasó) a la parada, el
+                    // viaje acaba para no quedarse buscando sin fin.
+                    finishTracking(
+                        lang === 'en' ? '🚌 Your bus has arrived' : '🚌 Tu autobús ha llegado',
+                        lang === 'en'
+                            ? 'Arrival alert finished. Tracking stopped to save battery.'
+                            : 'Aviso finalizado. Se ha detenido el seguimiento para ahorrar batería.'
+                    );
+                } else {
+                    tracking.patch({ phase: 'toDest' });
+                    scheduleTrackingRefresh();
+                    inAppAlert(t.trackingBoardNow, { durationMs: 6000 });
+                }
             } else {
                 document.getElementById("track-status")!.textContent =
                     t.trackingSearchingBus;
@@ -2034,9 +2062,9 @@ const { title } = Astro.props;
         // user leaves the saved location on time.
         if (etaAlertEnabled && !etaAlertTriggered && waitTime <= threshold) {
             localStorage.setItem('buscoruna_eta_alert_triggered', 'true');
-            const hasLocation = walkMins > 0 && !!info.locationName;
+            const hasLocation = walkMins > 0 && !!locName;
             const notifyBody = hasLocation
-                ? t.trackingLeaveNow.replace('{bus}', info.busId).replace('{n}', String(waitTime)).replace('{loc}', info.locationName)
+                ? t.trackingLeaveNow.replace('{bus}', info.busId).replace('{n}', String(waitTime)).replace('{loc}', locName)
                 : t.trackingLeaveNowNoLoc.replace('{bus}', info.busId).replace('{n}', String(waitTime));
 
             sendNotification(lang === 'en' ? '🚌 Your bus is arriving!' : '🚌 ¡Tu autobús está llegando!', {
@@ -2115,12 +2143,31 @@ const { title } = Astro.props;
         if (busFoundAtStop && targetBus) {
             let time = typeof targetBus.tiempo === "number" ? targetBus.tiempo : parseInt(targetBus.tiempo);
             if (isNaN(time)) time = 0;
+            lastDestObserved = time;
+            destGoneStreak = 0;
             renderDestEta(time);
             // On arrival at the destination: finish tracking to save battery.
             if (time <= 0) {
                 finishTracking(t.trackingFinishedTitle, t.trackingFinishedBody);
             }
             return;
+        }
+
+        // The destination feed stopped reporting the bus right after it was
+        // within ~1 min of the stop: it arrived (and departed) or is parked at
+        // the terminus. Finish after two consecutive missed polls so a
+        // transient API gap doesn't end the tracking early.
+        // El feed de destino deja de listar el bus justo cuando estaba a ~1 min:
+        // llegó (y salió) o está en la cabecera. Acabamos tras dos polls
+        // consecutivas sin el bus para no cortar por un fallo puntual de la API.
+        if (lastDestObserved >= 0 && lastDestObserved <= 1) {
+            destGoneStreak++;
+            if (destGoneStreak >= 2) {
+                finishTracking(t.trackingFinishedTitle, t.trackingFinishedBody);
+                return;
+            }
+        } else {
+            destGoneStreak = 0;
         }
 
         // Step 2: bus not reported at the destination yet -> live position
@@ -2172,9 +2219,19 @@ const { title } = Astro.props;
                                 const routeParadas = route.paradas.map((p) => parseInt(p.toString()));
                                 const bIdx = routeParadas.indexOf(busAtStopId);
                                 const dIdx = routeParadas.indexOf(targetDestIdNum);
-                                if (bIdx !== -1 && dIdx !== -1 && bIdx <= dIdx) {
+                                if (bIdx !== -1 && dIdx !== -1) {
+                                    // Live position shows the bus AT or PAST the
+                                    // destination stop -> journey over.
+                                    // La posición del bus lo muestra EN o MÁS
+                                    // ALLÁ de la parada de destino -> fin.
+                                    if (bIdx >= dIdx) {
+                                        lastDestObserved = 0;
+                                        destGoneStreak = 0;
+                                        finishTracking(t.trackingFinishedTitle, t.trackingFinishedBody);
+                                        return;
+                                    }
                                     stopsLeft = dIdx - bIdx;
-                                    foundInLine = stopsLeft > 0;
+                                    foundInLine = true;
 
                                     // Keep a per-stop travel average from real
                                     // observations of the bus moving.
@@ -2233,6 +2290,8 @@ const { title } = Astro.props;
         if (!info) {
             bar.style.display = "none";
             phase1BusSeen = false;
+            lastDestObserved = -1;
+            destGoneStreak = 0;
             if (trackingInterval) {
                 clearInterval(trackingInterval);
                 trackingInterval = null;

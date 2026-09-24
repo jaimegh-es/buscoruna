@@ -10,7 +10,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Preferences } from '@capacitor/preferences';
-import { tracking, type TrackingInfo } from './tracking';
+import { tracking, getWalkHeadStart, type TrackingInfo } from './tracking';
 
 export interface BackgroundTrackerPlugin {
     startTracking(options: {
@@ -192,6 +192,20 @@ export async function checkArrival(
     const state = await getState();
     const notFound: ArrivalCheckResult = { shouldNotify: false, title: '', body: '', etaMinutes: -1 };
 
+    // Walking head-start from the saved departure location: while waiting for
+    // the bus ('toStop') the user must leave home/work with enough margin, so
+    // the alert fires at the walking time BEFORE the arrival, not at the
+    // generic lead. Once on board ('toDest') this origin alert no longer
+    // applies, only the plain lead would be relevant (and there is none).
+    // Antelación de caminata desde la ubicación guardada: mientras se espera
+    // al bus ('toStop') se avisa con el tiempo de caminata de margen.
+    const { walkMinutes, locationName } = getWalkHeadStart(info);
+    const isWaiting = (info.phase || 'toStop') !== 'toDest';
+    const effectiveLead =
+        isWaiting && walkMinutes > 0
+            ? Math.max(cfg.leadMinutes, walkMinutes)
+            : cfg.leadMinutes;
+
     try {
         const data = await fetchArrivals(info.originStopId);
         if (!data || data.resultado !== 'OK' || !data.buses || !Array.isArray(data.buses.lineas)) {
@@ -210,16 +224,30 @@ export async function checkArrival(
         const waitTime = typeof bus.tiempo === 'number' ? bus.tiempo : parseInt(bus.tiempo);
         if (isNaN(waitTime)) return notFound;
 
-        if (state.triggered) return notFound;
+        // Share the triggered flag with the in-app updater (updatePhaseToStop)
+        // so both systems don't double-notify: whichever fires first wins.
+        // Compartimos el flag con el actualizador en la app para no avisar dos
+        // veces: gana el primero que dispare.
+        const webTriggered =
+            !isNativePlatform() &&
+            localStorage.getItem('buscoruna_eta_alert_triggered') === 'true';
+        if (state.triggered || webTriggered) return notFound;
 
-        // Fire when remaining time drops to or below the configured lead time.
-        if (waitTime <= cfg.leadMinutes) {
+        // Fire when remaining time drops to or below the configured lead time
+        // (which includes the walking head-start while waiting).
+        if (waitTime <= effectiveLead) {
             const title = lang === 'en' ? '🚌 Your bus is arriving!' : '🚌 ¡Tu autobús está llegando!';
-            const body = lang === 'en'
-                ? `Bus ${info.busId} arrives at your stop in ${waitTime} min.`
-                : `El bus ${info.busId} llega a tu parada en ${waitTime} min.`;
+            const body =
+                isWaiting && walkMinutes > 0 && locationName
+                    ? lang === 'en'
+                        ? `Bus ${info.busId} arrives at your stop in ${waitTime} min. It takes ${walkMinutes} min from ${locationName}. Leave now!`
+                        : `El bus ${info.busId} llega a tu parada en ${waitTime} min. Tardas ${walkMinutes} min desde ${locationName}. ¡Sal ahora!`
+                    : lang === 'en'
+                        ? `Bus ${info.busId} arrives at your stop in ${waitTime} min.`
+                        : `El bus ${info.busId} llega a tu parada en ${waitTime} min.`;
 
             // Mark triggered so we don't spam every interval.
+            localStorage.setItem('buscoruna_eta_alert_triggered', 'true');
             await setState({ ...state, triggered: true, lastNotifiedEta: waitTime });
 
             return { shouldNotify: true, title, body, etaMinutes: waitTime };

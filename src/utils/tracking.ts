@@ -1,3 +1,5 @@
+import { storage } from './storage';
+
 export type TrackingPhase = 'toStop' | 'toDest';
 
 export interface TrackingInfo {
@@ -42,6 +44,27 @@ function normalize(info: TrackingInfo | null): TrackingInfo | null {
 
 const TRACKING_KEY = 'buscoruna_tracking';
 const TARGET_DEST_KEY = 'buscoruna_target_dest';
+
+/**
+ * Effective walking head-start (in minutes) from the active saved departure
+ * location, plus its name. Returns the value snapshotted in the journey when
+ * available, and falls back to the stored per-stop walking time when the
+ * journey was started from a flow that doesn't snapshot it (bus tracker, trip
+ * planner, change-destination...).
+ */
+export function getWalkHeadStart(info: TrackingInfo): { walkMinutes: number; locationName: string } {
+    if (typeof info.walkMinutes === 'number' && info.walkMinutes > 0) {
+        return {
+            walkMinutes: info.walkMinutes,
+            locationName: info.locationName || storage.getActiveLocation()?.name || '',
+        };
+    }
+    const stored = storage.getStopWalkingTime(info.originStopId) || 0;
+    return {
+        walkMinutes: stored,
+        locationName: stored > 0 ? storage.getActiveLocation()?.name || '' : '',
+    };
+}
 
 export const tracking = {
   get: (): TrackingInfo | null => {
