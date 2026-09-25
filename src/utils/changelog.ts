@@ -14,6 +14,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        version: '0.0.9',
+        title: '🔧 Aviso de bloqueo corregido',
+        items: [
+            'Corregido el aviso falso de "página bloqueada por tu operadora": al movernos entre pantallas aparecía sin estar bloqueada nada.',
+            'Ahora la app reintenta la carga automáticamente y solo muestra el aviso si de verdad el servidor no responde.',
+        ],
+    },
+    {
         version: '0.0.8',
         title: '🎨 Pantalla de carga renovada',
         items: [

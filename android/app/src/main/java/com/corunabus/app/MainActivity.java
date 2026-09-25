@@ -62,6 +62,22 @@ public class MainActivity extends BridgeActivity {
     // Si una carga exitosa puede ocultar la pantalla de bloqueo: solo los
     // bloqueos por fallo del test se ocultan solos; los de carga, no.
     private boolean blockAutoHideOnLoad = true;
+    // Main-frame load failure handling: a lone failure is usually a transient
+    // blip (e.g. a momentary Cloudflare 503), NOT a carrier block, so it is
+    // retried first. The blocked screen only appears when the same URL keeps
+    // failing and the reachability test confirms the server really answers
+    // nothing — never on the first error.
+    // Manejo de fallos de carga del marco principal: un fallo aislado suele
+    // ser un tropiezo puntual (p. ej. un 503 transitorio de Cloudflare) y NO
+    // un bloqueo de operadora, así que primero se reintenta. La pantalla de
+    // bloqueo solo aparece si la misma URL sigue fallando y el test de
+    // accesibilidad confirma que el servidor no responde — nunca al primer
+    // error.
+    private static final long LOAD_RETRY_MS = 1500L;
+    private static final int MAX_LOAD_ATTEMPTS = 3;
+    private String mainFrameFailUrl = null;
+    private int mainFrameFailStreak = 0;
+    private int mainFrameRecoveries = 0;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -79,6 +95,12 @@ public class MainActivity extends BridgeActivity {
         bridgeBuilder.addWebViewListener(new WebViewListener() {
             @Override
             public void onPageLoaded(WebView webView) {
+                Log.d(TAG, "PageLoaded " + webView.getUrl());
+                // A successful load clears any pending failure state.
+                // Una carga correcta limpia cualquier estado de fallo pendiente.
+                mainFrameFailUrl = null;
+                mainFrameFailStreak = 0;
+                mainFrameRecoveries = 0;
                 mainHandler.post(() -> {
                     if (blockAutoHideOnLoad) hideBlockedScreen();
                     hideSplash();
@@ -208,7 +230,10 @@ public class MainActivity extends BridgeActivity {
                 super.onReceivedError(view, request, error);
                 // ERROR_UNKNOWN also covers cancelled loads; skip those.
                 if (request.isForMainFrame() && error.getErrorCode() != WebViewClient.ERROR_UNKNOWN) {
-                    mainHandler.post(() -> onMainFrameLoadFailed());
+                    Log.w(TAG, "MainFrameError code=" + error.getErrorCode()
+                        + " desc=" + error.getDescription() + " url=" + request.getUrl());
+                    final String failedUrl = request.getUrl() != null ? request.getUrl().toString() : null;
+                    mainHandler.post(() -> onMainFrameLoadFailed(failedUrl));
                 }
             }
 
@@ -216,15 +241,83 @@ public class MainActivity extends BridgeActivity {
             public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
                 super.onReceivedHttpError(view, request, errorResponse);
                 if (request.isForMainFrame() && errorResponse.getStatusCode() >= 400) {
-                    mainHandler.post(() -> onMainFrameLoadFailed());
+                    Log.w(TAG, "MainFrameHttpError status=" + errorResponse.getStatusCode()
+                        + " url=" + request.getUrl());
+                    final String failedUrl = request.getUrl() != null ? request.getUrl().toString() : null;
+                    mainHandler.post(() -> onMainFrameLoadFailed(failedUrl));
                 }
             }
         });
     }
 
-    private void onMainFrameLoadFailed() {
-        blockAutoHideOnLoad = false;
-        showBlockedScreen("Load failed");
+    /**
+     * A main-frame load failed. Never block the app on the first error: retry
+     * the URL after a short pause (transient 503s and cancelled/replaced loads
+     * heal on their own) and only, if the same URL still fails after
+     * {@link #MAX_LOAD_ATTEMPTS} attempts, consult the reachability test —
+     * the screen that says "blocked by the carrier" is reserved for a server
+     * that really cannot be reached.
+     * Ha fallado la carga del marco principal. Nunca se bloquea la app al
+     * primer error: se reintenta la URL tras una pausa corta (los 503
+     * puntuales y las cargas canceladas/sustituidas se recuperan solos) y
+     * solo, si la misma URL sigue fallando tras {@link #MAX_LOAD_ATTEMPTS}
+     * intentos, se consulta el test de accesibilidad — la pantalla de
+     * "bloqueado por tu operadora" se reserva para un servidor que de verdad
+     * no se puede alcanzar.
+     */
+    private void onMainFrameLoadFailed(String failedUrl) {
+        final String url = failedUrl != null ? failedUrl : "";
+        if (url.equals(mainFrameFailUrl)) {
+            mainFrameFailStreak++;
+        } else {
+            mainFrameFailUrl = url;
+            mainFrameFailStreak = 1;
+        }
+
+        // Attempts 1-2: retry instead of claiming a block.
+        // Intentos 1-2: reintentar en vez de dar por bloqueado.
+        if (mainFrameFailStreak < MAX_LOAD_ATTEMPTS && !url.isEmpty()) {
+            final String retryUrl = url;
+            mainHandler.postDelayed(() -> {
+                if (!retryUrl.equals(mainFrameFailUrl)) return; // superseded
+                if (bridge == null || bridge.getWebView() == null) return;
+                WebView wv = bridge.getWebView();
+                if (retryUrl.equals(wv.getUrl()) && wv.getProgress() >= 100) {
+                    // It ended up loading fine: nothing to retry.
+                    // Acabó cargando bien: no hay nada que reintentar.
+                    return;
+                }
+                Log.d(TAG, "Retrying failed load (" + mainFrameFailStreak + "): " + retryUrl);
+                wv.loadUrl(retryUrl);
+            }, LOAD_RETRY_MS);
+            return;
+        }
+
+        // Repeated failures: confirm with the reachability test before showing
+        // the blocked screen. If the server answers, it was transient — reload
+        // and start counting again (bounded, so a flapping server still ends
+        // up at the screen with its manual retry button).
+        // Fallos repetidos: confirmar con el test de accesibilidad antes de
+        // mostrar la pantalla de bloqueo. Si el servidor responde, fue
+        // puntual: recargar y volver a contar (con tope, para que un servidor
+        // intermitente acabe igualmente en la pantalla con su botón de
+        // reintento).
+        executor.execute(() -> {
+            boolean reachable = !url.isEmpty() && testUrlReachability(url);
+            mainHandler.post(() -> {
+                if (reachable && mainFrameRecoveries < MAX_LOAD_ATTEMPTS) {
+                    mainFrameRecoveries++;
+                    mainFrameFailStreak = 0;
+                    Log.d(TAG, "Server reachable after load failures, recovering: " + url);
+                    if (bridge != null && bridge.getWebView() != null) {
+                        bridge.getWebView().loadUrl(url);
+                    }
+                } else {
+                    blockAutoHideOnLoad = false;
+                    showBlockedScreen("Load failed");
+                }
+            });
+        });
     }
 
     private void setupBlockedView() {
@@ -329,6 +422,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void showBlockedScreen(String reason) {
+        Log.w(TAG, "Blocked screen shown: " + reason);
         isBlocked = true;
         hideSplash();
         if (bridge != null && bridge.getWebView() != null) {
