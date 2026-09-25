@@ -35,7 +35,16 @@ async function ensureNativeChannel() {
     }
 }
 
-export async function notify(title: string, body: string, opts: { id?: number; silent?: boolean } = {}) {
+/**
+ * Send a notification. Returns a function that dismisses it (no-op when the
+ * notification could not be shown): lets callers auto-expire alerts, e.g. the
+ * get-off notification closes itself 1 minute after being emitted.
+ *
+ * Envía una notificación. Devuelve una función que la cierra (sin efecto si la
+ * notificación no se pudo mostrar): permite cerrar avisos automáticamente,
+ * p. ej. la notificación de bajada se cierra sola 1 minuto después de emitirse.
+ */
+export async function notify(title: string, body: string, opts: { id?: number; silent?: boolean } = {}): Promise<() => void> {
     const { id = Math.floor(Math.random() * 100000), silent = false } = opts;
 
     // Native: system tray notification via the Android notification API
@@ -46,7 +55,7 @@ export async function notify(title: string, body: string, opts: { id?: number; s
             const req = await LocalNotifications.requestPermissions();
             if (req.display !== 'granted') {
                 console.warn('[Notify] permission denied on native');
-                return;
+                return () => {};
             }
         }
         await ensureNativeChannel();
@@ -62,7 +71,9 @@ export async function notify(title: string, body: string, opts: { id?: number; s
                 extra: { source: 'buscoruna' },
             }],
         });
-        return;
+        return () => {
+            LocalNotifications.removeDeliveredNotifications({ notifications: [{ id }] } as any).catch(() => {});
+        };
     }
 
     // Web: service worker notification (works when page is hidden on desktop)
@@ -76,16 +87,21 @@ export async function notify(title: string, body: string, opts: { id?: number; s
                         setTimeout(() => reject(new Error('SW timeout')), 5000),
                     ),
                 ]);
-                await reg.showNotification(title, { body, icon: '/logo.png', badge: '/logo.png', silent, tag: `buscoruna-${id}` });
-                return;
+                const tag = `buscoruna-${id}`;
+                await reg.showNotification(title, { body, icon: '/logo.png', badge: '/logo.png', silent, tag });
+                return () => {
+                    reg.getNotifications({ tag }).then((ns) => ns.forEach((n) => n.close())).catch(() => {});
+                };
             }
         } catch (err) {
             console.warn('[Notify] SW unavailable, falling back', err);
         }
         try {
-            new Notification(title, { body, icon: '/logo.png', silent });
+            const notif = new Notification(title, { body, icon: '/logo.png', silent });
+            return () => notif.close();
         } catch (e) {
             console.error('[Notify] window.Notification failed', e);
         }
     }
+    return () => {};
 }

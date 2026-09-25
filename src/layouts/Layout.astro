@@ -1761,8 +1761,8 @@ const { title } = Astro.props;
     // Service Worker / window.Notification on web.
     // Emisor unificado — bandeja nativa de Android en Capacitor,
     // Service Worker / window.Notification en web.
-    async function sendNotification(title: string, options: any = {}) {
-        await notify(title, options.body || '', { silent: !!options.silent });
+    async function sendNotification(title: string, options: any = {}): Promise<() => void> {
+        return await notify(title, options.body || '', { silent: !!options.silent });
     }
 
     // Show persistent background tracking notification
@@ -1984,6 +1984,45 @@ const { title } = Astro.props;
         tracking.clear();
     }
 
+    // --- Journey auto-end after the get-off alert ---
+    // Fin automático del viaje tras el aviso de bajada.
+    // One minute after the "press the stop button" alert is emitted the
+    // journey is over from the user's point of view: stop tracking on its
+    // own (dismisses the persistent notification and stops every poller)
+    // WITHOUT waiting for the user to open the app to confirm arrival.
+    // Ends silently: no system notification, only a small in-app note (we
+    // can't verify the actual arrival, so we never claim it).
+    // Un minuto después de emitir el aviso de "pulsa el botón de parada" el
+    // viaje termina: el seguimiento se detiene solo (cierra la notificación
+    // persistente y todos los sondeos) SIN esperar a que el usuario abra la
+    // app y confirme la llegada. Termina en silencio: sin notificación de
+    // sistema, solo un aviso discreto en la app.
+    let journeyAutoEndTimer: ReturnType<typeof setTimeout> | null = null;
+    let journeyAutoEndGen = -1;
+
+    function fireJourneyAutoEnd(gen: number) {
+        journeyAutoEndTimer = null;
+        if (gen !== trackingGeneration || !tracking.get()) return;
+        trackingGeneration++;
+        const popup = document.getElementById("gps-alert-popup");
+        if (popup) popup.style.display = "none";
+        inAppAlert(t.trackingFinishedBody, { durationMs: 6000 });
+        tracking.clear();
+    }
+
+    function scheduleJourneyAutoEnd() {
+        if (journeyAutoEndTimer) return;
+        journeyAutoEndGen = trackingGeneration;
+        journeyAutoEndTimer = setTimeout(() => fireJourneyAutoEnd(journeyAutoEndGen), 60000);
+    }
+
+    function cancelJourneyAutoEnd() {
+        if (journeyAutoEndTimer) {
+            clearTimeout(journeyAutoEndTimer);
+            journeyAutoEndTimer = null;
+        }
+    }
+
     // Phase 1 ('toStop'): count down, in real time, until the bus reaches the
     // boarding/origin stop. This integrates the old "arrival alert" button,
     // including the walking head-start from the active saved location.
@@ -2146,6 +2185,17 @@ const { title } = Astro.props;
             lastDestObserved = time;
             destGoneStreak = 0;
             renderDestEta(time);
+            // On Android the native service emits the "press the stop button"
+            // alert from this same feed (≤2 min) even with GPS disabled: mirror
+            // that moment so the journey also auto-ends 1 min after the alert
+            // when the app is open. On web only the GPS path emits the alert,
+            // so only that one starts the countdown.
+            // En Android el servicio nativo emite el aviso de "pulsa el botón"
+            // desde este mismo feed (≤2 min) aunque el GPS esté desactivado:
+            // replicamos ese momento para que el viaje también acabe 1 min
+            // después del aviso con la app abierta. En web solo el aviso por
+            // GPS se emite, así que solo ese inicia la cuenta.
+            if (time <= 2 && isNativePlatform()) scheduleJourneyAutoEnd();
             // On arrival at the destination: finish tracking to save battery.
             if (time <= 0) {
                 finishTracking(t.trackingFinishedTitle, t.trackingFinishedBody);
@@ -2727,7 +2777,25 @@ const { title } = Astro.props;
                     requireInteraction: true,
                     icon: "/logo.png",
                     badge: "/logo.png"
-                });
+                }).then((closeStopNotif) => {
+                    // The stop-button notification also disappears 1 minute
+                    // after being emitted, together with the auto-end of the
+                    // journey (no user interaction needed).
+                    // La notificación de "pulsa el botón" también desaparece
+                    // 1 minuto después de emitirse, junto con el fin
+                    // automático del viaje (sin interacción del usuario).
+                    if (typeof closeStopNotif === "function") setTimeout(closeStopNotif, 60000);
+                }).catch(() => {});
+                // Only auto-end once on board: while still waiting at the
+                // boarding stop ('toStop') this proximity alert can be a false
+                // positive on short routes (boarding stop next to the
+                // destination), and ending then would kill the journey before
+                // the user even gets on the bus.
+                // Solo acaba una vez a bordo: mientras se espera en la parada
+                // ('toStop') este aviso por cercanía puede ser falso en rutas
+                // cortas (parada de origen junto al destino) y acabaría el
+                // viaje antes de subir.
+                if ((info.phase || 'toStop') === 'toDest') scheduleJourneyAutoEnd();
             }
         });
     }
@@ -3399,6 +3467,10 @@ const { title } = Astro.props;
     window.addEventListener("tracking-updated", async (e: any) => {
         localStorage.removeItem('buscoruna_gps_alert_triggered');
         localStorage.removeItem('buscoruna_eta_alert_triggered');
+
+        // Journey over (or stopped): cancel any pending auto-end timer.
+        // Viaje terminado (o detenido): cancela el fin automático pendiente.
+        if (!e.detail) cancelJourneyAutoEnd();
 
         // Reset background-alert state and restart the foreground checker
         // Reiniciar el estado de aviso en segundo plano y relanzar el comprobador

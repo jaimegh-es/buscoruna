@@ -8,13 +8,19 @@ import android.os.Looper;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.BridgeWebChromeClient;
+import com.getcapacitor.BridgeWebViewClient;
 import com.getcapacitor.WebViewListener;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -34,6 +40,29 @@ public class MainActivity extends BridgeActivity {
     private TextView tvRetryStatus;
     private boolean isBlocked = false;
 
+    // Loading splash (logo + progress bar) shown while the remote site loads.
+    // Pantalla de carga (logo + barra de progreso) mientras carga la web remota.
+    private View splashView;
+    private ProgressBar splashProgress;
+    // Smoothed splash progress: target reported by the WebView vs. the value
+    // currently drawn by the ticker.
+    // Progreso suavizado de la splash: objetivo informado por el WebView vs.
+    // el valor que dibuja actualmente el ticker.
+    private int splashTargetProgress = 0;
+    private int splashShownProgress = 0;
+    private boolean splashTickRunning = false;
+    // Progress tick: 30 ms per frame, at most 6 % per frame (a full bar in
+    // ~0.5 s once the WebView reports 100).
+    // Tic del progreso: 30 ms por fotograma y como mucho 6 % por fotograma
+    // (barra completa en ~0.5 s cuando elWebView informa del 100).
+    private static final long SPLASH_TICK_MS = 30L;
+    private static final int SPLASH_TICK_STEP = 6;
+    // Whether a successful page load may dismiss the blocked (LaLiga) screen.
+    // Only test-failure blocks are auto-hidden on load; load-failure blocks stay.
+    // Si una carga exitosa puede ocultar la pantalla de bloqueo: solo los
+    // bloqueos por fallo del test se ocultan solos; los de carga, no.
+    private boolean blockAutoHideOnLoad = true;
+
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -44,18 +73,158 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(BackgroundTrackerPlugin.class);
 
         // Add WebView listener so when web loads, blocked screen is dismissed
+        // and the loading splash hides (page ready to show).
+        // Al cargar la web se cierra la pantalla de bloqueo y la pantalla de
+        // carga (la página ya está lista para mostrarse).
         bridgeBuilder.addWebViewListener(new WebViewListener() {
             @Override
             public void onPageLoaded(WebView webView) {
-                mainHandler.post(() -> hideBlockedScreen());
+                mainHandler.post(() -> {
+                    if (blockAutoHideOnLoad) hideBlockedScreen();
+                    hideSplash();
+                });
             }
         });
 
         super.onCreate(savedInstanceState);
         WebView.setWebContentsDebuggingEnabled(true);
 
+        setupSplashView();
         setupBlockedView();
+        setupLoadingHooks();
         checkAccessibilityAndReload(false);
+    }
+
+    // Splash view: centered logo + determinate progress bar over the light
+    // background while the remote page loads. Hidden on load completion, on
+    // progress 100 or when the blocked screen takes over.
+    // Vista splash: logo centrado y barra de progreso sobre fondo claro
+    // mientras carga la web remota. Se oculta al terminar la carga, al llegar
+    // a 100 o cuando se muestra la pantalla de bloqueo.
+    private void setupSplashView() {
+        ViewGroup root = findViewById(android.R.id.content);
+        if (root == null) return;
+
+        splashView = getLayoutInflater().inflate(R.layout.view_splash_loading, root, false);
+        splashProgress = splashView.findViewById(R.id.splash_progress);
+        root.addView(splashView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
+    private void showSplash() {
+        if (splashView == null) return;
+        splashView.animate().cancel();
+        splashView.setAlpha(1f);
+        splashView.setVisibility(View.VISIBLE);
+        splashShownProgress = 0;
+        splashTargetProgress = 0;
+        if (splashProgress != null) splashProgress.setProgress(0);
+        startSplashTicker();
+    }
+
+    private void hideSplash() {
+        stopSplashTicker();
+        if (splashView == null || splashView.getVisibility() != View.VISIBLE) return;
+        splashView.animate().cancel();
+        splashView.animate().alpha(0f).setDuration(220).withEndAction(() -> {
+            splashView.setVisibility(View.GONE);
+            splashView.setAlpha(1f);
+        }).start();
+    }
+
+    // Smoothed progress: the WebView reports progress in coarse jumps, so the
+    // bar eases towards the latest target in small steps on a short tick
+    // instead of leaping. It never goes backwards and only hides the splash
+    // once it has visually reached 100.
+    // Progreso suavizado: el WebView informa del avance en saltos grandes, así
+    // que la barra se acerca al último objetivo en pasos pequeños en lugar de
+    // saltar. Nunca retrocede y solo oculta la splash cuando llega visualmente
+    // a 100.
+    private final Runnable splashTick = new Runnable() {
+        @Override
+        public void run() {
+            if (splashView == null || splashView.getVisibility() != View.VISIBLE) {
+                splashTickRunning = false;
+                return;
+            }
+            if (splashShownProgress < splashTargetProgress) {
+                int remaining = splashTargetProgress - splashShownProgress;
+                splashShownProgress += Math.max(1, Math.min(SPLASH_TICK_STEP, remaining));
+                if (splashProgress != null) splashProgress.setProgress(splashShownProgress);
+                mainHandler.postDelayed(this, SPLASH_TICK_MS);
+            } else if (splashTargetProgress >= 100) {
+                // Bar visually full: dismiss the splash (guarded by
+                // stopSplashTicker so this runs only once).
+                // Barra al 100%: se cierra la splash (lo evita
+                // stopSplashTicker para que solo ocurra una vez).
+                hideSplash();
+            } else {
+                mainHandler.postDelayed(this, SPLASH_TICK_MS);
+            }
+        }
+    };
+
+    private void startSplashTicker() {
+        if (splashTickRunning) return;
+        splashTickRunning = true;
+        mainHandler.post(splashTick);
+    }
+
+    private void stopSplashTicker() {
+        splashTickRunning = false;
+        mainHandler.removeCallbacks(splashTick);
+    }
+
+    private void updateSplashProgress(int progress) {
+        if (splashView == null || splashView.getVisibility() != View.VISIBLE) return;
+        // Monotonic: the bar only moves forward while the ticker glides to it.
+        // Monótona: la barra solo avanza mientras el ticker se acerca a ella.
+        splashTargetProgress = Math.max(splashTargetProgress, progress);
+        startSplashTicker();
+    }
+
+    // Hook the WebView for splash progress (WebChromeClient) and main-frame
+    // load failures (shows the Cloudflare/LaLiga blocked screen instead of a
+    // broken page). Subresource errors are ignored on purpose: third-party
+    // resources routinely fail during carrier blocks.
+    // Engancha el WebView: progreso de la splash (WebChromeClient) y fallos de
+    // carga del marco principal (muestra la pantalla de bloqueo de Cloudflare/
+    // LaLiga en vez de una página rota). Los errores de subrecursos se ignoran
+    // a propósito: recursos de terceros fallan habitualmente en bloqueos.
+    private void setupLoadingHooks() {
+        if (bridge == null || bridge.getWebView() == null) return;
+        WebView wv = bridge.getWebView();
+
+        wv.setWebChromeClient(new BridgeWebChromeClient(bridge) {
+            @Override
+            public void onProgressChanged(WebView view, int newProgress) {
+                super.onProgressChanged(view, newProgress);
+                mainHandler.post(() -> updateSplashProgress(newProgress));
+            }
+        });
+
+        bridge.setWebViewClient(new BridgeWebViewClient(bridge) {
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                super.onReceivedError(view, request, error);
+                // ERROR_UNKNOWN also covers cancelled loads; skip those.
+                if (request.isForMainFrame() && error.getErrorCode() != WebViewClient.ERROR_UNKNOWN) {
+                    mainHandler.post(() -> onMainFrameLoadFailed());
+                }
+            }
+
+            @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
+                super.onReceivedHttpError(view, request, errorResponse);
+                if (request.isForMainFrame() && errorResponse.getStatusCode() >= 400) {
+                    mainHandler.post(() -> onMainFrameLoadFailed());
+                }
+            }
+        });
+    }
+
+    private void onMainFrameLoadFailed() {
+        blockAutoHideOnLoad = false;
+        showBlockedScreen("Load failed");
     }
 
     private void setupBlockedView() {
@@ -135,7 +304,9 @@ public class MainActivity extends BridgeActivity {
             boolean accessible = testUrlReachability(urlToCheck);
             mainHandler.post(() -> {
                 if (accessible) {
+                    blockAutoHideOnLoad = true;
                     hideBlockedScreen();
+                    showSplash();
                     if (bridge != null && bridge.getWebView() != null) {
                         WebView wv = bridge.getWebView();
                         wv.setVisibility(View.VISIBLE);
@@ -159,6 +330,7 @@ public class MainActivity extends BridgeActivity {
 
     private void showBlockedScreen(String reason) {
         isBlocked = true;
+        hideSplash();
         if (bridge != null && bridge.getWebView() != null) {
             WebView webView = bridge.getWebView();
             webView.stopLoading();

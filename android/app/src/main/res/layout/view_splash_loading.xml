@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading splash shown while the remote site loads in the WebView:
+     Coruña Bus logo centered with a determinate progress bar below it,
+     on a light background.
+     Pantalla de carga mostrada mientras la web remota carga en el WebView:
+     logo de Coruña Bus centrado con barra de progreso debajo, sobre fondo
+     claro. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
+
+        <!-- Rounded corners: the red logo bitmap is clipped to the rounded
+             outline provided by its background drawable.
+             Bordes redondeados: el logo se recorta según el contorno
+             redondeado del drawable de fondo. -->
+        <ImageView
+            android:layout_width="160dp"
+            android:layout_height="160dp"
+            android:contentDescription="@string/app_name"
+            android:src="@drawable/corunabus_logo"
+            android:background="@drawable/corunabus_logo_rounded"
+            android:clipToOutline="true" />
+
+        <ProgressBar
+            android:id="@+id/splash_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="240dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:indeterminate="false"
+            android:max="100"
+            android:progress="0"
+            android:progressBackgroundTint="#E2E2E2"
+            android:progressTint="#EA3629" />
+    </LinearLayout>
+</FrameLayout>

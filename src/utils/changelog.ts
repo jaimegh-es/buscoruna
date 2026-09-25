@@ -14,6 +14,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
     {
+        version: '0.0.8',
+        title: '🎨 Pantalla de carga renovada',
+        items: [
+            'Nueva pantalla de carga con el logo de Coruña Bus centrado y barra de progreso mientras la app carga (fondo claro y logo con bordes redondeados).',
+            'Si la página no carga por un bloqueo de tu operadora, se muestra el aviso de bloqueo con las opciones para desbloquearla.',
+            'El seguimiento termina solo: 1 minuto después del aviso "pulsa el botón de parada" se cierra la notificación y se acaba el viaje, sin necesidad de abrir la app.',
+        ],
+    },
+    {
         version: '0.0.6',
         title: '🚏 Seguimiento más inteligente',
         items: [

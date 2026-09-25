@@ -728,6 +728,31 @@ public class BackgroundTrackerService extends Service implements LocationListene
             notificationManager.notify(NOTIFICATION_ID_GPS_ALERT, builder.build());
         }
         vibrateDevice();
+
+        // The user has been told to press the stop button: the journey is over
+        // from their point of view. Stop the whole service 1 minute later on
+        // its own — which dismisses the persistent tracking notification —
+        // instead of waiting for the arrival feed or for the user to open the
+        // app to confirm arrival.
+        // El usuario ya fue avisado de pulsar el botón de parada: el viaje
+        // termina para él. El servicio se detiene solo 1 minuto después (con
+        // lo que desaparece la notificación persistente de seguimiento), sin
+        // esperar al feed de llegada ni a que el usuario abra la app.
+        //
+        // Only once on board: while still waiting at the boarding stop
+        // ('toStop') this alert can be a false positive (short routes where
+        // the boarding stop sits next to the destination, or the destination
+        // feed already at ≤2 min before the user boards), and auto-ending
+        // then would kill the journey before it really started. Legacy
+        // journeys without phase are treated as on board.
+        // Solo una vez a bordo: mientras se espera en la parada ('toStop')
+        // este aviso puede ser falso (rutas cortas cuya parada de origen está
+        // junto al destino, o el feed de destino a ≤2 min antes de subir) y
+        // acabar entonces mataría el viaje antes de empezar. Los viajes
+        // antiguos sin fase se tratan como a bordo.
+        if (!"toStop".equals(phase)) {
+            scheduleStopAfter(60);
+        }
     }
 
     private void vibrateDevice() {
@@ -832,6 +857,13 @@ public class BackgroundTrackerService extends Service implements LocationListene
             wakeLock = null;
         }
         stopForeground(true);
+        // Tracking over: dismiss the "press the stop button" notification too,
+        // so nothing is left waiting for the user in the tray.
+        // Seguimiento terminado: también se cierra la notificación de "pulsa
+        // el botón de parada" para que no quede nada esperando al usuario.
+        if (notificationManager != null) {
+            notificationManager.cancel(NOTIFICATION_ID_GPS_ALERT);
+        }
         super.onDestroy();
     }
 
